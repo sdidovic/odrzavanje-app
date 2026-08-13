@@ -100,6 +100,16 @@ h2:first-child{margin-top:2px}
 /* ---------- ponovljeni kvar ---------- */
 .rep{color:var(--red);font-size:11px;font-weight:700;white-space:nowrap}
 
+/* ---------- poruke (chat) ---------- */
+.msg{padding:7px 13px}
+.msg-meta{font-size:11px;color:var(--muted);font-weight:600}
+.msg-txt{font-size:14px;background:#f0f1f5;border-radius:0 10px 10px 10px;padding:8px 11px;margin-top:3px;
+  display:inline-block;max-width:88%;text-align:left}
+.msg.moja{text-align:right}
+.msg.moja .msg-txt{background:var(--accent-soft);border-radius:10px 0 10px 10px}
+.msg-form{margin-top:12px}
+body[data-role="majstor"] .btn-audit{display:none}
+
 /* ---------- kontakt linkovi ---------- */
 .clink{color:var(--accent);font-weight:600;text-decoration:none}
 .clink:active{text-decoration:underline}
@@ -238,9 +248,9 @@ form .btn{margin-top:18px}
 /* ---------- tab bar ---------- */
 #tabbar{position:fixed;bottom:0;left:0;right:0;z-index:30;background:#fff;
   border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom)}
-.tab-inner{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
-.tab{background:none;border:none;padding:8px 2px 9px;display:flex;flex-direction:column;
-  align-items:center;gap:3px;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.tab-inner{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr)}
+.tab{background:none;border:none;padding:8px 1px 9px;display:flex;flex-direction:column;
+  align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--muted);cursor:pointer}
 .tab svg{width:22px;height:22px}
 .tab.active{color:var(--accent)}
 .tab .dot{position:relative}
@@ -278,6 +288,8 @@ form .btn{margin-top:18px}
   <section id="screen-strojevi" class="screen hidden"></section>
   <section id="screen-kvarovi"  class="screen hidden"></section>
   <section id="screen-dijelovi" class="screen hidden"></section>
+  <section id="screen-kontakti" class="screen hidden"></section>
+  <section id="screen-poruke"   class="screen hidden"></section>
   <section id="screen-stroj"    class="screen hidden"></section>
 </main>
 
@@ -294,6 +306,12 @@ form .btn{margin-top:18px}
   <button class="tab" data-tab="dijelovi" onclick="app.go('dijelovi')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8.6 12 3 3 8.6v6.8L12 21l9-5.6z"/><path d="M3 8.6l9 5.4 9-5.4"/><line x1="12" y1="14" x2="12" y2="21"/></svg>
     Dijelovi</button>
+  <button class="tab" data-tab="kontakti" onclick="app.go('kontakti')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.9.5 2.8.6a2 2 0 0 1 1.8 2.1z"/></svg>
+    Kontakti</button>
+  <button class="tab" data-tab="poruke" onclick="app.go('poruke')">
+    <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="badge" id="badge-poruke" style="display:none"></span></span>
+    Poruke</button>
 </div></nav>
 
 <div id="loader"></div>
@@ -316,9 +334,16 @@ var SUPA_CFG = {
   url: 'https://egnrzbsvpafnwymwgwho.supabase.co',
   anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnbnJ6YnN2cGFmbnd5bXdnd2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2MzM1NzEsImV4cCI6MjEwMjIwOTU3MX0.fh2G4j6O-VfAZLCGD8-F_gkEShOlJOYq97rY9wak-Pg'
 };
-var KORISNICI = ['Marko','Ivica','Damir','Stjepan','Direktor'];
-/* ^ pločice na prijavi — kad dodaš korisnika u Supabase (Auth + tablica users),
-   dodaj mu ime i OVDJE, inače neće imati pločicu za prijavu */
+/* Pločice na prijavi: naziv koji se prikazuje + login email (bez osobnih imena).
+   Kad dodaš korisnika u Supabase (Auth + tablica users), dodaj ga i OVDJE. */
+var KORISNICI = [
+  { naziv:'Majstor 1', email:'marko@odrzavanje.local' },
+  { naziv:'Majstor 2', email:'ivica@odrzavanje.local' },
+  { naziv:'Majstor 3', email:'damir@odrzavanje.local' },
+  { naziv:'Voditelj',  email:'stjepan@odrzavanje.local' },
+  { naziv:'Direktor',  email:'direktor@odrzavanje.local' }
+];
+var MAJSTORI = ['Majstor 1','Majstor 2','Majstor 3'];
 
 var REMOTE = !!(SUPA_CFG.url && SUPA_CFG.anonKey && window.supabase);
 var sb = REMOTE ? window.supabase.createClient(SUPA_CFG.url, SUPA_CFG.anonKey) : null;
@@ -327,7 +352,8 @@ var LOGIN_SEL = '';
 var LOGIN_BUSY = false;
 var CURRENT_SCREEN = 'pregled';
 
-var LS_KEY = 'odrzavanje-app-v1';  /* odvojeno od demo datoteke odrzavanje.html */
+var LS_KEY = 'odrzavanje-app-v2';  /* odvojeno od demo datoteke odrzavanje.html */
+var DEMO_FOTO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAA8KCw0LCQ8NDA0REA8RFiUYFhQUFi0gIhslNS84NzQvNDM7QlVIOz9QPzM0SmRLUFdaX2BfOUdob2dcblVdX1v/2wBDARARERYTFisYGCtbPTQ9W1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1v/wAARCADwAUADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDDoooqiQooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAoop6Ru/wB1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RQ5UMdgC4AJ+vWn1AznQxuVYgkf3WBH5ihELttBUH/aYAfma3NsUV4sQt4Sst88bbowfk+XgenXtUUUYukjkNvEp/frhUAGAmV+uCevWkBjU9IpJASiMwXqQOBW9NYwrZD925i8tSrLAuA3GSZM5PORipGCLqFzHHFHHEqyAhEA4APX8QKYGPBbBMM/LenpUk0yxLzyewqOa6VeI/mPr2qmzFmyxyTQIV2LsWY8mm0UUgCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAHpI8Z+VsVbGoM6Iko4QYBAqjRTA0kmjf7rinMit95QfqKy6cruv3WI+hoAvG3iP8H5Un2WL0P51VFzKP4/0p32qX1H5UAWzEht1hI+VWLD1yQB/QU0W0Q/h/Wq32uX2/Kmm5lP8X6UDLyxov3VA/CpEult1cfJuYY3HOQO+Ky2kdursfxplAi494o+4CfrURu5ijoGwrjDADtUFFABRRRSAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiilAJ6A0AJRTgjnojflSiGQ/wN+VADKKl+zy/3DSi2l/u/qKYENFTi0l9vzpRZydytAFeirIs27uKcLL1k/SgCpRUk0flSbc5qOkAUUUUAFFFFABRRT4lDyqp6E0AMoq/9li9D+dKLaL+5+ppgZ9FaIgiH8ApwijHRF/KgDMorUCKOij8qXgUAZYVj0B/KneW56I35VollHVh+dIZEHV1/OgCgIZD/AAN+VKLeU/wfrV3zov74ppuIh/H+lAFUWsv90fnSi0k/2fzqwbqL+8fypDdx/wC1+VAEQs37stL9jP8AfH5U83idlakN6OyH86AEFl6yfpSizXuxpv209k/WkN43ZRQBILOP1anC0i9D+dQG8k9F/KkN1L6j8qALItov7v6mlEEQ/gFVDcy/3v0FNM8p/jNAF7yo/wC4v5UoRB0VfyrPMsh/jb86Tex/iP50AaYAHQUhIHUiswknqaSgDTMiDq6/nSGaMfxr+dZtFAGibiIfxik+0xf3v0NZ9FAF43cXv+VIbyPsrVSooAuG8XshpDe+kf61UooAkmk8192McVHRRSAKKKKACiiigApVYqwYdRSUUATG6l9R+VJ9pl/v/oKiopgSGeX++aQyyHq7fnTKKAHFmPVj+dNoopAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFAH//Z';   /* demo fotografija kvara (JPEG data-URI) */
 
 /* ---------- seed: strojevi ---------- */
 var SEED_MACHINES = [
@@ -369,54 +395,54 @@ var SEED_PARTNERI = [
 
 /* ---------- seed: kvarovi (d = prije koliko dana) ---------- */
 var SEED_KVAROVI = [
-  {m:'p2', d:0,  opis:'Folija se zaglavljuje u čeljustima za varenje — linija stoji', sati:1.5, status:'otvoren', dod:'Marko', pri:'hitno', ceka:true, smj:'1. smjena'},
-  {m:'k1', d:1,  opis:'Postupni pad tlaka — sumnja na propuštanje rashladne tvari na usisnom vodu', sati:2, status:'otvoren', upoz:true, dod:'Damir', pri:'visok', smj:'2. smjena'},
-  {m:'e1', d:3,  opis:'Puknuti pogonski remen puža', sati:3, tko:'Marko', zam:'Remen HTD 1440-8M'},
-  {m:'s1', d:5,  opis:'Senzor temperature zone 2 daje nestabilna očitanja', sati:2.5, tko:'Ivica', zam:'Senzor PT100'},
-  {m:'t1', d:7,  opis:'Kvar grijača odleđivanja isparivača', sati:1.5, tko:'Damir', zam:'Grijač odleđivanja 2 kW'},
-  {m:'p1', d:9,  opis:'Folija zaglavljena u formatoru vrećice', sati:1, tko:'Marko'},
-  {m:'e2', d:13, opis:'Začepljena matrica — zaostali komadi tijesta nakon pranja', sati:2, tko:'Ivica'},
-  {m:'v1', d:16, opis:'Povećana zračnost ležaja gornjeg valjka — vibracije', sati:2.5, tko:'Damir', zam:'Ležaj 6208 2RS'},
-  {m:'p2', d:18, opis:'Folija se zaglavljuje — istrošen nož za rezanje', sati:1, tko:'Marko', zam:'Nož za rezanje folije'},
-  {m:'s1', d:21, opis:'Kvar grijača zone 3 — sušara ne postiže temperaturu', sati:4, tko:'Ivica', zam:'Grijač sušare 3 kW'},
-  {m:'k1', d:24, opis:'Pad tlaka — propuštanje brtve na glavi kompresora', sati:3, tko:'Damir', zam:'Brtva glave kompresora'},
-  {m:'l1', d:27, opis:'Transportna traka klizi — istegnuta', sati:1.5, tko:'Marko'},
-  {m:'e1', d:31, opis:'Propuštanje brtve na glavi ekstrudera', sati:2, tko:'Ivica', zam:'Brtva EPDM (prehrambena klasa)'},
-  {m:'t1', d:34, opis:'Naslage leda na ventilatoru isparivača — vibracije', sati:1, tko:'Damir'},
-  {m:'p3', d:37, opis:'Fotosenzor ne očitava marker na foliji', sati:1.5, tko:'Marko', zam:'Fotosenzor markera'},
-  {m:'e1', d:40, opis:'Puknuti pogonski remen puža — ponovljeni kvar', sati:2.5, tko:'Marko', zam:'Remen HTD 1440-8M'},
-  {m:'pa1',d:42, opis:'Pad temperature pasterizacije — kamenac na grijačima', sati:2, tko:'Ivica', zam:'Sonda temperature + čišćenje grijača'},
-  {m:'s1', d:44, opis:'Senzor temperature zone 2 — pogrešna očitanja', sati:2, tko:'Ivica', zam:'Senzor PT100'},
-  {m:'p2', d:48, opis:'Zaglavljena folija, oštećen dozator', sati:3, tko:'Damir', zam:'Dozator folije'},
-  {m:'v1', d:52, opis:'Propuštanje ulja iz reduktora valjaka', sati:2, tko:'Ivica', zam:'Brtva reduktora'},
-  {m:'k1', d:56, opis:'Zaprljan kondenzator — povišena temperatura kondenzacije', sati:2, tko:'Damir', zam:'Filter ulja kompresora'},
-  {m:'e2', d:60, opis:'Začepljena matrica', sati:1.5, tko:'Marko'},
-  {m:'p1', d:64, opis:'Nedosljedno varenje vrećice — istrošena teflonska traka', sati:2, tko:'Ivica', zam:'Teflonska traka'},
-  {m:'t1', d:68, opis:'Alarm visokog tlaka rashladne jedinice tunela', sati:4, tko:'Damir', zam:'Ekspanzijski ventil'},
-  {m:'l1', d:73, opis:'Tup nož za rezanje listova — nejednak rez', sati:1, tko:'Marko', zam:'Nož za rezanje listova'},
-  {m:'e1', d:78, opis:'Puknuti remen razvodnog pogona', sati:3, tko:'Damir', zam:'Remen razvodnog pogona'},
-  {m:'s1', d:85, opis:'Začepljen filter zraka sušare — slaba cirkulacija', sati:1, tko:'Ivica', zam:'Filter zraka'}
+  {m:'p2', d:0,  opis:'Folija se zaglavljuje u čeljustima za varenje — linija stoji', sati:1.5, status:'otvoren', dod:'Majstor 1', pri:'hitno', ceka:true, smj:'1. smjena'},
+  {m:'k1', d:1,  opis:'Postupni pad tlaka — sumnja na propuštanje rashladne tvari na usisnom vodu', sati:2, status:'otvoren', upoz:true, dod:'Majstor 3', pri:'visok', smj:'2. smjena'},
+  {m:'e1', d:3,  opis:'Puknuti pogonski remen puža', sati:3, tko:'Majstor 1', zam:'Remen HTD 1440-8M'},
+  {m:'s1', d:5,  opis:'Senzor temperature zone 2 daje nestabilna očitanja', sati:2.5, tko:'Majstor 2', zam:'Senzor PT100'},
+  {m:'t1', d:7,  opis:'Kvar grijača odleđivanja isparivača', sati:1.5, tko:'Majstor 3', zam:'Grijač odleđivanja 2 kW'},
+  {m:'p1', d:9,  opis:'Folija zaglavljena u formatoru vrećice', sati:1, tko:'Majstor 1'},
+  {m:'e2', d:13, opis:'Začepljena matrica — zaostali komadi tijesta nakon pranja', sati:2, tko:'Majstor 2'},
+  {m:'v1', d:16, opis:'Povećana zračnost ležaja gornjeg valjka — vibracije', sati:2.5, tko:'Majstor 3', zam:'Ležaj 6208 2RS'},
+  {m:'p2', d:18, opis:'Folija se zaglavljuje — istrošen nož za rezanje', sati:1, tko:'Majstor 1', zam:'Nož za rezanje folije'},
+  {m:'s1', d:21, opis:'Kvar grijača zone 3 — sušara ne postiže temperaturu', sati:4, tko:'Majstor 2', zam:'Grijač sušare 3 kW'},
+  {m:'k1', d:24, opis:'Pad tlaka — propuštanje brtve na glavi kompresora', sati:3, tko:'Majstor 3', zam:'Brtva glave kompresora'},
+  {m:'l1', d:27, opis:'Transportna traka klizi — istegnuta', sati:1.5, tko:'Majstor 1'},
+  {m:'e1', d:31, opis:'Propuštanje brtve na glavi ekstrudera', sati:2, tko:'Majstor 2', zam:'Brtva EPDM (prehrambena klasa)'},
+  {m:'t1', d:34, opis:'Naslage leda na ventilatoru isparivača — vibracije', sati:1, tko:'Majstor 3'},
+  {m:'p3', d:37, opis:'Fotosenzor ne očitava marker na foliji', sati:1.5, tko:'Majstor 1', zam:'Fotosenzor markera'},
+  {m:'e1', d:40, opis:'Puknuti pogonski remen puža — ponovljeni kvar', sati:2.5, tko:'Majstor 1', zam:'Remen HTD 1440-8M'},
+  {m:'pa1',d:42, opis:'Pad temperature pasterizacije — kamenac na grijačima', sati:2, tko:'Majstor 2', zam:'Sonda temperature + čišćenje grijača'},
+  {m:'s1', d:44, opis:'Senzor temperature zone 2 — pogrešna očitanja', sati:2, tko:'Majstor 2', zam:'Senzor PT100'},
+  {m:'p2', d:48, opis:'Zaglavljena folija, oštećen dozator', sati:3, tko:'Majstor 3', zam:'Dozator folije'},
+  {m:'v1', d:52, opis:'Propuštanje ulja iz reduktora valjaka', sati:2, tko:'Majstor 2', zam:'Brtva reduktora'},
+  {m:'k1', d:56, opis:'Zaprljan kondenzator — povišena temperatura kondenzacije', sati:2, tko:'Majstor 3', zam:'Filter ulja kompresora'},
+  {m:'e2', d:60, opis:'Začepljena matrica', sati:1.5, tko:'Majstor 1'},
+  {m:'p1', d:64, opis:'Nedosljedno varenje vrećice — istrošena teflonska traka', sati:2, tko:'Majstor 2', zam:'Teflonska traka'},
+  {m:'t1', d:68, opis:'Alarm visokog tlaka rashladne jedinice tunela', sati:4, tko:'Majstor 3', zam:'Ekspanzijski ventil'},
+  {m:'l1', d:73, opis:'Tup nož za rezanje listova — nejednak rez', sati:1, tko:'Majstor 1', zam:'Nož za rezanje listova'},
+  {m:'e1', d:78, opis:'Puknuti remen razvodnog pogona', sati:3, tko:'Majstor 3', zam:'Remen razvodnog pogona'},
+  {m:'s1', d:85, opis:'Začepljen filter zraka sušare — slaba cirkulacija', sati:1, tko:'Majstor 2', zam:'Filter zraka'}
 ];
 
 /* ---------- seed: dijelovi ---------- */
 var SEED_DIJELOVI = [
-  {naziv:'Remen HTD 1440-8M',                    stroj:'Ekstruder E1 / E2',  stanje:1,  min:2, dob:'Tokić',           cijena:22},
-  {naziv:'Brtva glave kompresora',               stroj:'Kompresor K1',       stanje:0,  min:1, dob:'MB Frigo',        cijena:145},
-  {naziv:'Senzor PT100',                         stroj:'Sušara S1',          stanje:1,  min:2, dob:'Tokić',           cijena:38},
-  {naziv:'Ležaj 6208 2RS (SKF)',                 stroj:'Valjci V1',          stanje:4,  min:2, dob:'PKL',             cijena:18},
-  {naziv:'Ležaj 6310 C3 (SKF)',                  stroj:'Ekstruder E1 / E2',  stanje:3,  min:2, dob:'PKL',             cijena:28},
-  {naziv:'Set brtvi EPDM (prehrambena klasa)',   stroj:'Ekstruder E1 / E2',  stanje:6,  min:3, dob:'HANSA-FLEX',      cijena:54},
-  {naziv:'Grijač sušare 3 kW',                   stroj:'Sušara S1',          stanje:2,  min:1, dob:'Tokić',           cijena:112},
-  {naziv:'Grijač odleđivanja 2 kW',              stroj:'Tunel T1',           stanje:1,  min:1, dob:'MB Frigo',        cijena:96},
-  {naziv:'Folija BOPP 350 mm (rola)',            stroj:'Pakirka P1 / P2',    stanje:14, min:8, dob:'Bomark Ambalaža', cijena:61},
-  {naziv:'Folija PE za zamrznuti program (rola)',stroj:'Pakirka P3',         stanje:6,  min:4, dob:'Bomark Ambalaža', cijena:55},
-  {naziv:'Nož za rezanje folije (izrada po mjeri)',stroj:'Pakirke P1–P3',    stanje:3,  min:2, dob:'Hladni Val',      cijena:44},
-  {naziv:'Teflonska traka za varenje',           stroj:'Pakirke P1–P3',      stanje:5,  min:3, dob:'Tokić',           cijena:18},
-  {naziv:'Mazivo NSF H1 food-grade (kartuša)',   stroj:'Svi strojevi',       stanje:8,  min:4, dob:'Petrol (OKS)',    cijena:29},
-  {naziv:'Filter ulja kompresora',               stroj:'Kompresor K1',       stanje:2,  min:1, dob:'MB Frigo',        cijena:52},
-  {naziv:'Ekspanzijski ventil',                  stroj:'Tunel T1',           stanje:1,  min:1, dob:'MB Frigo',        cijena:210},
-  {naziv:'Matrica za penne (bronca, rezervna)',  stroj:'Ekstruder E1 / E2',  stanje:1,  min:1, dob:'Storci (IT)',     cijena:1450},
-  {naziv:'Fotosenzor markera folije',            stroj:'Pakirka P3',         stanje:2,  min:1, dob:'Tokić',           cijena:67}
+  {naziv:'Remen HTD 1440-8M',                    stroj:'Ekstruder E1 / E2',  stanje:1,  min:2, dob:'Tokić',           cijena:22, kat:'Remeni i prijenos'},
+  {naziv:'Brtva glave kompresora',               stroj:'Kompresor K1',       stanje:0,  min:1, dob:'MB Frigo',        cijena:145, kat:'Rashladna tehnika'},
+  {naziv:'Senzor PT100',                         stroj:'Sušara S1',          stanje:1,  min:2, dob:'Tokić',           cijena:38, kat:'Senzori i elektrika'},
+  {naziv:'Ležaj 6208 2RS (SKF)',                 stroj:'Valjci V1',          stanje:4,  min:2, dob:'PKL',             cijena:18, kat:'Ležajevi'},
+  {naziv:'Ležaj 6310 C3 (SKF)',                  stroj:'Ekstruder E1 / E2',  stanje:3,  min:2, dob:'PKL',             cijena:28, kat:'Ležajevi'},
+  {naziv:'Set brtvi EPDM (prehrambena klasa)',   stroj:'Ekstruder E1 / E2',  stanje:6,  min:3, dob:'HANSA-FLEX',      cijena:54, kat:'Brtve i maziva'},
+  {naziv:'Grijač sušare 3 kW',                   stroj:'Sušara S1',          stanje:2,  min:1, dob:'Tokić',           cijena:112, kat:'Grijači'},
+  {naziv:'Grijač odleđivanja 2 kW',              stroj:'Tunel T1',           stanje:1,  min:1, dob:'MB Frigo',        cijena:96, kat:'Rashladna tehnika'},
+  {naziv:'Folija BOPP 350 mm (rola)',            stroj:'Pakirka P1 / P2',    stanje:14, min:8, dob:'Bomark Ambalaža', cijena:61, kat:'Folije i ambalaža'},
+  {naziv:'Folija PE za zamrznuti program (rola)',stroj:'Pakirka P3',         stanje:6,  min:4, dob:'Bomark Ambalaža', cijena:55, kat:'Folije i ambalaža'},
+  {naziv:'Nož za rezanje folije (izrada po mjeri)',stroj:'Pakirke P1–P3',    stanje:3,  min:2, dob:'Hladni Val',      cijena:44, kat:'Alati i matrice'},
+  {naziv:'Teflonska traka za varenje',           stroj:'Pakirke P1–P3',      stanje:5,  min:3, dob:'Tokić',           cijena:18, kat:'Folije i ambalaža'},
+  {naziv:'Mazivo NSF H1 food-grade (kartuša)',   stroj:'Svi strojevi',       stanje:8,  min:4, dob:'Petrol (OKS)',    cijena:29, kat:'Brtve i maziva'},
+  {naziv:'Filter ulja kompresora',               stroj:'Kompresor K1',       stanje:2,  min:1, dob:'MB Frigo',        cijena:52, kat:'Rashladna tehnika'},
+  {naziv:'Ekspanzijski ventil',                  stroj:'Tunel T1',           stanje:1,  min:1, dob:'MB Frigo',        cijena:210, kat:'Rashladna tehnika'},
+  {naziv:'Matrica za penne (bronca, rezervna)',  stroj:'Ekstruder E1 / E2',  stanje:1,  min:1, dob:'Storci (IT)',     cijena:1450, kat:'Alati i matrice'},
+  {naziv:'Fotosenzor markera folije',            stroj:'Pakirka P3',         stanje:2,  min:1, dob:'Tokić',           cijena:67, kat:'Senzori i elektrika'},
 ];
 
 /* ---------- seed: preventiva (dueIn = za koliko dana; negativno = kasni) ---------- */
@@ -544,7 +570,8 @@ function buildSeed(){
     }),
     dijelovi: SEED_DIJELOVI.map(function(p,i){
       return { id:'d'+(i+1), naziv:p.naziv, stroj:p.stroj, stanje:p.stanje, min:p.min, dob:p.dob, cijena:p.cijena,
-               naruceno: p.naziv.indexOf('Brtva glave')===0 ? isoShift(-1) : null };
+               naruceno: p.naziv.indexOf('Brtva glave')===0 ? isoShift(-1) : null,
+               kategorija: p.kat||'Ostalo' };
     }),
     preventiva: SEED_PREVENTIVA.map(function(p,i){
       var next = isoShift(p.dueIn);
@@ -557,24 +584,34 @@ function buildSeed(){
       return { id:'pt'+(i+1), naziv:p.naziv, usluga:p.usluga, mjesto:p.mjesto, nap:p.nap||'', tel:p.tel||'', email:p.email||'' };
     }),
     komentari: [
-      { id:'ko1', kvar_id:'kv1', tko:'Marko',
+      { id:'ko1', kvar_id:'kv1', tko:'Majstor 1',
         tekst:'Čeljusti očišćene, folija opet zaglavljuje — sumnjam na oprugu dozatora.',
         created_at: isoShift(0) },
-      { id:'ko2', kvar_id:'kv1', tko:'Stjepan',
+      { id:'ko2', kvar_id:'kv1', tko:'Voditelj',
         tekst:'Naručena opruga kod Hladni Val, stiže sutra. Do tada punite foliju ručno i bilježite zastoje.',
         created_at: isoShift(0) }
+    ],
+    poruke: [
+      { id:'po1', tko:'Voditelj',  tekst:'Dobrodošli u alat — od danas se sve prijave, dodjele i dogovori vode ovdje, ne usmeno.', created_at: isoShift(-1)+'T08:00:00Z' },
+      { id:'po2', tko:'Majstor 1', tekst:'Pakirka P2 čeka oprugu dozatora, do tada folija ručno. Detalji u komentaru kvara.', created_at: isoShift(0)+'T06:40:00Z' },
+      { id:'po3', tko:'Majstor 3', tekst:'Kompresor K1 pod nadzorom — očitavajte tlak svaki sat i javite padne li ispod 6 bara.', created_at: isoShift(0)+'T07:15:00Z' }
     ]
   };
+}
+function buildSeedSFotkom(){
+  var d = buildSeed();
+  d.kvarovi[0].foto = DEMO_FOTO;   /* demo fotografija na otvorenom kvaru P2 */
+  return d;
 }
 function localLoad(){
   try{
     var raw = localStorage.getItem(LS_KEY);
     if(raw){
       DATA = JSON.parse(raw);
-      if(DATA && DATA.machines && DATA.kvarovi && DATA.dijelovi && DATA.preventiva && DATA.partneri && DATA.komentari) return;
+      if(DATA && DATA.machines && DATA.kvarovi && DATA.dijelovi && DATA.preventiva && DATA.partneri && DATA.komentari && DATA.poruke) return;
     }
   }catch(e){}
-  DATA = buildSeed();
+  DATA = buildSeedSFotkom();
   save();
 }
 async function load(tiho){
@@ -587,7 +624,8 @@ async function load(tiho){
     sb.from('dijelovi').select('*'),
     sb.from('preventiva').select('*'),
     sb.from('partneri').select('*'),
-    sb.from('komentari').select('*').order('created_at')
+    sb.from('komentari').select('*').order('created_at'),
+    sb.from('poruke').select('*').order('created_at')
   ]);
   for(var i=0;i<r.length;i++){ if(r[i].error) throw r[i].error; }
   DATA = {
@@ -596,7 +634,8 @@ async function load(tiho){
     dijelovi: r[2].data,
     preventiva: r[3].data.map(function(p){ p.tkoZadnji = p.tko_zadnji; return p; }),
     partneri: r[4].data,
-    komentari: r[5].data
+    komentari: r[5].data,
+    poruke: r[6].data
   };
   }finally{ if(!tiho) sakrijLoader(); }
 }
@@ -609,7 +648,7 @@ function save(){
    PENDING_OPS štiti unos u tijeku od pregaženja pollingom; kod greške
    se lokalni unos vraća (rollback) i stanje ponovno povlači iz baze. */
 var PENDING_OPS = 0;
-var TABLE2KEY = { machines:'machines', kvarovi:'kvarovi', dijelovi:'dijelovi', preventiva:'preventiva', partneri:'partneri', komentari:'komentari' };
+var TABLE2KEY = { machines:'machines', kvarovi:'kvarovi', dijelovi:'dijelovi', preventiva:'preventiva', partneri:'partneri', komentari:'komentari', poruke:'poruke' };
 function rerender(){
   REPS = repCounts();
   if(RENDERERS[CURRENT_SCREEN]) RENDERERS[CURRENT_SCREEN]();
@@ -754,12 +793,20 @@ function renderPregled(){
       '<div class="bar-val">'+EUR(x.c)+'</div></div>';
   }).join('');
 
+  /* majstor ne vidi financije — njegov pregled počinje zadacima */
+  var bigCard = vidiFinancije()
+    ? '<div class="big-card" onclick="app.go(\'kvarovi\')">'+
+        '<div class="big-label">Trošak zastoja ovaj mjesec</div>'+
+        '<div class="big-num">'+EUR(cost)+trend+'</div>'+
+        '<div class="big-sub">'+esc(monthLabel())+' &middot; '+mk.length+' zastoja &middot; ukupno '+H(hrs)+'</div>'+
+      '</div>'
+    : '<div class="big-card" onclick="app.go(\'kvarovi\')">'+
+        '<div class="big-label">Zastoji ovaj mjesec</div>'+
+        '<div class="big-num">'+mk.length+'</div>'+
+        '<div class="big-sub">'+esc(monthLabel())+' &middot; ukupno '+H(hrs)+' zastoja</div>'+
+      '</div>';
   $('#screen-pregled').innerHTML =
-    '<div class="big-card" onclick="app.go(\'kvarovi\')">'+
-      '<div class="big-label">Trošak zastoja ovaj mjesec</div>'+
-      '<div class="big-num">'+EUR(cost)+trend+'</div>'+
-      '<div class="big-sub">'+esc(monthLabel())+' &middot; '+mk.length+' zastoja &middot; ukupno '+H(hrs)+'</div>'+
-    '</div>'+
+    bigCard+
     '<div class="stat-grid">'+
       statCard(open.length, 'Otvoreni kvarovi',        open.length ? 'red'    : 'green', "app.goKvaroviOtvoreni()")+
       statCard(low.length,  'Dijelovi ispod minimuma', low.length  ? 'red'    : 'green', "app.go('dijelovi')")+
@@ -774,15 +821,18 @@ function renderPregled(){
     })()+
     '<h2 id="za-obaviti">Za obaviti — kasne i sljedećih 7 dana</h2>'+
     '<div class="card">'+dueHtml+'</div>'+
-    '<h2>Najskuplji strojevi — zadnja 3 mj.</h2>'+
-    '<div class="card">'+topHtml+'</div>'+
-    '<h2>Trošak zastoja po mjesecima</h2>'+
-    '<div class="card">'+trendHtml+'</div>'+
+    (vidiFinancije()
+      ? '<h2>Najskuplji strojevi — zadnja 3 mj.</h2>'+
+        '<div class="card">'+topHtml+'</div>'+
+        '<h2>Trošak zastoja po mjesecima</h2>'+
+        '<div class="card">'+trendHtml+'</div>'
+      : '')+
     '<h2>Zadnji događaji</h2>'+
     '<div class="card">'+ last3.map(function(k){ return eventRow(k); }).join('') +'</div>'+
     '<div class="session-row">'+
       (REMOTE ? 'Prijavljen: <b>'+esc(SESSION.ime)+'</b> ('+esc(SESSION.role)+') &middot; <a onclick="app.odjava()">Odjava</a> &middot; ' : '')+
       '<a class="role-voditelj" onclick="app.izvoz()">Izvoz podataka</a>'+
+      '<span class="role-voditelj"> &middot; <a onclick="app.izvozCSV()">Izvoz CSV (kvarovi)</a></span>'+
     '</div>';
 }
 function statCard(n, label, color, onclick){
@@ -852,8 +902,8 @@ function renderStroj(){
     '<button class="back" onclick="app.go(\'strojevi\')">‹ Strojevi</button>'+
     '<div class="card"><div class="detail-head"><div>'+
       '<div class="detail-name">'+esc(m.name)+'</div>'+
-      '<div class="detail-sub">'+esc(m.program)+' &middot; trošak zastoja '+m.rate+' €/h'+
-      ' &middot; ukupno zadnja 3 mj.: <b>'+EUR(ukupno)+'</b>'+
+      '<div class="detail-sub">'+esc(m.program)+
+      (vidiFinancije() ? ' &middot; trošak zastoja '+m.rate+' €/h &middot; ukupno zadnja 3 mj.: <b>'+EUR(ukupno)+'</b>' : '')+
       (mttr ? ' &middot; prosj. trajanje popravka: <b>'+H(mttr)+'</b>' : '')+'</div></div>'+
       statusChip(machineStatus(m.id))+'</div></div>'+
     '<h2>Plan preventive</h2><div class="card">'+prevHtml+'</div>'+
@@ -870,7 +920,7 @@ function kvarItem(k, showMachine){
   var chip = k.status==='otvoren'
     ? (k.upoz ? '<span class="chip upoz">Upozorenje</span>' : '<span class="chip kvar">Otvoren</span>')
     : '<span class="chip rijesen">Riješen</span>';
-  var meta = 'Zastoj '+H(k.sati)+' &middot; <b>'+EUR(kvarCost(k))+'</b>';
+  var meta = 'Zastoj '+H(k.sati)+(vidiFinancije() ? ' &middot; <b>'+EUR(kvarCost(k))+'</b>' : '');
   if(k.smjena) meta += ' &middot; '+esc(k.smjena);
   if(k.status==='otvoren' && k.dodijeljen) meta += ' &middot; Dodijeljeno: <b>'+esc(k.dodijeljen)+'</b>';
   if(k.tko) meta += ' &middot; Riješio: '+esc(k.tko);
@@ -928,13 +978,16 @@ function renderKvarovi(){
     '<option value="otvoren"'+(FILTER.status==='otvoren'?' selected':'')+'>Otvoreni</option>'+
     '<option value="rijesen"'+(FILTER.status==='rijesen'?' selected':'')+'>Riješeni</option>';
   var majstorOpts = '<option value="svi">Svi majstori</option>'+
-    ['Marko','Ivica','Damir'].map(function(mj){
+    MAJSTORI.map(function(mj){
       return '<option'+(FILTER.majstor===mj?' selected':'')+'>'+mj+'</option>';
     }).join('')+
     '<option value="nedodijeljeno"'+(FILTER.majstor==='nedodijeljeno'?' selected':'')+'>Nedodijeljeni</option>';
 
   $('#screen-kvarovi').innerHTML =
-    '<button class="btn primary block btn-new role-write" onclick="app.noviKvar()">+ Novi kvar</button>'+
+    '<div class="role-write" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'+
+      '<button class="btn primary" onclick="app.brzaPrijava()">⚡ Brza prijava</button>'+
+      '<button class="btn sec" onclick="app.noviKvar()">+ Detaljna</button>'+
+    '</div>'+
     '<div class="filters">'+
       '<select onchange="app.setFilter(\'stroj\',this.value)">'+strojOpts+'</select>'+
       '<select onchange="app.setFilter(\'status\',this.value)">'+statusOpts+'</select>'+
@@ -958,7 +1011,7 @@ function partRow(p){
       (p.naruceno?'Poništi narudžbu':'Označi naručeno')+'</button></div>' : '';
   return '<div class="row"><div class="grow">'+
     '<div class="row-title" style="font-size:13.5px">'+esc(p.naziv)+chip+'</div>'+
-    '<div class="row-sub">'+esc(p.stroj)+' &middot; '+esc(p.dob)+' &middot; '+EUR(p.cijena)+'</div>'+akcija+'</div>'+
+    '<div class="row-sub">'+esc(p.stroj)+' &middot; '+esc(p.dob)+(vidiFinancije() ? ' &middot; '+EUR(p.cijena) : '')+'</div>'+akcija+'</div>'+
     '<div class="qty">'+
       '<button class="qbtn role-write" onclick="app.qty(\''+p.id+'\',-1)">−</button>'+
       '<div class="qval'+(low?' low':'')+'">'+p.stanje+'<span>min '+p.min+'</span></div>'+
@@ -975,11 +1028,27 @@ function partsListHtml(){
     if(ra!==rb) return ra-rb;
     return a.naziv.localeCompare(b.naziv,'hr');
   });
-  if(q) list = list.filter(function(p){
-    return (p.naziv+' '+p.stroj+' '+p.dob).toLowerCase().indexOf(q) > -1;
+  if(q){
+    list = list.filter(function(p){
+      return (p.naziv+' '+p.stroj+' '+p.dob+' '+(p.kategorija||'')).toLowerCase().indexOf(q) > -1;
+    });
+    return '<div class="card">'+(list.length ? list.map(partRow).join('')
+      : '<div class="empty">Nema dijelova za traženi pojam.</div>')+'</div>';
+  }
+  /* bez pretrage: kritično na vrh, ostalo grupirano po kategorijama */
+  var krit = list.filter(function(p){ return p.stanje < p.min; });
+  var ost  = list.filter(function(p){ return p.stanje >= p.min; });
+  var html = '';
+  if(krit.length){
+    html += '<h2 style="color:var(--red)">⚠ Ispod minimuma — naručiti</h2>'+
+            '<div class="card" style="border-color:var(--red-border)">'+krit.map(partRow).join('')+'</div>';
+  }
+  var kats = {};
+  ost.forEach(function(p){ var k = p.kategorija || 'Ostalo'; (kats[k] = kats[k] || []).push(p); });
+  Object.keys(kats).sort(function(a,b){ return a.localeCompare(b,'hr'); }).forEach(function(k){
+    html += '<h2>'+esc(k)+'</h2><div class="card">'+kats[k].map(partRow).join('')+'</div>';
   });
-  return list.length ? list.map(partRow).join('')
-    : '<div class="empty">Nema dijelova za traženi pojam.</div>';
+  return html || '<div class="card"><div class="empty">Nema dijelova.</div></div>';
 }
 function renderDijelovi(){
   var vrijednost = 0, ispodMin = 0;
@@ -990,8 +1059,10 @@ function renderDijelovi(){
       ' oninput="app.traziDio(this.value)" style="margin-bottom:4px">'+
     '<div class="row-sub" style="margin-top:8px">Vrijednost skladišta: <b style="color:var(--text)">'+EUR(vrijednost)+'</b>'+
       ' &middot; ispod minimuma: <b style="color:'+(ispodMin?'var(--red)':'var(--green)')+'">'+ispodMin+'</b></div>'+
-    '<h2>Kritični dijelovi na skladištu</h2>'+
-    '<div class="card" id="parts-list">'+partsListHtml()+'</div>'+
+    '<div id="parts-list">'+partsListHtml()+'</div>';
+}
+function renderKontakti(){
+  $('#screen-kontakti').innerHTML =
     '<h2>Dobavljači i servisi</h2>'+
     '<div class="card">'+ DATA.partneri.map(function(pt){
       var kontakt = '';
@@ -1011,14 +1082,50 @@ function renderDijelovi(){
     '<button class="btn sec sm block role-voditelj" style="margin-top:8px" onclick="app.noviPartner()">+ Novi dobavljač</button>';
 }
 
+/* =====================  render: Poruke (zajednički kanal)  ===================== */
+function fmtDateTime(ts){
+  var s = String(ts||'');
+  var d = s.slice(0,10), t = s.length > 11 ? s.slice(11,16) : '';
+  return (d ? fmtDate(d) : '') + (t ? ' ' + t : '');
+}
+function brojNeprocitanih(){
+  var seen = ''; try{ seen = localStorage.getItem('porukeSeen') || ''; }catch(e){}
+  return (DATA && DATA.poruke ? DATA.poruke : []).filter(function(p){ return String(p.created_at) > seen; }).length;
+}
+function oznaciProcitano(){
+  var zadnja = (DATA.poruke||[]).reduce(function(m,p){ return String(p.created_at) > m ? String(p.created_at) : m; }, '');
+  try{ if(zadnja) localStorage.setItem('porukeSeen', zadnja); }catch(e){}
+}
+function renderPoruke(){
+  var lista = (DATA.poruke||[]).slice().sort(function(a,b){
+    return String(a.created_at).localeCompare(String(b.created_at));
+  });
+  var html = lista.length ? lista.map(function(p){
+    var moja = p.tko === SESSION.ime;
+    return '<div class="msg'+(moja?' moja':'')+'">'+
+      '<div class="msg-meta">'+esc(p.tko)+' &middot; '+fmtDateTime(p.created_at)+'</div>'+
+      '<div class="msg-txt">'+esc(p.tekst)+'</div></div>';
+  }).join('') : '<div class="empty">Još nema poruka.</div>';
+  $('#screen-poruke').innerHTML =
+    '<h2>Zajedničke poruke — vide ih svi</h2>'+
+    '<div class="card" style="padding:5px 0">'+html+'</div>'+
+    '<form class="msg-form" onsubmit="app.posaljiPoruku(event)">'+
+      '<textarea name="tekst" rows="2" required placeholder="Poruka svima — primopredaja, obavijest, upozorenje…"></textarea>'+
+      '<button class="btn primary block" type="submit" style="margin-top:8px">Pošalji</button>'+
+    '</form>';
+  oznaciProcitano();
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
 /* =====================  navigacija  ===================== */
 var RENDERERS = {
   pregled: renderPregled, strojevi: renderStrojevi,
-  kvarovi: renderKvarovi, dijelovi: renderDijelovi, stroj: renderStroj
+  kvarovi: renderKvarovi, dijelovi: renderDijelovi,
+  kontakti: renderKontakti, poruke: renderPoruke, stroj: renderStroj
 };
 function showScreen(name){
   CURRENT_SCREEN = name;
-  ['pregled','strojevi','kvarovi','dijelovi','stroj'].forEach(function(s){
+  ['pregled','strojevi','kvarovi','dijelovi','kontakti','poruke','stroj'].forEach(function(s){
     $('#screen-'+s).classList.toggle('hidden', s!==name);
   });
   REPS = repCounts();
@@ -1038,6 +1145,13 @@ function updateBadge(){
   var b = $('#badge-kvarovi');
   b.style.display = n ? 'flex' : 'none';
   b.textContent = n;
+  /* nepročitane zajedničke poruke */
+  var bp = $('#badge-poruke');
+  if(bp){
+    var np = CURRENT_SCREEN === 'poruke' ? 0 : brojNeprocitanih();
+    bp.style.display = np ? 'flex' : 'none';
+    bp.textContent = np;
+  }
 }
 
 /* =====================  akcije  ===================== */
@@ -1054,7 +1168,7 @@ var app = {
     LOGIN_BUSY = true;
     try{
       var res = await sb.auth.signInWithPassword({
-        email: LOGIN_SEL.toLowerCase() + '@odrzavanje.local',
+        email: korisnikEmail(LOGIN_SEL),
         password: pin
       });
       if(res.error){ err.textContent = 'Pogrešan PIN.'; $('#pin').value=''; return; }
@@ -1070,12 +1184,13 @@ var app = {
   },
   demoUlaz: function(){
     REMOTE = false; sb = null;
-    SESSION = { ime:'Demo', role:'voditelj' };
+    SESSION = { ime:'Voditelj', role:'voditelj' };
     document.body.dataset.role = 'voditelj';
     $('#demo-banner').style.display = '';
     $('#screen-login').classList.remove('show');
     localLoad();
     if(!initHash()) showScreen('pregled');
+    dobrodoslica();
   },
   komentariKvara: function(kId){
     if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
@@ -1100,16 +1215,77 @@ var app = {
         '<button class="btn primary block" type="submit">Dodaj komentar</button>'+
       '</form></div></div>';
   },
+  brzaPrijava: function(){
+    PENDING_FOTO = '';
+    var opts = DATA.machines.map(function(m){ return '<option value="'+m.id+'">'+esc(m.name)+'</option>'; }).join('');
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
+      '<div class="modal-head"><h3>⚡ Brza prijava kvara</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<form onsubmit="app.saveBrza(event)">'+
+        '<label>Stroj</label><select name="m" required>'+opts+'</select>'+
+        '<label>📷 Fotografija</label>'+
+        '<input type="file" accept="image/*" capture="environment" onchange="app.fotoOdabrana(event)">'+
+        '<img id="foto-prev" class="foto-prev" alt="pregled fotografije">'+
+        '<label>Što se dogodilo</label><textarea name="opis" rows="2" required placeholder="kratko — npr. puca remen, stroj stoji"></textarea>'+
+        '<button class="btn primary block" type="submit">Prijavi kvar</button>'+
+      '</form></div></div>';
+  },
+  saveBrza: async function(e){
+    e.preventDefault();
+    var f = new FormData(e.target);
+    var kvar = {
+      id:'kv'+Date.now(), m:f.get('m'), date:todayISO(),
+      opis:String(f.get('opis')||'').trim(), sati:0,
+      status:'otvoren', upoz:false, tko:null, zam:null,
+      foto:PENDING_FOTO || null, dodijeljen:null,
+      prioritet:'normalno', smjena:(new Date().getHours()>=6 && new Date().getHours()<14)?'1. smjena':'2. smjena',
+      ceka_dio:false, sudjelovali:null
+    };
+    var pendingFoto = PENDING_FOTO; PENDING_FOTO = '';
+    DATA.kvarovi.push(kvar);
+    app.closeModal(); showScreen('kvarovi');
+    if(REMOTE){
+      kvar.foto = await uploadFoto(pendingFoto) || null;
+      await apiInsert('kvarovi', { m:kvar.m, date:kvar.date, opis:kvar.opis, sati:0,
+        status:'otvoren', upoz:false, foto:kvar.foto, prioritet:'normalno', smjena:kvar.smjena }, kvar);
+    } else { save(); }
+  },
+  posaljiPoruku: async function(e){
+    e.preventDefault();
+    var f = new FormData(e.target);
+    var txt = String(f.get('tekst')||'').trim();
+    if(!txt) return;
+    var p = { id:'po'+Date.now(), tko:SESSION.ime||'Voditelj', tekst:txt, created_at:new Date().toISOString() };
+    if(!DATA.poruke) DATA.poruke = [];
+    DATA.poruke.push(p);
+    renderPoruke();
+    await apiInsert('poruke', { tko:p.tko, tekst:p.tekst }, p);
+  },
   dodajKomentar: async function(e, kId){
     e.preventDefault();
     var f = new FormData(e.target);
     var kom = { id:'ko'+Date.now(), kvar_id:kId, tekst:String(f.get('tekst')||'').trim(),
-                tko: SESSION.ime || 'Demo', created_at: new Date().toISOString() };
+                tko: SESSION.ime || 'Voditelj', created_at: new Date().toISOString() };
     if(!kom.tekst) return;
     if(!DATA.komentari) DATA.komentari = [];
     DATA.komentari.push(kom);
     app.komentariKvara(kId);  /* osvježi popis u modalu */
     await apiInsert('komentari', { kvar_id:kId, tekst:kom.tekst, tko:kom.tko }, kom);
+  },
+  izvozCSV: function(){
+    var glava = 'datum;stroj;opis;status;prioritet;smjena;sati_zastoja;trosak_eur;dodijeljen;rijesio;sudjelovali;zamijenjeno;ceka_dio';
+    var redovi = DATA.kvarovi.slice().sort(byDateDesc).map(function(k){
+      var m = machineById(k.m) || {name:''};
+      var c = function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; };
+      return [k.date, m.name, k.opis, k.status, k.prioritet||'', k.smjena||'', k.sati,
+              Math.round(kvarCost(k)), k.dodijeljen||'', k.tko||'', k.sudjelovali||'', k.zam||'',
+              k.ceka_dio?'da':'ne'].map(c).join(';');
+    });
+    var blob = new Blob(['﻿'+glava+'\n'+redovi.join('\n')], {type:'text/csv;charset=utf-8'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'kvarovi-' + todayISO() + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
   },
   izvoz: function(){
     var blob = new Blob([JSON.stringify(DATA, null, 2)], {type:'application/json'});
@@ -1158,6 +1334,9 @@ var app = {
         '<label>Stanje na skladištu</label><input type="number" name="stanje" min="0" step="1" value="1" required>'+
         '<label>Minimum</label><input type="number" name="min" min="0" step="1" value="1" required>'+
         '<label>Dobavljač</label><select name="dob">'+dobOpts+'</select>'+
+        '<label>Kategorija</label><select name="kat">'+
+          ['Remeni i prijenos','Ležajevi','Brtve i maziva','Senzori i elektrika','Grijači','Folije i ambalaža','Rashladna tehnika','Alati i matrice','Ostalo']
+          .map(function(k){ return '<option>'+k+'</option>'; }).join('')+'</select>'+
         '<label>Cijena (€)</label><input type="number" name="cijena" min="0" step="1" value="0" required>'+
         '<button class="btn primary block" type="submit">Spremi dio</button>'+
       '</form></div></div>';
@@ -1168,12 +1347,13 @@ var app = {
     var dio = {
       id:'d'+Date.now(), naziv:String(f.get('naziv')||'').trim(), stroj:String(f.get('stroj')||'').trim(),
       stanje:parseInt(f.get('stanje'),10)||0, min:parseInt(f.get('min'),10)||0,
-      dob:f.get('dob'), cijena:parseFloat(f.get('cijena'))||0
+      dob:f.get('dob'), cijena:parseFloat(f.get('cijena'))||0,
+      kategorija:f.get('kat')||'Ostalo'
     };
     DATA.dijelovi.push(dio);
     app.closeModal(); showScreen('dijelovi');
     await apiInsert('dijelovi', { naziv:dio.naziv, stroj:dio.stroj, stanje:dio.stanje,
-      min:dio.min, dob:dio.dob, cijena:dio.cijena }, dio);
+      min:dio.min, dob:dio.dob, cijena:dio.cijena, kategorija:dio.kategorija }, dio);
   },
   noviPartner: function(){
     $('#modal-root').innerHTML =
@@ -1483,8 +1663,9 @@ var app = {
     await apiUpdate('machines', mId, { bilj:m.bilj });
   },
 
-  audit: function(){
-    var t30 = isoShift(-30);
+  audit: function(dani){
+    dani = parseInt(dani,10) || 30;
+    var t30 = isoShift(-dani);
     var zahvati = DATA.kvarovi.filter(function(k){ return k.status==='rijesen' && k.date>=t30; }).sort(byDateDesc);
     var otvoreni = DATA.kvarovi.filter(function(k){ return k.status==='otvoren'; });
 
@@ -1530,8 +1711,14 @@ var app = {
       '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal audit">'+
       '<div class="modal-head"><h3>Izvještaj za audit (IFS)</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<div class="a-meta">Generirano: '+fmtDate(todayISO())+' &middot; Clarum &middot; Sektor održavanja &middot; ref. IFS Food v8, t. 4.16 / 4.17 / 5.4</div>'+
+      '<label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Razdoblje zahvata</label>'+
+      '<select onchange="app.audit(this.value)" style="margin:4px 0 6px">'+
+        '<option value="30"'+(dani===30?' selected':'')+'>Zadnjih 30 dana</option>'+
+        '<option value="90"'+(dani===90?' selected':'')+'>Zadnjih 90 dana</option>'+
+        '<option value="365"'+(dani===365?' selected':'')+'>Zadnjih 12 mjeseci</option>'+
+      '</select>'+
       '<h4>1. Plan preventivnog održavanja po stroju</h4>'+prevHtml+
-      '<h4>2. Zahvati u zadnjih 30 dana (s otpuštanjem linije)</h4>'+zahvatiHtml+
+      '<h4>2. Zahvati u zadnjih '+dani+' dana (s otpuštanjem linije)</h4>'+zahvatiHtml+
       '<h4>3. Privremeni popravci</h4>'+
       '<div class="a-sub">Nema aktivnih privremenih popravaka. Privremeni popravak se označava, procjenjuje s aspekta sigurnosti hrane i dobiva rok trajne sanacije.</div>'+
       '<h4>4. Mjerna i kontrolna oprema</h4>'+mjernaHtml+
@@ -1550,8 +1737,12 @@ var app = {
 function renderLoginTiles(){
   var el = $('#user-tiles');
   if(el) el.innerHTML = KORISNICI.map(function(k){
-    return '<div class="user-tile'+(LOGIN_SEL===k?' sel':'')+'" onclick="app.odaberiKorisnika(\''+esc(k)+'\')">'+esc(k)+'</div>';
+    return '<div class="user-tile'+(LOGIN_SEL===k.naziv?' sel':'')+'" onclick="app.odaberiKorisnika(\''+esc(k.naziv)+'\')">'+esc(k.naziv)+'</div>';
   }).join('');
+}
+function korisnikEmail(naziv){
+  var k = KORISNICI.filter(function(x){ return x.naziv===naziv; })[0];
+  return k ? k.email : null;
 }
 async function postLogin(){
   var u = (await sb.auth.getUser()).data.user;
@@ -1571,14 +1762,27 @@ async function postLogin(){
   $('#screen-login').classList.remove('show');
   await load();
   if(!initHash()) showScreen('pregled');
+  dobrodoslica();
+}
+function dobrodoslica(){
+  /* pri dolasku u smjenu: odmah reci što je bitno */
+  var mojih = DATA.kvarovi.filter(function(k){ return k.status==='otvoren' && k.dodijeljen===SESSION.ime; }).length;
+  var nep = brojNeprocitanih();
+  var dijelovi_min = DATA.dijelovi.filter(function(p){ return p.stanje < p.min && !p.naruceno; }).length;
+  var dio = [];
+  if(mojih) dio.push(mojih + (mojih===1?' tvoj zadatak':' tvoja zadatka/zadataka'));
+  if(nep) dio.push(nep + ' nepročitanih poruka');
+  if(SESSION.role!=='majstor' && dijelovi_min) dio.push(dijelovi_min + ' dijela za naručiti');
+  if(dio.length) toast('👋 ' + esc(SESSION.ime) + ': ' + dio.join(' · '));
 }
 function majstorOpts(sel){
-  var imena = ['Marko','Ivica','Damir'];
+  var imena = MAJSTORI.slice();
   if(SESSION.ime && SESSION.ime !== 'Demo' && imena.indexOf(SESSION.ime) === -1) imena.push(SESSION.ime);
   return imena.map(function(t){
     return '<option'+(sel===t?' selected':'')+'>'+esc(t)+'</option>';
   }).join('');
 }
+function vidiFinancije(){ return SESSION.role !== 'majstor'; }
 function smjenaOpts(){
   var h = new Date().getHours();
   var def = (h >= 6 && h < 14) ? '1. smjena' : '2. smjena';
@@ -1599,7 +1803,7 @@ async function start(){
     /* DEMO NAČIN: lokalno, bez prijave, uloga voditelj */
     $('#demo-banner').style.display = '';
     document.body.dataset.role = 'voditelj';
-    SESSION = { ime:'Demo', role:'voditelj' };
+    SESSION = { ime:'Voditelj', role:'voditelj' };
     localLoad();
     if(!initHash()) showScreen('pregled');
     return;
@@ -1627,6 +1831,25 @@ setInterval(async function(){
     rerender();
   }catch(e){}
 }, 30000);
+
+/* realtime: nove poruke/kvarovi/komentari odmah stižu svima (multi-user) */
+async function rtNovo(tip, pl){
+  var row = (pl && pl['new']) ? pl['new'] : {};
+  if(row.tko && row.tko === SESSION.ime) return;   /* moj vlastiti unos */
+  if(tip==='poruke')    toast('💬 Nova poruka — ' + (row.tko||''));
+  if(tip==='kvarovi')   toast('⚠ Novi kvar prijavljen');
+  if(tip==='komentari') toast('💬 Novi komentar na kvaru');
+  if(PENDING_OPS > 0 || $('#modal-root').innerHTML){ return; }
+  try{ await load(true); rerender(); }catch(e){}
+}
+if(REMOTE){
+  ['poruke','kvarovi','komentari'].forEach(function(t){
+    sb.channel('rt-'+t)
+      .on('postgres_changes', {event:'INSERT', schema:'public', table:t},
+          function(pl){ rtNovo(t, pl); })
+      .subscribe();
+  });
+}
 
 /* PWA servisni radnik (samo preko http/https, ne za file://) */
 if('serviceWorker' in navigator && location.protocol.indexOf('http') === 0){
