@@ -100,6 +100,18 @@ h2:first-child{margin-top:2px}
 /* ---------- ponovljeni kvar ---------- */
 .rep{color:var(--red);font-size:11px;font-weight:700;white-space:nowrap}
 
+/* ---------- analitika tablice ---------- */
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;
+  color:var(--muted);padding:8px 10px;border-bottom:2px solid var(--border);white-space:nowrap}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ---------- statusna točka stroja ---------- */
+.sdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:0}
+.sdot.ok{background:#2e9e57}.sdot.upoz{background:#e5a50a}.sdot.kvar{background:var(--red)}
+
 /* ---------- poruke (chat) ---------- */
 .msg{padding:7px 13px}
 .msg-meta{font-size:11px;color:var(--muted);font-weight:600}
@@ -107,6 +119,9 @@ h2:first-child{margin-top:2px}
   display:inline-block;max-width:88%;text-align:left}
 .msg.moja{text-align:right}
 .msg.moja .msg-txt{background:var(--accent-soft);border-radius:10px 0 10px 10px}
+.msg.sustav{text-align:center;padding:4px 13px}
+.msg.sustav .msg-txt{background:none;border:none;font-size:12px;color:var(--muted);padding:2px 0;max-width:100%}
+.msg.sustav .msg-meta{display:none}
 .msg-form{margin-top:12px}
 body[data-role="majstor"] .btn-audit{display:none}
 
@@ -171,11 +186,11 @@ body:not([data-role="voditelj"]) .role-voditelj{display:none !important}
 
 /* ---------- ispis IFS izvještaja ---------- */
 @media print{
-  header,#tabbar,main{display:none !important}
+  header,#tabbar,main,#demo-banner,#loader,#toast{display:none !important}
   body{background:#fff}
   .overlay{position:static;background:none;display:block;padding:0}
   .modal{max-height:none;overflow:visible;border-radius:0;width:100%;max-width:none;box-shadow:none;animation:none;padding:0}
-  .modal .btn,.modal .x{display:none !important}
+  .modal .btn,.modal .x,.modal select,.modal input,.modal label{display:none !important}
 }
 
 /* ---------- kvar items ---------- */
@@ -290,6 +305,8 @@ form .btn{margin-top:18px}
   <section id="screen-dijelovi" class="screen hidden"></section>
   <section id="screen-kontakti" class="screen hidden"></section>
   <section id="screen-poruke"   class="screen hidden"></section>
+  <section id="screen-analitika" class="screen hidden"></section>
+  <section id="screen-raspored" class="screen hidden"></section>
   <section id="screen-stroj"    class="screen hidden"></section>
 </main>
 
@@ -548,7 +565,7 @@ function kvarSig(k){
 function repCounts(){
   var t90 = isoShift(-92), map = {};
   DATA.kvarovi.forEach(function(k){
-    if(k.date < t90) return;
+    if(k.date < t90 || k.status==='otkazan' || (k.tip||'kvar')!=='kvar') return;
     var s = kvarSig(k);
     if(s) map[s] = (map[s]||0)+1;
   });
@@ -566,7 +583,8 @@ function buildSeed(){
       return { id:'kv'+(i+1), m:k.m, date:isoShift(-k.d), opis:k.opis, sati:k.sati,
                status:k.status||'rijesen', upoz:!!k.upoz, tko:k.tko||null, zam:k.zam||null,
                foto:null, dodijeljen:k.dod||null, prioritet:k.pri||'normalno',
-               ceka_dio:!!k.ceka, smjena:k.smj||null, sudjelovali:null };
+               ceka_dio:!!k.ceka, smjena:k.smj||null, sudjelovali:null,
+               tip:'kvar', rok:null, storno_razlog:null, kategorija:autoKat(k.opis) };
     }),
     dijelovi: SEED_DIJELOVI.map(function(p,i){
       return { id:'d'+(i+1), naziv:p.naziv, stroj:p.stroj, stanje:p.stanje, min:p.min, dob:p.dob, cijena:p.cijena,
@@ -581,7 +599,9 @@ function buildSeed(){
                tkoZadnji: (p.izv && p.izv!=='interno') ? p.izv : majstori[i % 3] };
     }),
     partneri: SEED_PARTNERI.map(function(p,i){
-      return { id:'pt'+(i+1), naziv:p.naziv, usluga:p.usluga, mjesto:p.mjesto, nap:p.nap||'', tel:p.tel||'', email:p.email||'' };
+      var tip = (p.naziv==='MB Frigo' || p.naziv==='Hladni Val') ? 'Servis'
+              : (p.naziv==='Storci' ? 'Proizvođač' : 'Dobavljač');
+      return { id:'pt'+(i+1), naziv:p.naziv, usluga:p.usluga, mjesto:p.mjesto, nap:p.nap||'', tel:p.tel||'', email:p.email||'', tip:tip };
     }),
     komentari: [
       { id:'ko1', kvar_id:'kv1', tko:'Majstor 1',
@@ -722,21 +742,22 @@ async function uploadFoto(dataUrl){
 
 /* =====================  render: Pregled  ===================== */
 function renderPregled(){
+  var KV = samoKvarovi();  /* bez storniranih i bez zadataka — financije i brojke */
   var mm = todayISO().slice(0,7);
-  var mk = DATA.kvarovi.filter(function(k){ return k.date.slice(0,7)===mm; });
+  var mk = KV.filter(function(k){ return k.date.slice(0,7)===mm; });
   var cost = 0, hrs = 0;
   mk.forEach(function(k){ cost += kvarCost(k); hrs += k.sati; });
-  var open = DATA.kvarovi.filter(function(k){ return k.status==='otvoren'; });
+  var open = KV.filter(function(k){ return k.status==='otvoren'; });
   var low  = DATA.dijelovi.filter(function(p){ return p.stanje < p.min; });
   var late = DATA.preventiva.filter(function(p){ return p.next < todayISO(); });
-  var last3 = DATA.kvarovi.slice().sort(byDateDesc).slice(0,3);
+  var last3 = aktivni().slice().sort(byDateDesc).slice(0,3);
 
   /* usporedba s prošlim mjesecom */
   var now = new Date();
   var pm = new Date(now.getFullYear(), now.getMonth()-1, 1);
   var pmKey = pm.getFullYear()+'-'+pad2(pm.getMonth()+1);
   var prevCost = 0;
-  DATA.kvarovi.forEach(function(k){ if(k.date.slice(0,7)===pmKey) prevCost += kvarCost(k); });
+  KV.forEach(function(k){ if(k.date.slice(0,7)===pmKey) prevCost += kvarCost(k); });
   var trend = '';
   if(prevCost > 0){
     var pct = Math.round((cost - prevCost) / prevCost * 100);
@@ -745,7 +766,7 @@ function renderPregled(){
 
   /* najskuplji strojevi u zadnja 3 mjeseca */
   var t90 = isoShift(-92), costBy = {};
-  DATA.kvarovi.forEach(function(k){ if(k.date >= t90) costBy[k.m] = (costBy[k.m]||0) + kvarCost(k); });
+  KV.forEach(function(k){ if(k.date >= t90 && k.m) costBy[k.m] = (costBy[k.m]||0) + kvarCost(k); });
   var top = Object.keys(costBy).map(function(id){ return {id:id, c:costBy[id]}; })
     .sort(function(a,b){ return b.c - a.c; }).slice(0,3);
   var maxC = top.length ? top[0].c : 1;
@@ -782,7 +803,7 @@ function renderPregled(){
     var d0 = new Date(); var md = new Date(d0.getFullYear(), d0.getMonth()-off, 1);
     var key = md.getFullYear()+'-'+pad2(md.getMonth()+1);
     var c = 0;
-    DATA.kvarovi.forEach(function(k){ if(k.date.slice(0,7)===key) c += kvarCost(k); });
+    KV.forEach(function(k){ if(k.date.slice(0,7)===key) c += kvarCost(k); });
     return { label: MJESECI[md.getMonth()], c: c };
   });
   var maxM = Math.max.apply(null, mjeseci3.map(function(x){ return x.c; }).concat([1]));
@@ -812,15 +833,17 @@ function renderPregled(){
       statCard(low.length,  'Dijelovi ispod minimuma', low.length  ? 'red'    : 'green', "app.go('dijelovi')")+
       statCard(late.length, 'Preventive kasne',        late.length ? 'yellow' : 'green', "app.skociNaObaveze()")+
     '</div>'+
+    (vidiFinancije() ? '<button class="btn sec sm block" style="margin-top:10px" onclick="app.go(\'analitika\')">📊 Analitika i izvoz</button>' : '')+
     (function(){
       /* majstoru odmah pokaži njegove zadatke na vrhu */
-      var moji = DATA.kvarovi.filter(function(k){ return k.status==='otvoren' && k.dodijeljen===SESSION.ime; });
+      var moji = aktivni().filter(function(k){ return k.status==='otvoren' && k.dodijeljen===SESSION.ime; });
       return moji.length
         ? '<h2>Moji zadaci ('+moji.length+')</h2><div class="card">'+moji.map(function(k){ return kvarItem(k,true); }).join('')+'</div>'
         : '';
     })()+
     '<h2 id="za-obaviti">Za obaviti — kasne i sljedećih 7 dana</h2>'+
     '<div class="card">'+dueHtml+'</div>'+
+    '<button class="btn sec sm block" style="margin-top:8px" onclick="app.go(\'raspored\')">📅 Cijeli raspored preventive</button>'+
     (vidiFinancije()
       ? '<h2>Najskuplji strojevi — zadnja 3 mj.</h2>'+
         '<div class="card">'+topHtml+'</div>'+
@@ -866,7 +889,7 @@ function machineRow(m){
   var next = nextPrevDate(m.id);
   var lateTxt = (next && next < todayISO()) ? ' <b style="color:var(--red)">(kasni)</b>' : '';
   return '<div class="row click" onclick="app.openStroj(\''+m.id+'\')">'+
-    '<div class="grow"><div class="row-title">'+esc(m.name)+'</div>'+
+    '<div class="grow"><div class="row-title"><span class="sdot '+st+'"></span>'+esc(m.name)+'</div>'+
     '<div class="row-sub">Zadnji kvar: '+(last?fmtDate(last):'—')+
     ' &middot; Preventiva: '+(next?fmtDate(next):'—')+lateTxt+'</div></div>'+
     '<div class="row-right">'+statusChip(st)+'<span class="chev">›</span></div></div>';
@@ -890,7 +913,8 @@ function renderStroj(){
       (p.tkoZadnji ? ' ('+esc(p.tkoZadnji)+')' : '')+'</div>' : '';
     return '<div class="row"><div class="grow">'+
       '<div class="row-title" style="font-size:13.5px">'+esc(p.opis)+'</div>'+
-      '<div class="row-sub">'+esc(p.interval)+' &middot; sljedeće: '+fmtDate(p.next)+izv+'</div>'+zadnje+'</div>'+
+      '<div class="row-sub">'+esc(p.interval)+' &middot; sljedeće: '+fmtDate(p.next)+izv+'</div>'+zadnje+
+      '<div style="margin-top:4px"><button class="btn-mini role-write" onclick="app.urediPreventivu(\''+p.id+'\')">Uredi</button></div></div>'+
       '<div class="row-right">'+(late ? '<span class="chip upoz">Kasni</span>' : '')+
       '<button class="okbtn role-write" title="Označi obavljeno" onclick="app.obaviPreventivu(\''+p.id+'\')">✓</button></div></div>';
   }).join('') : '<div class="empty">Nema planiranih stavki.</div>';
@@ -904,7 +928,8 @@ function renderStroj(){
       '<div class="detail-name">'+esc(m.name)+'</div>'+
       '<div class="detail-sub">'+esc(m.program)+
       (vidiFinancije() ? ' &middot; trošak zastoja '+m.rate+' €/h &middot; ukupno zadnja 3 mj.: <b>'+EUR(ukupno)+'</b>' : '')+
-      (mttr ? ' &middot; prosj. trajanje popravka: <b>'+H(mttr)+'</b>' : '')+'</div></div>'+
+      (mttr ? ' &middot; prosj. trajanje popravka: <b>'+H(mttr)+'</b>' : '')+'</div>'+
+      '<div style="margin-top:7px"><button class="btn-mini role-voditelj" onclick="app.urediStroj(\''+m.id+'\')">Uredi stroj</button></div></div>'+
       statusChip(machineStatus(m.id))+'</div></div>'+
     '<h2>Plan preventive</h2><div class="card">'+prevHtml+'</div>'+
     '<button class="btn sec sm block role-write" style="margin-top:8px" onclick="app.novaPreventiva(\''+m.id+'\')">+ Dodaj stavku preventive</button>'+
@@ -916,31 +941,42 @@ function renderStroj(){
     '<h2>Povijest kvarova ('+ks.length+')</h2><div class="card">'+kvarHtml+'</div>';
 }
 function kvarItem(k, showMachine){
-  var m = machineById(k.m) || {id:'', name:'Nepoznat stroj'};
-  var chip = k.status==='otvoren'
-    ? (k.upoz ? '<span class="chip upoz">Upozorenje</span>' : '<span class="chip kvar">Otvoren</span>')
-    : '<span class="chip rijesen">Riješen</span>';
-  var meta = 'Zastoj '+H(k.sati)+(vidiFinancije() ? ' &middot; <b>'+EUR(kvarCost(k))+'</b>' : '');
-  if(k.smjena) meta += ' &middot; '+esc(k.smjena);
+  var zadatak = (k.tip||'kvar') === 'zadatak';
+  var m = machineById(k.m) || {id:'', name: zadatak ? 'Opći zadatak' : 'Nepoznat stroj'};
+  var chip;
+  if(k.status==='otkazan') chip = '<span class="chip rijesen">Otkazan</span>';
+  else if(k.status==='otvoren') chip = k.upoz ? '<span class="chip upoz">Upozorenje</span>' : '<span class="chip kvar">Otvoren</span>';
+  else chip = '<span class="chip rijesen">Riješen</span>';
+  var meta;
+  if(zadatak){
+    meta = k.rok ? ('Rok: '+(k.rok < todayISO() && k.status==='otvoren' ? '<b style="color:var(--red)">'+fmtDate(k.rok)+'</b>' : fmtDate(k.rok))) : 'Bez roka';
+  } else {
+    meta = 'Zastoj '+H(k.sati)+(vidiFinancije() ? ' &middot; <b>'+EUR(kvarCost(k))+'</b>' : '');
+    if(k.kategorija && k.kategorija!=='Ostalo') meta += ' &middot; '+esc(k.kategorija);
+  }
+  if(k.smjena && !zadatak) meta += ' &middot; '+esc(k.smjena);
   if(k.status==='otvoren' && k.dodijeljen) meta += ' &middot; Dodijeljeno: <b>'+esc(k.dodijeljen)+'</b>';
   if(k.tko) meta += ' &middot; Riješio: '+esc(k.tko);
   if(k.sudjelovali) meta += ' &middot; Sudjelovali: '+esc(k.sudjelovali);
   if(k.zam) meta += ' &middot; Zamijenjeno: '+esc(k.zam);
+  if(k.status==='otkazan' && k.storno_razlog) meta += ' &middot; Storno: '+esc(k.storno_razlog);
   var brKom = (DATA.komentari||[]).filter(function(c){ return c.kvar_id===k.id; }).length;
   var pChip = '';
+  if(zadatak) pChip += '<span class="chip" style="background:var(--accent-soft);color:var(--accent);border:1px solid #d5d2ef">Zadatak</span> ';
   if(k.status==='otvoren'){
     if(k.prioritet==='hitno') pChip += '<span class="chip kvar">HITNO</span> ';
     else if(k.prioritet==='visok') pChip += '<span class="chip upoz">Visok</span> ';
     if(k.ceka_dio) pChip += '<span class="chip upoz">Čeka dio</span> ';
   }
-  var sig = kvarSig(k);
+  var sig = zadatak ? null : kvarSig(k);
   var rep = (sig && REPS[sig] >= 2) ? ' <span class="rep">'+REPS[sig]+'× u 3 mj.</span>' : '';
   var akcija = '<button class="btn-mini" onclick="app.komentariKvara(\''+k.id+'\')">💬'+(brKom?' '+brKom:'')+'</button>';
+  if(k.status!=='otkazan')
+    akcija += ' <button class="btn-mini role-write" onclick="app.urediKvar(\''+k.id+'\')">Uredi</button>';
   if(k.status==='otvoren')
-    akcija += ' <button class="btn-mini role-write" onclick="app.urediKvar(\''+k.id+'\')">Uredi</button>'+
-              ' <button class="btn-mini role-write" onclick="app.rijesiKvar(\''+k.id+'\')">Riješi</button>';
+    akcija += ' <button class="btn-mini role-write" onclick="app.rijesiKvar(\''+k.id+'\')">'+(zadatak?'Gotovo':'Riješi')+'</button>';
   var foto = k.foto ? '<img class="kthumb" src="'+k.foto+'" alt="foto kvara" onclick="app.viewFoto(\''+k.id+'\')">' : '';
-  return '<div class="kvar-item">'+
+  return '<div class="kvar-item"'+(k.status==='otkazan'?' style="opacity:.55"':'')+'>'+
     '<div class="kvar-top"><span>'+(showMachine?'<b style="color:var(--text)">'+esc(m.name)+'</b> &middot; ':'')+fmtDate(k.date)+'</span>'+
     '<span style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end">'+pChip+chip+akcija+'</span></div>'+
     '<div class="kvar-opis">'+esc(k.opis)+rep+'</div>'+
@@ -948,14 +984,18 @@ function kvarItem(k, showMachine){
 }
 
 /* =====================  render: Kvarovi  ===================== */
-var FILTER = { stroj:'svi', status:'svi', majstor:'svi' };
+var FILTER = { stroj:'svi', status:'svi', majstor:'svi', od:'', do:'', q:'' };
 var PENDING_FOTO = '';
 function renderKvarovi(){
   var list = DATA.kvarovi.filter(function(k){
+    if(FILTER.status==='svi' && k.status==='otkazan') return false;  /* otkazane samo na izričit zahtjev */
     if(FILTER.stroj!=='svi' && k.m!==FILTER.stroj) return false;
     if(FILTER.status!=='svi' && k.status!==FILTER.status) return false;
     if(FILTER.majstor==='nedodijeljeno'){ if(k.dodijeljen || k.status!=='otvoren') return false; }
     else if(FILTER.majstor!=='svi' && k.dodijeljen!==FILTER.majstor) return false;
+    if(FILTER.od && k.date < FILTER.od) return false;
+    if(FILTER.do && k.date > FILTER.do) return false;
+    if(FILTER.q && (k.opis+' '+(k.zam||'')+' '+(k.kategorija||'')).toLowerCase().indexOf(FILTER.q.toLowerCase()) === -1) return false;
     return true;
   }).sort(function(a,b){
     /* otvoreni prije riješenih; među otvorenima HITNO → Visok → Normalno; pa najnoviji */
@@ -976,7 +1016,8 @@ function renderKvarovi(){
   var statusOpts =
     '<option value="svi"'+(FILTER.status==='svi'?' selected':'')+'>Svi statusi</option>'+
     '<option value="otvoren"'+(FILTER.status==='otvoren'?' selected':'')+'>Otvoreni</option>'+
-    '<option value="rijesen"'+(FILTER.status==='rijesen'?' selected':'')+'>Riješeni</option>';
+    '<option value="rijesen"'+(FILTER.status==='rijesen'?' selected':'')+'>Riješeni</option>'+
+    '<option value="otkazan"'+(FILTER.status==='otkazan'?' selected':'')+'>Otkazani (storno)</option>';
   var majstorOpts = '<option value="svi">Svi majstori</option>'+
     MAJSTORI.map(function(mj){
       return '<option'+(FILTER.majstor===mj?' selected':'')+'>'+mj+'</option>';
@@ -992,7 +1033,12 @@ function renderKvarovi(){
       '<select onchange="app.setFilter(\'stroj\',this.value)">'+strojOpts+'</select>'+
       '<select onchange="app.setFilter(\'status\',this.value)">'+statusOpts+'</select>'+
       '<select onchange="app.setFilter(\'majstor\',this.value)">'+majstorOpts+'</select>'+
+      '<input type="search" value="'+esc(FILTER.q)+'" placeholder="Pretraži opis…" oninput="app.setFilterTiho(\'q\',this.value)" style="grid-column:1/-1">'+
+      '<input type="date" value="'+FILTER.od+'" onchange="app.setFilter(\'od\',this.value)" title="Od datuma">'+
+      '<input type="date" value="'+FILTER.do+'" onchange="app.setFilter(\'do\',this.value)" title="Do datuma">'+
     '</div>'+
+    ((FILTER.q||FILTER.od||FILTER.do||FILTER.stroj!=='svi'||FILTER.status!=='svi'||FILTER.majstor!=='svi')
+      ? '<button class="btn-mini" style="margin-bottom:10px" onclick="app.resetFiltere()">✕ Poništi filtere ('+list.length+' rezultata)</button>' : '')+
     '<div class="card">'+
       (list.length ? list.map(function(k){ return kvarItem(k,true); }).join('')
                    : '<div class="empty">Nema kvarova za odabrani filter.</div>')+
@@ -1006,9 +1052,11 @@ function partRow(p){
   var chip = '';
   if(p.naruceno) chip = ' <span class="chip upoz">Naručeno '+fmtDate(p.naruceno)+'</span>';
   else if(low)   chip = ' <span class="chip kvar">'+(p.stanje===0?'Naruči odmah':'Naruči')+'</span>';
-  var akcija = (low || p.naruceno)
-    ? '<div style="margin-top:5px"><button class="btn-mini role-write" onclick="app.toggleNaruceno(\''+p.id+'\')">'+
-      (p.naruceno?'Poništi narudžbu':'Označi naručeno')+'</button></div>' : '';
+  var akcija = '<div style="margin-top:5px">'+
+    ((low || p.naruceno)
+      ? '<button class="btn-mini role-write" onclick="app.toggleNaruceno(\''+p.id+'\')">'+
+        (p.naruceno?'Poništi narudžbu':'Označi naručeno')+'</button> ' : '')+
+    '<button class="btn-mini role-voditelj" onclick="app.urediDio(\''+p.id+'\')">Uredi</button></div>';
   return '<div class="row"><div class="grow">'+
     '<div class="row-title" style="font-size:13.5px">'+esc(p.naziv)+chip+'</div>'+
     '<div class="row-sub">'+esc(p.stroj)+' &middot; '+esc(p.dob)+(vidiFinancije() ? ' &middot; '+EUR(p.cijena) : '')+'</div>'+akcija+'</div>'+
@@ -1061,25 +1109,179 @@ function renderDijelovi(){
       ' &middot; ispod minimuma: <b style="color:'+(ispodMin?'var(--red)':'var(--green)')+'">'+ispodMin+'</b></div>'+
     '<div id="parts-list">'+partsListHtml()+'</div>';
 }
+var KONT_Q = '';
+function partnerRow(pt){
+  var kontakt = '';
+  if(pt.tel || pt.email){
+    kontakt = '<div class="row-sub" style="margin-top:2px">'+
+      (pt.tel ? '<a class="clink" href="tel:'+esc(String(pt.tel).replace(/[\s\/]/g,''))+'">'+esc(pt.tel)+'</a>' : '')+
+      (pt.tel && pt.email ? ' &middot; ' : '')+
+      (pt.email ? '<a class="clink" href="mailto:'+esc(pt.email)+'">'+esc(pt.email)+'</a>' : '')+
+    '</div>';
+  }
+  return '<div class="row"><div class="grow">'+
+    '<div class="row-title" style="font-size:13.5px">'+esc(pt.naziv)+'</div>'+
+    '<div class="row-sub">'+esc(pt.usluga)+' &middot; '+esc(pt.mjesto)+(pt.nap?' &middot; '+esc(pt.nap):'')+'</div>'+
+    kontakt+
+  '</div><button class="btn-mini role-voditelj" onclick="app.urediPartnera(\''+pt.id+'\')">Uredi</button></div>';
+}
+function kontaktiListHtml(){
+  var q = KONT_Q.trim().toLowerCase();
+  var list = DATA.partneri.slice().sort(function(a,b){ return a.naziv.localeCompare(b.naziv,'hr'); });
+  if(q){
+    list = list.filter(function(p){
+      return (p.naziv+' '+p.usluga+' '+p.mjesto+' '+(p.tip||'')).toLowerCase().indexOf(q) > -1;
+    });
+    return '<div class="card">'+(list.length ? list.map(partnerRow).join('')
+      : '<div class="empty">Nema kontakta za traženi pojam.</div>')+'</div>';
+  }
+  var grupe = {};
+  list.forEach(function(p){
+    var t = p.tip || 'Dobavljač';
+    if(TIP_PARTNERA.indexOf(t) === -1) t = 'Ostalo';  /* nepoznat tip nikad ne nestaje iz prikaza */
+    (grupe[t] = grupe[t] || []).push(p);
+  });
+  var NASLOVI = {'Dobavljač':'Dobavljači','Servis':'Servisi','Proizvođač':'Proizvođači','Ostalo':'Ostalo'};
+  return TIP_PARTNERA.filter(function(t){ return grupe[t]; }).map(function(t){
+    return '<h2>'+esc(NASLOVI[t]||t)+'</h2><div class="card">'+grupe[t].map(partnerRow).join('')+'</div>';
+  }).join('') || '<div class="card"><div class="empty">Nema kontakata.</div></div>';
+}
 function renderKontakti(){
   $('#screen-kontakti').innerHTML =
-    '<h2>Dobavljači i servisi</h2>'+
-    '<div class="card">'+ DATA.partneri.map(function(pt){
-      var kontakt = '';
-      if(pt.tel || pt.email){
-        kontakt = '<div class="row-sub" style="margin-top:2px">'+
-          (pt.tel ? '<a class="clink" href="tel:'+esc(String(pt.tel).replace(/[\s\/]/g,''))+'">'+esc(pt.tel)+'</a>' : '')+
-          (pt.tel && pt.email ? ' &middot; ' : '')+
-          (pt.email ? '<a class="clink" href="mailto:'+esc(pt.email)+'">'+esc(pt.email)+'</a>' : '')+
-        '</div>';
-      }
-      return '<div class="row"><div class="grow">'+
-        '<div class="row-title" style="font-size:13.5px">'+esc(pt.naziv)+'</div>'+
-        '<div class="row-sub">'+esc(pt.usluga)+' &middot; '+esc(pt.mjesto)+(pt.nap?' &middot; '+esc(pt.nap):'')+'</div>'+
-        kontakt+
-      '</div></div>';
-    }).join('') +'</div>'+
-    '<button class="btn sec sm block role-voditelj" style="margin-top:8px" onclick="app.noviPartner()">+ Novi dobavljač</button>';
+    '<input type="search" placeholder="Pretraži kontakte (naziv, usluga, mjesto…)" value="'+esc(KONT_Q)+'"'+
+      ' oninput="app.traziKontakt(this.value)" style="margin-bottom:4px">'+
+    '<div id="kontakti-list">'+kontaktiListHtml()+'</div>'+
+    '<button class="btn sec sm block role-voditelj" style="margin-top:8px" onclick="app.noviPartner()">+ Novi dobavljač / servis</button>';
+}
+
+/* =====================  render: Analitika (voditelj/direktor)  ===================== */
+var ANA_DANA = 90;
+function anaKvarovi(){
+  var od = ANA_DANA ? isoShift(-ANA_DANA) : '0000-00-00';
+  return samoKvarovi().filter(function(k){ return k.date >= od; });
+}
+function tbl(headeri, redovi){
+  return '<div style="overflow-x:auto"><table class="tbl"><thead><tr>'+
+    headeri.map(function(h,i){ return '<th'+(i?' class="num"':'')+'>'+h+'</th>'; }).join('')+
+    '</tr></thead><tbody>'+
+    redovi.map(function(r){ return '<tr>'+r.map(function(c,i){ return '<td'+(i?' class="num"':'')+'>'+c+'</td>'; }).join('')+'</tr>'; }).join('')+
+    '</tbody></table></div>';
+}
+function anaPodaci(){
+  var KV = anaKvarovi();
+  var poStroju = {};
+  KV.forEach(function(k){
+    var key = k.m || '—';
+    var s = poStroju[key] = poStroju[key] || { n:0, sati:0, cost:0, rijeseni:0, satiR:0 };
+    s.n++; s.sati += k.sati; s.cost += kvarCost(k);
+    if(k.status==='rijesen'){ s.rijeseni++; s.satiR += k.sati; }
+  });
+  var poSmjeni = {};
+  KV.forEach(function(k){
+    var key = k.smjena || '—';
+    var s = poSmjeni[key] = poSmjeni[key] || { n:0, sati:0, cost:0 };
+    s.n++; s.sati += k.sati; s.cost += kvarCost(k);
+  });
+  var poKat = {};
+  KV.forEach(function(k){
+    var key = k.kategorija || 'Ostalo';
+    var s = poKat[key] = poKat[key] || { n:0, sati:0, cost:0 };
+    s.n++; s.sati += k.sati; s.cost += kvarCost(k);
+  });
+  var uzroci = {};
+  KV.forEach(function(k){
+    var sig = kvarSig(k); if(!sig) return;
+    var u = uzroci[sig] = uzroci[sig] || { n:0, sati:0, cost:0, primjer:k };
+    u.n++; u.sati += k.sati; u.cost += kvarCost(k);
+  });
+  return { KV:KV, poStroju:poStroju, poSmjeni:poSmjeni, poKat:poKat, uzroci:uzroci };
+}
+function renderAnalitika(){
+  var d = anaPodaci();
+  var uk = { n:d.KV.length, sati:0, cost:0 };
+  d.KV.forEach(function(k){ uk.sati += k.sati; uk.cost += kvarCost(k); });
+  var rijeseni = d.KV.filter(function(k){ return k.status==='rijesen'; });
+  var mttr = rijeseni.length ? rijeseni.reduce(function(s,k){ return s+k.sati; },0)/rijeseni.length : 0;
+  var periodi = [[30,'30 dana'],[90,'90 dana'],[365,'12 mjeseci'],[0,'Sve']];
+  var perOpts = periodi.map(function(p){
+    return '<option value="'+p[0]+'"'+(ANA_DANA===p[0]?' selected':'')+'>'+p[1]+'</option>'; }).join('');
+
+  var strojRedovi = Object.keys(d.poStroju).map(function(id){
+    var s = d.poStroju[id]; var m = machineById(id) || {name:'—'};
+    return { name:m.name, id:id, s:s };
+  }).sort(function(a,b){ return b.s.cost - a.s.cost; }).map(function(x){
+    var mt = x.s.rijeseni ? (x.s.satiR / x.s.rijeseni) : 0;
+    return [esc(x.name), x.s.n, H(x.s.sati), EUR(x.s.cost), mt ? H(mt) : '—'];
+  });
+  var smjenaRedovi = Object.keys(d.poSmjeni).sort().map(function(sm){
+    var s = d.poSmjeni[sm];
+    return [esc(sm), s.n, H(s.sati), EUR(s.cost)];
+  });
+  var katRedovi = Object.keys(d.poKat).map(function(kk){
+    return { kk:kk, s:d.poKat[kk] };
+  }).sort(function(a,b){ return b.s.cost - a.s.cost; }).map(function(x){
+    return [esc(x.kk), x.s.n, H(x.s.sati), EUR(x.s.cost)];
+  });
+  var uzrokRedovi = Object.keys(d.uzroci).map(function(sig){
+    return d.uzroci[sig];
+  }).filter(function(u){ return u.n >= 2; }).sort(function(a,b){ return b.cost - a.cost; })
+    .slice(0,10).map(function(u){
+      var m = machineById(u.primjer.m) || {name:'—'};
+      return [esc(m.name)+': '+esc(u.primjer.opis.slice(0,44)), u.n+'×', H(u.sati), EUR(u.cost)];
+    });
+
+  $('#screen-analitika').innerHTML =
+    '<button class="back" onclick="app.go(\'pregled\')">‹ Pregled</button>'+
+    '<div class="filters" style="grid-template-columns:1fr">'+
+      '<select onchange="app.anaPeriod(this.value)">'+perOpts+'</select>'+
+    '</div>'+
+    '<div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">'+
+      '<div class="stat"><span class="stat-num">'+uk.n+'</span><span class="stat-label">kvarova</span></div>'+
+      '<div class="stat"><span class="stat-num" style="font-size:19px">'+H(uk.sati)+'</span><span class="stat-label">zastoja</span></div>'+
+      '<div class="stat"><span class="stat-num" style="font-size:17px">'+EUR(uk.cost)+'</span><span class="stat-label">trošak</span></div>'+
+      '<div class="stat"><span class="stat-num" style="font-size:19px">'+(mttr?H(mttr):'—')+'</span><span class="stat-label">MTTR</span></div>'+
+    '</div>'+
+    '<h2>Po stroju</h2><div class="card" style="padding:4px 0">'+
+      tbl(['Stroj','Kvarova','Sati','Trošak','MTTR'], strojRedovi)+'</div>'+
+    '<h2>Po smjeni</h2><div class="card" style="padding:4px 0">'+
+      tbl(['Smjena','Kvarova','Sati','Trošak'], smjenaRedovi)+'</div>'+
+    '<h2>Po kategoriji</h2><div class="card" style="padding:4px 0">'+
+      tbl(['Kategorija','Kvarova','Sati','Trošak'], katRedovi)+'</div>'+
+    '<h2>Ponovljeni uzroci (2+ puta)</h2><div class="card" style="padding:4px 0">'+
+      (uzrokRedovi.length ? tbl(['Uzrok','Ponavljanja','Sati','Trošak'], uzrokRedovi)
+        : '<div class="empty">Nema ponovljenih uzroka u periodu.</div>')+'</div>'+
+    '<button class="btn primary block" style="margin-top:14px" onclick="app.izvozCSV(ANA_DANA)">⬇ Izvoz CSV (kvarovi, odabrani period)</button>'+
+    '<button class="btn sec block" style="margin-top:8px" onclick="app.analitikaIspis()">📄 Ispis / PDF analitike</button>';
+}
+
+/* =====================  render: Raspored preventive  ===================== */
+function renderRaspored(){
+  var danas = todayISO();
+  var t7 = isoShift(7), t14 = isoShift(14), t31 = isoShift(31);
+  var grupe = [
+    { naslov:'⚠ Kasni', boja:'var(--red)', f:function(p){ return p.next < danas; } },
+    { naslov:'Ovaj tjedan', f:function(p){ return p.next >= danas && p.next <= t7; } },
+    { naslov:'Sljedeći tjedan', f:function(p){ return p.next > t7 && p.next <= t14; } },
+    { naslov:'Ovaj mjesec', f:function(p){ return p.next > t14 && p.next <= t31; } },
+    { naslov:'Kasnije', f:function(p){ return p.next > t31; } }
+  ];
+  var sve = DATA.preventiva.slice().sort(function(a,b){ return a.next < b.next ? -1 : 1; });
+  $('#screen-raspored').innerHTML =
+    '<button class="back" onclick="app.go(\'pregled\')">‹ Pregled</button>'+
+    grupe.map(function(g){
+      var stavke = sve.filter(g.f);
+      if(!stavke.length) return '';
+      return '<h2'+(g.boja?' style="color:'+g.boja+'"':'')+'>'+g.naslov+' ('+stavke.length+')</h2>'+
+        '<div class="card">'+stavke.map(function(p){
+          var m = machineById(p.m) || {name:'—'};
+          return '<div class="row click" onclick="app.openStroj(\''+p.m+'\')">'+
+            '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(p.opis)+'</div>'+
+            '<div class="row-sub">'+esc(m.name)+' &middot; '+fmtDate(p.next)+
+              ((p.izv && p.izv!=='interno') ? ' &middot; <b>'+esc(p.izv)+'</b>' : '')+'</div></div>'+
+            '<button class="okbtn role-write" onclick="event.stopPropagation();app.obaviPreventivu(\''+p.id+'\')">✓</button>'+
+          '</div>';
+        }).join('')+'</div>';
+    }).join('') || '<div class="card"><div class="empty">Nema planiranih stavki.</div></div>';
 }
 
 /* =====================  render: Poruke (zajednički kanal)  ===================== */
@@ -1101,10 +1303,11 @@ function renderPoruke(){
     return String(a.created_at).localeCompare(String(b.created_at));
   });
   var html = lista.length ? lista.map(function(p){
-    var moja = p.tko === SESSION.ime;
-    return '<div class="msg'+(moja?' moja':'')+'">'+
+    var sustav = p.tko === 'Sustav';
+    var moja = !sustav && p.tko === SESSION.ime;
+    return '<div class="msg'+(moja?' moja':'')+(sustav?' sustav':'')+'">'+
       '<div class="msg-meta">'+esc(p.tko)+' &middot; '+fmtDateTime(p.created_at)+'</div>'+
-      '<div class="msg-txt">'+esc(p.tekst)+'</div></div>';
+      '<div class="msg-txt">'+esc(p.tekst)+(sustav?' <span style="opacity:.6">('+fmtDateTime(p.created_at).split(' ').pop()+')</span>':'')+'</div></div>';
   }).join('') : '<div class="empty">Još nema poruka.</div>';
   $('#screen-poruke').innerHTML =
     '<h2>Zajedničke poruke — vide ih svi</h2>'+
@@ -1121,16 +1324,17 @@ function renderPoruke(){
 var RENDERERS = {
   pregled: renderPregled, strojevi: renderStrojevi,
   kvarovi: renderKvarovi, dijelovi: renderDijelovi,
-  kontakti: renderKontakti, poruke: renderPoruke, stroj: renderStroj
+  kontakti: renderKontakti, poruke: renderPoruke,
+  analitika: renderAnalitika, raspored: renderRaspored, stroj: renderStroj
 };
 function showScreen(name){
   CURRENT_SCREEN = name;
-  ['pregled','strojevi','kvarovi','dijelovi','kontakti','poruke','stroj'].forEach(function(s){
+  ['pregled','strojevi','kvarovi','dijelovi','kontakti','poruke','analitika','raspored','stroj'].forEach(function(s){
     $('#screen-'+s).classList.toggle('hidden', s!==name);
   });
   REPS = repCounts();
   RENDERERS[name]();
-  var tabName = name==='stroj' ? 'strojevi' : name;
+  var tabName = name==='stroj' ? 'strojevi' : (name==='analitika'||name==='raspored' ? 'pregled' : name);
   document.querySelectorAll('.tab').forEach(function(t){
     t.classList.toggle('active', t.getAttribute('data-tab')===tabName);
   });
@@ -1239,15 +1443,19 @@ var app = {
       status:'otvoren', upoz:false, tko:null, zam:null,
       foto:PENDING_FOTO || null, dodijeljen:null,
       prioritet:'normalno', smjena:(new Date().getHours()>=6 && new Date().getHours()<14)?'1. smjena':'2. smjena',
-      ceka_dio:false, sudjelovali:null
+      ceka_dio:false, sudjelovali:null, tip:'kvar', rok:null,
+      kategorija:autoKat(f.get('opis'))
     };
     var pendingFoto = PENDING_FOTO; PENDING_FOTO = '';
     DATA.kvarovi.push(kvar);
     app.closeModal(); showScreen('kvarovi');
+    var bm = machineById(kvar.m) || {name:''};
+    sysPoruka('⚠ Prijavljen kvar: '+bm.name+' — '+kvar.opis+' ('+(SESSION.ime||'')+')');
     if(REMOTE){
       kvar.foto = await uploadFoto(pendingFoto) || null;
       await apiInsert('kvarovi', { m:kvar.m, date:kvar.date, opis:kvar.opis, sati:0,
-        status:'otvoren', upoz:false, foto:kvar.foto, prioritet:'normalno', smjena:kvar.smjena }, kvar);
+        status:'otvoren', upoz:false, foto:kvar.foto, prioritet:'normalno', smjena:kvar.smjena,
+        kategorija:kvar.kategorija, tip:'kvar' }, kvar);
     } else { save(); }
   },
   posaljiPoruku: async function(e){
@@ -1272,12 +1480,47 @@ var app = {
     app.komentariKvara(kId);  /* osvježi popis u modalu */
     await apiInsert('komentari', { kvar_id:kId, tekst:kom.tekst, tko:kom.tko }, kom);
   },
-  izvozCSV: function(){
-    var glava = 'datum;stroj;opis;status;prioritet;smjena;sati_zastoja;trosak_eur;dodijeljen;rijesio;sudjelovali;zamijenjeno;ceka_dio';
-    var redovi = DATA.kvarovi.slice().sort(byDateDesc).map(function(k){
+  anaPeriod: function(v){ ANA_DANA = parseInt(v,10)||0; renderAnalitika(); },
+  analitikaIspis: function(){
+    /* analitika u modal (print CSS ispisuje samo modal) pa na pisač/PDF */
+    var d = anaPodaci();
+    var redovi = Object.keys(d.poStroju).map(function(id){
+      var s = d.poStroju[id]; var m = machineById(id) || {name:'—'};
+      return { name:m.name, s:s };
+    }).sort(function(a,b){ return b.s.cost - a.s.cost; });
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal audit">'+
+      '<div class="modal-head"><h3>Analitika kvarova</h3>'+
+        '<span><button class="btn sec sm" onclick="window.print()">📄 PDF</button> '+
+        '<button class="x" onclick="app.closeModal()">✕</button></span></div>'+
+      '<div class="a-meta">Generirano: '+fmtDate(todayISO())+' &middot; period: '+(ANA_DANA?('zadnjih '+ANA_DANA+' dana'):'sve')+' &middot; Clarum &middot; Sektor održavanja</div>'+
+      '<h4>Kvarovi po stroju</h4>'+
+      redovi.map(function(x){
+        var mt = x.s.rijeseni ? (x.s.satiR/x.s.rijeseni) : 0;
+        return '<div class="a-item"><b>'+esc(x.name)+'</b> — '+x.s.n+' kvarova, '+H(x.s.sati)+' zastoja, '+EUR(x.s.cost)+
+          (mt?', MTTR '+H(mt):'')+'</div>';
+      }).join('')+
+      '<h4>Po smjeni</h4>'+
+      Object.keys(d.poSmjeni).sort().map(function(sm){
+        var s = d.poSmjeni[sm];
+        return '<div class="a-item">'+esc(sm)+' — '+s.n+' kvarova, '+H(s.sati)+', '+EUR(s.cost)+'</div>';
+      }).join('')+
+      '<h4>Po kategoriji</h4>'+
+      Object.keys(d.poKat).map(function(kk){
+        var s = d.poKat[kk];
+        return '<div class="a-item">'+esc(kk)+' — '+s.n+' kvarova, '+H(s.sati)+', '+EUR(s.cost)+'</div>';
+      }).join('')+
+      '<button class="btn primary block" style="margin-top:16px" onclick="app.closeModal()">Zatvori</button>'+
+      '</div></div>';
+  },
+  izvozCSV: function(dani){
+    dani = parseInt(dani,10)||0;
+    var od = dani ? isoShift(-dani) : '0000-00-00';
+    var glava = 'datum;stroj;vrsta;kategorija;opis;status;prioritet;smjena;sati_zastoja;trosak_eur;dodijeljen;rijesio;sudjelovali;zamijenjeno;ceka_dio';
+    var redovi = DATA.kvarovi.filter(function(k){ return k.date >= od; }).sort(byDateDesc).map(function(k){
       var m = machineById(k.m) || {name:''};
       var c = function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; };
-      return [k.date, m.name, k.opis, k.status, k.prioritet||'', k.smjena||'', k.sati,
+      return [k.date, m.name, k.tip||'kvar', k.kategorija||'', k.opis, k.status, k.prioritet||'', k.smjena||'', k.sati,
               Math.round(kvarCost(k)), k.dodijeljen||'', k.tko||'', k.sudjelovali||'', k.zam||'',
               k.ceka_dio?'da':'ne'].map(c).join(';');
     });
@@ -1301,6 +1544,17 @@ var app = {
   },
   openStroj: function(id){ CURRENT_M = id; showScreen('stroj'); },
   setFilter: function(key,val){ FILTER[key]=val; renderKvarovi(); },
+  setFilterTiho: function(key,val){
+    /* pretraga bez re-rendera inputa (fokus ostaje) — osvježi samo listu */
+    FILTER[key]=val;
+    var card = document.querySelector('#screen-kvarovi .card:last-of-type');
+    if(card){
+      var stara = card.outerHTML; renderKvarovi();
+      var inp = document.querySelector('#screen-kvarovi input[type="search"]');
+      if(inp){ inp.focus(); var v=inp.value; inp.setSelectionRange(v.length,v.length); }
+    }
+  },
+  resetFiltere: function(){ FILTER = { stroj:'svi', status:'svi', majstor:'svi', od:'', do:'', q:'' }; renderKvarovi(); },
   qty: async function(id, delta){
     var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
     if(!p) return;
@@ -1309,6 +1563,141 @@ var app = {
     if(el) el.innerHTML = partsListHtml();
     updateBadge();
     await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
+  },
+  urediDio: function(id){
+    var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
+    if(!p) return;
+    var dobOpts = DATA.partneri.map(function(x){
+      return '<option'+(p.dob===x.naziv?' selected':'')+'>'+esc(x.naziv)+'</option>'; }).join('');
+    var katOpts = ['Remeni i prijenos','Ležajevi','Brtve i maziva','Senzori i elektrika','Grijači','Folije i ambalaža','Rashladna tehnika','Alati i matrice','Ostalo']
+      .map(function(kk){ return '<option'+((p.kategorija||'Ostalo')===kk?' selected':'')+'>'+kk+'</option>'; }).join('');
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
+      '<div class="modal-head"><h3>Uredi dio</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<form onsubmit="app.saveUrediDio(event,\''+id+'\')">'+
+        '<label>Naziv</label><input name="naziv" required value="'+esc(p.naziv)+'">'+
+        '<label>Za koji stroj</label><input name="stroj" value="'+esc(p.stroj)+'">'+
+        '<label>Stanje</label><input type="number" name="stanje" min="0" step="1" value="'+p.stanje+'" required>'+
+        '<label>Minimum</label><input type="number" name="min" min="0" step="1" value="'+p.min+'" required>'+
+        '<label>Dobavljač</label><select name="dob">'+dobOpts+'</select>'+
+        '<label>Kategorija</label><select name="kat">'+katOpts+'</select>'+
+        '<label>Cijena (€)</label><input type="number" name="cijena" min="0" step="0.01" value="'+p.cijena+'">'+
+        '<button class="btn primary block" type="submit">Spremi</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</form></div></div>';
+  },
+  saveUrediDio: async function(e, id){
+    e.preventDefault();
+    var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
+    if(!p) return;
+    var f = new FormData(e.target);
+    p.naziv = String(f.get('naziv')||'').trim() || p.naziv;
+    p.stroj = String(f.get('stroj')||'').trim();
+    p.stanje = parseInt(f.get('stanje'),10)||0;
+    p.min = parseInt(f.get('min'),10)||0;
+    p.dob = f.get('dob');
+    p.kategorija = f.get('kat')||'Ostalo';
+    p.cijena = parseFloat(f.get('cijena'))||0;
+    app.closeModal(); showScreen('dijelovi');
+    await apiUpdate('dijelovi', id, { naziv:p.naziv, stroj:p.stroj, stanje:p.stanje,
+      min:p.min, dob:p.dob, kategorija:p.kategorija, cijena:p.cijena });
+  },
+  urediStroj: function(mId){
+    var m = machineById(mId);
+    if(!m) return;
+    var progOpts = PROGRAMS.map(function(pr){
+      return '<option'+(m.program===pr?' selected':'')+'>'+esc(pr)+'</option>'; }).join('');
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
+      '<div class="modal-head"><h3>Uredi stroj</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<form onsubmit="app.saveUrediStroj(event,\''+mId+'\')">'+
+        '<label>Naziv</label><input name="name" required value="'+esc(m.name)+'">'+
+        '<label>Program</label><select name="program">'+progOpts+'</select>'+
+        '<label>Trošak zastoja (€/h)</label><input type="number" name="rate" step="10" min="0" value="'+m.rate+'" required>'+
+        '<button class="btn primary block" type="submit">Spremi</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</form></div></div>';
+  },
+  saveUrediStroj: async function(e, mId){
+    e.preventDefault();
+    var m = machineById(mId);
+    if(!m) return;
+    var f = new FormData(e.target);
+    m.name = String(f.get('name')||'').trim() || m.name;
+    m.program = f.get('program');
+    m.rate = parseFloat(f.get('rate'))||m.rate;
+    app.closeModal(); showScreen('stroj');
+    await apiUpdate('machines', mId, { name:m.name, program:m.program, rate:m.rate });
+  },
+  urediPreventivu: function(pId){
+    if(jeTempId(pId)){ alert('Zapis se upravo sprema — pokušaj za par sekundi.'); return; }
+    var p = DATA.preventiva.filter(function(x){ return x.id===pId; })[0];
+    if(!p) return;
+    var intOpts = ['svakih 7 dana','svakih 30 dana','svakih 60 dana','svakih 90 dana','svakih 180 dana','svakih 12 mjeseci']
+      .map(function(iv){ return '<option'+(p.interval===iv?' selected':'')+'>'+iv+'</option>'; }).join('');
+    var izvOpts = ['interno'].concat(DATA.partneri.map(function(x){ return x.naziv; }))
+      .map(function(t){ return '<option'+(p.izv===t?' selected':'')+'>'+esc(t)+'</option>'; }).join('');
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
+      '<div class="modal-head"><h3>Uredi preventivu</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<form onsubmit="app.saveUrediPreventivu(event,\''+pId+'\')">'+
+        '<label>Zahvat</label><input name="opis" required value="'+esc(p.opis)+'">'+
+        '<label>Interval</label><select name="interval">'+intOpts+'</select>'+
+        '<label>Sljedeći termin</label><input type="date" name="next" value="'+p.next+'" required>'+
+        '<label>Izvođač</label><select name="izv">'+izvOpts+'</select>'+
+        '<button class="btn primary block" type="submit">Spremi</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</form></div></div>';
+  },
+  saveUrediPreventivu: async function(e, pId){
+    e.preventDefault();
+    var p = DATA.preventiva.filter(function(x){ return x.id===pId; })[0];
+    if(!p) return;
+    var f = new FormData(e.target);
+    p.opis = String(f.get('opis')||'').trim() || p.opis;
+    p.interval = f.get('interval');
+    p.next = f.get('next') || p.next;
+    p.izv = f.get('izv') || 'interno';
+    app.closeModal();
+    showScreen($('#screen-stroj').classList.contains('hidden') ? 'raspored' : 'stroj');
+    await apiUpdate('preventiva', pId, { opis:p.opis, interval:p.interval, next:p.next, izv:p.izv });
+  },
+  traziKontakt: function(v){
+    KONT_Q = v;
+    var el = $('#kontakti-list');
+    if(el) el.innerHTML = kontaktiListHtml();
+  },
+  urediPartnera: function(id){
+    var pt = DATA.partneri.filter(function(x){ return x.id===id; })[0];
+    if(!pt) return;
+    var tipOpts = TIP_PARTNERA.map(function(t){
+      return '<option'+((pt.tip||'Dobavljač')===t?' selected':'')+'>'+t+'</option>'; }).join('');
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
+      '<div class="modal-head"><h3>Uredi kontakt</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<form onsubmit="app.saveUrediPartnera(event,\''+id+'\')">'+
+        '<label>Naziv</label><input name="naziv" required value="'+esc(pt.naziv)+'">'+
+        '<label>Vrsta</label><select name="tip">'+tipOpts+'</select>'+
+        '<label>Usluga / roba</label><input name="usluga" value="'+esc(pt.usluga)+'">'+
+        '<label>Mjesto</label><input name="mjesto" value="'+esc(pt.mjesto)+'">'+
+        '<label>Telefon</label><input name="tel" type="tel" value="'+esc(pt.tel)+'">'+
+        '<label>E-mail</label><input name="email" type="email" value="'+esc(pt.email)+'">'+
+        '<label>Napomena</label><input name="nap" value="'+esc(pt.nap)+'">'+
+        '<button class="btn primary block" type="submit">Spremi</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</form></div></div>';
+  },
+  saveUrediPartnera: async function(e, id){
+    e.preventDefault();
+    var pt = DATA.partneri.filter(function(x){ return x.id===id; })[0];
+    if(!pt) return;
+    var f = new FormData(e.target);
+    ['naziv','usluga','mjesto','tel','email','nap','tip'].forEach(function(k){
+      pt[k] = String(f.get(k)||'').trim();
+    });
+    app.closeModal(); showScreen('kontakti');
+    await apiUpdate('partneri', id, { naziv:pt.naziv, usluga:pt.usluga, mjesto:pt.mjesto,
+      tel:pt.tel, email:pt.email, nap:pt.nap, tip:pt.tip });
   },
   toggleNaruceno: async function(id){
     var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
@@ -1361,6 +1750,7 @@ var app = {
       '<div class="modal-head"><h3>Novi dobavljač / servis</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<form onsubmit="app.savePartner(event)">'+
         '<label>Naziv</label><input name="naziv" required placeholder="npr. Servis d.o.o.">'+
+        '<label>Vrsta</label><select name="tip">'+TIP_PARTNERA.map(function(t){ return '<option>'+t+'</option>'; }).join('')+'</select>'+
         '<label>Usluga / roba</label><input name="usluga" required placeholder="npr. servis viličara, elektromaterijal…">'+
         '<label>Mjesto</label><input name="mjesto" placeholder="npr. Slavonski Brod">'+
         '<label>Telefon</label><input name="tel" type="tel" placeholder="npr. 035 123 456">'+
@@ -1375,12 +1765,13 @@ var app = {
     var pt = {
       id:'pt'+Date.now(), naziv:String(f.get('naziv')||'').trim(), usluga:String(f.get('usluga')||'').trim(),
       mjesto:String(f.get('mjesto')||'').trim(), nap:String(f.get('nap')||'').trim(),
-      tel:String(f.get('tel')||'').trim(), email:String(f.get('email')||'').trim()
+      tel:String(f.get('tel')||'').trim(), email:String(f.get('email')||'').trim(),
+      tip:f.get('tip')||'Dobavljač'
     };
     DATA.partneri.push(pt);
-    app.closeModal(); showScreen('dijelovi');
+    app.closeModal(); showScreen('kontakti');
     await apiInsert('partneri', { naziv:pt.naziv, usluga:pt.usluga, mjesto:pt.mjesto,
-      nap:pt.nap, tel:pt.tel, email:pt.email }, pt);
+      nap:pt.nap, tel:pt.tel, email:pt.email, tip:pt.tip }, pt);
   },
   closeModal: function(){ $('#modal-root').innerHTML=''; PENDING_FOTO=''; },
 
@@ -1390,24 +1781,32 @@ var app = {
       '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
       '<div class="modal-head"><h3>Novi kvar</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<form onsubmit="app.saveKvar(event)">'+
-        '<label>Stroj</label><select name="m" required>'+opts+'</select>'+
+        '<label>Vrsta prijave</label><select name="tip" onchange="var z=this.value===\'zadatak\';document.getElementById(\'f-rok\').style.display=z?\'\':\'none\';document.getElementById(\'f-kvar-polja\').style.display=z?\'none\':\'\'">'+
+          '<option value="kvar">Kvar na stroju</option><option value="zadatak">Zadatak (nije kvar)</option></select>'+
+        '<label>Stroj</label><select name="m"><option value="">— (opći zadatak)</option>'+opts+'</select>'+
+        '<div id="f-rok" style="display:none"><label>Rok izvršenja</label>'+
+          '<input type="date" name="rok" min="'+todayISO()+'"></div>'+
         '<label>📷 Fotografija (kamera ili galerija)</label>'+
         '<input type="file" accept="image/*" capture="environment" onchange="app.fotoOdabrana(event)">'+
         '<img id="foto-prev" class="foto-prev" alt="pregled fotografije">'+
-        '<label>Opis kvara</label><textarea name="opis" rows="2" required placeholder="npr. puknuti remen na pogonu"></textarea>'+
+        '<label>Opis</label><textarea name="opis" rows="2" required placeholder="npr. puknuti remen na pogonu"></textarea>'+
         '<label>Prioritet</label><select name="prioritet">'+
           '<option value="normalno">Normalno</option><option value="visok">Visok</option>'+
           '<option value="hitno">HITNO — linija stoji</option></select>'+
         '<label>Dodijeli majstoru</label><select name="dodijeljen">'+
           '<option value="">—</option>'+majstorOpts('')+'</select>'+
-        '<label>Smjena</label><select name="smjena">'+smjenaOpts()+'</select>'+
         '<label>Datum</label><input type="date" name="date" value="'+todayISO()+'" max="'+todayISO()+'" required>'+
-        '<label>Trajanje zastoja (h)</label><input type="number" name="sati" step="0.5" min="0" value="1" required>'+
+        '<div id="f-kvar-polja">'+
+        '<label>Kategorija kvara</label><select name="kategorija"><option value="">— automatski —</option>'+
+          KAT_KVARA.map(function(kk){ return '<option>'+kk+'</option>'; }).join('')+'</select>'+
+        '<label>Smjena</label><select name="smjena">'+smjenaOpts()+'</select>'+
+        '<label>Trajanje zastoja (h)</label><input type="number" name="sati" step="0.5" min="0" value="1">'+
         '<label>Status</label><select name="status" onchange="document.getElementById(\'f-rj\').style.display = this.value===\'rijesen\' ? \'\' : \'none\'">'+
           '<option value="otvoren">Otvoren</option><option value="rijesen">Riješen</option></select>'+
         '<div id="f-rj" style="display:none">'+
           '<label>Riješio</label><select name="tko">'+majstorOpts(SESSION.ime)+'</select>'+
           '<label>Zamijenjeno (dio)</label><input name="zam" placeholder="npr. remen, ležaj, brtva…">'+
+        '</div>'+
         '</div>'+
         '<button class="btn primary block" type="submit">Spremi kvar</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
@@ -1417,29 +1816,39 @@ var app = {
   saveKvar: async function(e){
     e.preventDefault();
     var f = new FormData(e.target);
-    var status = f.get('status');
-    if(f.get('prioritet')==='hitno' && !PENDING_FOTO &&
+    var tip = f.get('tip') || 'kvar';
+    var status = tip==='zadatak' ? 'otvoren' : f.get('status');
+    if(tip==='kvar' && !f.get('m')){ alert('Odaberi stroj (ili promijeni vrstu u Zadatak).'); return; }
+    if(tip==='kvar' && f.get('prioritet')==='hitno' && !PENDING_FOTO &&
        !confirm('HITAN kvar bez fotografije — nastaviti bez nje?')) return;
     var kvar = {
-      id:'kv'+Date.now(), m:f.get('m'), date:f.get('date'),
-      opis:String(f.get('opis')||'').trim(), sati:parseFloat(f.get('sati'))||0,
+      id:'kv'+Date.now(), m:f.get('m') || null, date:f.get('date'),
+      opis:String(f.get('opis')||'').trim(),
+      sati: tip==='zadatak' ? 0 : (parseFloat(f.get('sati'))||0),
       status:status, upoz:false,
       tko: status==='rijesen' ? f.get('tko') : null,
       zam: status==='rijesen' ? (String(f.get('zam')||'').trim()||null) : null,
       foto: PENDING_FOTO || null,
       dodijeljen: f.get('dodijeljen') || null,
       prioritet: f.get('prioritet') || 'normalno',
-      smjena: f.get('smjena') || null,
-      ceka_dio: false, sudjelovali: null
+      smjena: tip==='zadatak' ? null : (f.get('smjena') || null),
+      ceka_dio: false, sudjelovali: null,
+      tip: tip, rok: tip==='zadatak' ? (f.get('rok') || null) : null,
+      kategorija: tip==='zadatak' ? 'Ostalo' : (f.get('kategorija') || autoKat(f.get('opis')))
     };
     var pendingFoto = PENDING_FOTO; PENDING_FOTO = '';
     DATA.kvarovi.push(kvar);
     app.closeModal(); showScreen('kvarovi');
+    var nm = machineById(kvar.m);
+    sysPoruka((tip==='zadatak' ? '📋 Novi zadatak: ' : '⚠ Prijavljen kvar: ')+
+      (nm ? nm.name+' — ' : '')+kvar.opis+
+      (kvar.dodijeljen ? ' → '+kvar.dodijeljen : '')+' ('+(SESSION.ime||'')+')');
     if(REMOTE){
       kvar.foto = await uploadFoto(pendingFoto) || null;
       await apiInsert('kvarovi', { m:kvar.m, date:kvar.date, opis:kvar.opis, sati:kvar.sati,
         status:kvar.status, upoz:kvar.upoz, tko:kvar.tko, zam:kvar.zam, foto:kvar.foto,
-        dodijeljen:kvar.dodijeljen, prioritet:kvar.prioritet, smjena:kvar.smjena }, kvar);
+        dodijeljen:kvar.dodijeljen, prioritet:kvar.prioritet, smjena:kvar.smjena,
+        tip:kvar.tip, rok:kvar.rok, kategorija:kvar.kategorija }, kvar);
     } else { save(); }
   },
 
@@ -1448,8 +1857,9 @@ var app = {
     var p = DATA.preventiva.filter(function(x){ return x.id===pId; })[0];
     if(!p) return;
     var m = machineById(p.m) || {name:''};
-    var pref = (p.izv && p.izv!=='interno') ? p.izv : (p.tkoZadnji || 'Marko');
-    var tkoOpts = ['Marko','Ivica','Damir'].concat(DATA.partneri.map(function(x){ return x.naziv; }))
+    var pref = (p.izv && p.izv!=='interno') ? p.izv : (p.tkoZadnji || SESSION.ime || MAJSTORI[0]);
+    var tkoOpts = MAJSTORI.concat([SESSION.ime]).concat(DATA.partneri.map(function(x){ return x.naziv; }))
+      .filter(function(t,i,a){ return t && a.indexOf(t)===i; })
       .map(function(t){ return '<option'+(pref===t?' selected':'')+'>'+esc(t)+'</option>'; }).join('');
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
@@ -1472,6 +1882,8 @@ var app = {
     p.next = addDaysISO(datum, intervalDays(p.interval));
     app.closeModal();
     showScreen(CURRENT_M && !$('#screen-stroj').classList.contains('hidden') ? 'stroj' : 'pregled');
+    var pmm = machineById(p.m);
+    sysPoruka('🔧 Preventiva obavljena: '+(pmm ? pmm.name+' — ' : '')+p.opis+' ('+esc(p.tkoZadnji||'')+')');
     await apiUpdate('preventiva', p.id, { zadnje:p.zadnje, tko_zadnji:p.tkoZadnji, next:p.next });
   },
   rijesiKvar: function(kId){
@@ -1513,14 +1925,20 @@ var app = {
     if(dioId){
       var p = DATA.dijelovi.filter(function(x){ return x.id===dioId; })[0];
       if(p){
+        var prije = p.stanje;
         p.stanje = Math.max(0, p.stanje - kol);
         if(!k.zam) k.zam = p.naziv + (kol>1 ? ' ×'+kol : '');
         else k.zam += ' + ' + p.naziv + (kol>1 ? ' ×'+kol : '');
+        if(prije >= p.min && p.stanje < p.min)
+          sysPoruka('📦 Dio ispod minimuma: '+p.naziv+' (stanje '+p.stanje+', min '+p.min+') — naručiti!');
         await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
       }
     }
     app.closeModal();
     showScreen($('#screen-stroj').classList.contains('hidden') ? 'kvarovi' : 'stroj');
+    var rm = machineById(k.m);
+    sysPoruka('✅ '+(k.tip==='zadatak'?'Zadatak obavljen':'Kvar riješen')+': '+
+      (rm ? rm.name+' — ' : '')+k.opis+' ('+esc(k.tko||'')+')');
     await apiUpdate('kvarovi', k.id, { sati:k.sati, status:k.status, upoz:false, ceka_dio:false,
       tko:k.tko, zam:k.zam, sudjelovali:k.sudjelovali, closed_at:new Date().toISOString() });
   },
@@ -1528,23 +1946,39 @@ var app = {
     if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
     if(!k) return;
-    var m = machineById(k.m) || {name:''};
+    var strojOpts = '<option value="">— (zadatak bez stroja)</option>'+DATA.machines.map(function(mm){
+      return '<option value="'+mm.id+'"'+(k.m===mm.id?' selected':'')+'>'+esc(mm.name)+'</option>'; }).join('');
     var majOpts = '<option value="">—</option>'+majstorOpts(k.dodijeljen);
     var priOpts = [['normalno','Normalno'],['visok','Visok'],['hitno','HITNO — linija stoji']].map(function(p2){
       return '<option value="'+p2[0]+'"'+(k.prioritet===p2[0]?' selected':'')+'>'+p2[1]+'</option>'; }).join('');
     var smjOpts = ['1. smjena','2. smjena'].map(function(s){
       return '<option'+(k.smjena===s?' selected':'')+'>'+s+'</option>'; }).join('');
+    var katOpts = KAT_KVARA.map(function(kk){
+      return '<option'+((k.kategorija||'Ostalo')===kk?' selected':'')+'>'+kk+'</option>'; }).join('');
+    var rijeseno = k.status==='rijesen'
+      ? '<label>Riješio</label><select name="tko">'+majstorOpts(k.tko)+'</select>'+
+        '<label>Sudjelovali</label><input name="sudjelovali" value="'+esc(k.sudjelovali||'')+'">'+
+        '<label>Zamijenjeno</label><input name="zam" value="'+esc(k.zam||'')+'">'
+      : '';
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
-      '<div class="modal-head"><h3>Uredi kvar</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<div class="row-sub" style="margin-bottom:2px">'+esc(m.name)+' &middot; '+esc(k.opis)+'</div>'+
+      '<div class="modal-head"><h3>Uredi '+(k.tip==='zadatak'?'zadatak':'kvar')+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<form onsubmit="app.saveUredi(event,\''+kId+'\')">'+
-        '<label>Dodijeljen majstoru</label><select name="dodijeljen">'+majOpts+'</select>'+
+        '<label>Stroj</label><select name="m">'+strojOpts+'</select>'+
+        '<label>Opis</label><textarea name="opis" rows="2" required>'+esc(k.opis)+'</textarea>'+
+        '<label>Datum</label><input type="date" name="date" value="'+k.date+'" required>'+
+        '<label>Trajanje zastoja (h)</label><input type="number" name="sati" step="0.5" min="0" value="'+k.sati+'">'+
+        '<label>Kategorija</label><select name="kategorija">'+katOpts+'</select>'+
         '<label>Prioritet</label><select name="prioritet">'+priOpts+'</select>'+
         '<label>Smjena</label><select name="smjena"><option value=""'+(k.smjena?'':' selected')+'>—</option>'+smjOpts+'</select>'+
-        '<div style="margin-top:12px"><label style="display:inline;text-transform:none;letter-spacing:0">'+
-          '<input type="checkbox" name="ceka"'+(k.ceka_dio?' checked':'')+'> Čeka dio (naručeno, popravak stoji)</label></div>'+
-        '<button class="btn primary block" type="submit">Spremi</button>'+
+        '<label>Dodijeljen</label><select name="dodijeljen">'+majOpts+'</select>'+
+        rijeseno+
+        (k.status!=='rijesen'
+          ? '<div style="margin-top:12px"><label style="display:inline;text-transform:none;letter-spacing:0">'+
+            '<input type="checkbox" name="ceka"'+(k.ceka_dio?' checked':'')+'> Čeka dio (naručeno, popravak stoji)</label></div>'
+          : '')+
+        '<button class="btn primary block" type="submit">Spremi izmjene</button>'+
+        '<button class="btn sec block role-voditelj" type="button" style="margin-top:8px" onclick="app.stornirajKvar(\''+kId+'\')">Storniraj (pogrešan unos)</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
@@ -1553,14 +1987,37 @@ var app = {
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
     if(!k) return;
     var f = new FormData(e.target);
+    k.m = f.get('m') || null;
+    k.opis = String(f.get('opis')||'').trim() || k.opis;
+    k.date = f.get('date') || k.date;
+    k.sati = parseFloat(f.get('sati')); if(isNaN(k.sati)) k.sati = 0;
+    k.kategorija = f.get('kategorija') || 'Ostalo';
     k.dodijeljen = f.get('dodijeljen') || null;
     k.prioritet  = f.get('prioritet') || 'normalno';
     k.smjena     = f.get('smjena') || null;
-    k.ceka_dio   = !!f.get('ceka');
+    if(k.status==='rijesen'){
+      k.tko = f.get('tko') || k.tko;
+      k.sudjelovali = String(f.get('sudjelovali')||'').trim() || null;
+      k.zam = String(f.get('zam')||'').trim() || null;
+    } else {
+      k.ceka_dio = !!f.get('ceka');
+    }
     app.closeModal();
     showScreen($('#screen-stroj').classList.contains('hidden') ? 'kvarovi' : 'stroj');
-    await apiUpdate('kvarovi', k.id, { dodijeljen:k.dodijeljen, prioritet:k.prioritet,
-      smjena:k.smjena, ceka_dio:k.ceka_dio });
+    await apiUpdate('kvarovi', k.id, { m:k.m, opis:k.opis, date:k.date, sati:k.sati,
+      kategorija:k.kategorija, dodijeljen:k.dodijeljen, prioritet:k.prioritet,
+      smjena:k.smjena, ceka_dio:k.ceka_dio, tko:k.tko, sudjelovali:k.sudjelovali, zam:k.zam });
+  },
+  stornirajKvar: async function(kId){
+    var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
+    if(!k) return;
+    var razlog = prompt('Razlog storniranja (obavezno — ostaje u evidenciji):');
+    if(!razlog || !razlog.trim()) return;
+    k.status = 'otkazan';
+    k.storno_razlog = razlog.trim();
+    app.closeModal();
+    showScreen('kvarovi');
+    await apiUpdate('kvarovi', k.id, { status:'otkazan', storno_razlog:k.storno_razlog });
   },
   fotoOdabrana: function(e){
     var file = e.target.files && e.target.files[0];
@@ -1683,7 +2140,7 @@ var app = {
     }).join('');
 
     var zahvatiHtml = zahvati.length ? zahvati.map(function(k){
-      var m = machineById(k.m);
+      var m = machineById(k.m) || {name: (k.tip==='zadatak' ? 'Zadatak' : '—')};
       return '<div class="a-item"><b>'+fmtDate(k.date)+'</b> — '+esc(m.name)+': '+esc(k.opis)+
         '<div class="a-sub">zastoj '+H(k.sati)+' &middot; izvršio: '+esc(k.tko||'—')+
         (k.zam?' &middot; zamijenjeno: '+esc(k.zam):'')+'</div>'+
@@ -1701,7 +2158,7 @@ var app = {
 
     var otvHtml = otvoreni.length
       ? '<h4>7. Otvorene stavke</h4>'+otvoreni.map(function(k){
-          var m = machineById(k.m);
+          var m = machineById(k.m) || {name: (k.tip==='zadatak' ? 'Zadatak' : '—')};
           return '<div class="a-item"><b>'+fmtDate(k.date)+'</b> — '+esc(m.name)+': '+esc(k.opis)+
             '<div class="a-sub">status: '+(k.upoz?'upozorenje':'otvoren kvar')+', u tijeku</div></div>';
         }).join('')
@@ -1709,7 +2166,10 @@ var app = {
 
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal audit">'+
-      '<div class="modal-head"><h3>Izvještaj za audit (IFS)</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<div class="modal-head"><h3>Izvještaj za audit (IFS)</h3>'+
+        '<span style="display:flex;gap:8px;align-items:center">'+
+        '<button class="btn sec sm" onclick="window.print()">📄 PDF</button>'+
+        '<button class="x" onclick="app.closeModal()">✕</button></span></div>'+
       '<div class="a-meta">Generirano: '+fmtDate(todayISO())+' &middot; Clarum &middot; Sektor održavanja &middot; ref. IFS Food v8, t. 4.16 / 4.17 / 5.4</div>'+
       '<label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Razdoblje zahvata</label>'+
       '<select onchange="app.audit(this.value)" style="margin:4px 0 6px">'+
@@ -1783,6 +2243,26 @@ function majstorOpts(sel){
   }).join('');
 }
 function vidiFinancije(){ return SESSION.role !== 'majstor'; }
+var KAT_KVARA = ['Mehanički','Električni','Pneumatika i rashlada','Ostalo'];
+var TIP_PARTNERA = ['Dobavljač','Servis','Proizvođač','Ostalo'];
+function aktivni(){ return DATA.kvarovi.filter(function(k){ return k.status !== 'otkazan'; }); }
+function samoKvarovi(){ return aktivni().filter(function(k){ return (k.tip||'kvar') === 'kvar'; }); }
+function autoKat(opis){
+  var o = String(opis||'').toLowerCase();
+  if(/senzor|grija|fotosen|elektri/.test(o)) return 'Električni';
+  if(/tlak|ventil|kompresor|rashlad|kondenzator|led/.test(o)) return 'Pneumatika i rashlada';
+  if(/remen|ležaj|matric|brtv|nož|folij|traka|valj|dozator|reduktor/.test(o)) return 'Mehanički';
+  return 'Ostalo';
+}
+function sysPoruka(tekst){
+  /* automatski sistemski zapis u zajedničkom kanalu — živa knjiga smjene */
+  var p = { id:'po'+Date.now(), tko:'Sustav', tekst:tekst, created_at:new Date().toISOString() };
+  if(!DATA.poruke) DATA.poruke = [];
+  DATA.poruke.push(p);
+  if(REMOTE){ try{ sb.from('poruke').insert({ tko:'Sustav', tekst:tekst }).then(function(){}); }catch(e){} }
+  else save();
+  updateBadge();
+}
 function smjenaOpts(){
   var h = new Date().getHours();
   var def = (h >= 6 && h < 14) ? '1. smjena' : '2. smjena';
