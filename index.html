@@ -108,6 +108,21 @@ h2:first-child{margin-top:2px}
 .tbl tr:last-child td{border-bottom:none}
 .tbl .num{text-align:right;font-variant-numeric:tabular-nums}
 
+/* ---------- kalendar rasporeda ---------- */
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cal-naslov{font-size:15px;font-weight:700;text-transform:capitalize}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-h{text-align:center;font-size:10px;font-weight:700;color:var(--muted);padding:3px 0;text-transform:uppercase}
+.cal-d{min-height:44px;border-radius:8px;display:flex;flex-direction:column;align-items:center;
+  justify-content:flex-start;padding-top:5px;font-size:13px;font-weight:600;color:var(--text);
+  cursor:pointer;border:1.5px solid transparent}
+.cal-d.prazan{cursor:default}
+.cal-d.ima{background:#f2f3f7}
+.cal-d.danas{border-color:var(--accent)}
+.cal-d.odabran{background:var(--accent-soft);border-color:var(--accent)}
+.cal-tocke{display:flex;gap:2.5px;margin-top:3px;min-height:6px}
+.cal-t{display:inline-block;width:6px;height:6px;border-radius:50%}
+
 /* ---------- statusna točka stroja ---------- */
 .sdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:0}
 .sdot.ok{background:#2e9e57}.sdot.upoz{background:#e5a50a}.sdot.kvar{background:var(--red)}
@@ -185,17 +200,36 @@ body:not([data-role="voditelj"]) .role-voditelj{display:none !important}
 .session-row a{color:var(--accent);font-weight:600;cursor:pointer;text-decoration:none}
 
 /* ---------- ispis IFS izvještaja ---------- */
+.print-head{display:none}
 @media print{
+  @page{margin:16mm 14mm}
   header,#tabbar,main,#demo-banner,#loader,#toast{display:none !important}
-  body{background:#fff}
+  body{background:#fff;color:#000;font-size:11pt;line-height:1.5}
   .overlay{position:static;background:none;display:block;padding:0}
   .modal{max-height:none;overflow:visible;border-radius:0;width:100%;max-width:none;box-shadow:none;animation:none;padding:0}
-  .modal .btn,.modal .x,.modal select,.modal input,.modal label{display:none !important}
+  .modal .btn,.modal .x,.modal select,.modal input,.modal textarea,.modal form,.modal label{display:none !important}
+  .modal-head{display:none !important}
+  /* memorandum na vrhu ispisa */
+  .print-head{display:flex !important;align-items:center;gap:14px;border-bottom:3px solid #3a3285;
+    padding-bottom:10px;margin-bottom:14px}
+  .print-head img{height:52px}
+  .print-head .ph-naslov{font-size:16pt;font-weight:700;color:#3a3285}
+  .print-head .ph-sub{font-size:9.5pt;color:#444;margin-top:2px}
+  .audit h4{color:#000;border-bottom:1.5px solid #3a3285;font-size:12pt;margin:14pt 0 6pt;
+    padding-bottom:3pt;page-break-after:avoid}
+  .audit .a-item{page-break-inside:avoid;border-bottom:.5pt solid #ccc;padding:5pt 0;font-size:10pt}
+  .audit .a-m{page-break-after:avoid;font-size:10.5pt}
+  .audit .a-sub{color:#333;font-size:9pt}
+  .audit .a-meta{color:#333;font-size:9pt;margin-bottom:8pt}
+  .chip{border:.75pt solid #666 !important;background:none !important;color:#000 !important;font-size:7.5pt}
+  .rep{color:#000;font-weight:700}
 }
 
 /* ---------- kvar items ---------- */
 .kvar-item{padding:11px 13px;border-bottom:1px solid var(--border)}
 .kvar-item:last-child{border-bottom:none}
+.kvar-item.click{cursor:pointer}
+.kvar-item.click:active{background:#f7f8fa}
 .kvar-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;color:var(--muted)}
 .kvar-opis{font-size:14px;font-weight:600;margin-top:3px}
 .kvar-meta{font-size:12px;color:var(--muted);margin-top:3px}
@@ -970,21 +1004,21 @@ function kvarItem(k, showMachine){
   }
   var sig = zadatak ? null : kvarSig(k);
   var rep = (sig && REPS[sig] >= 2) ? ' <span class="rep">'+REPS[sig]+'× u 3 mj.</span>' : '';
-  var akcija = '<button class="btn-mini" onclick="app.komentariKvara(\''+k.id+'\')">💬'+(brKom?' '+brKom:'')+'</button>';
-  if(k.status!=='otkazan')
-    akcija += ' <button class="btn-mini role-write" onclick="app.urediKvar(\''+k.id+'\')">Uredi</button>';
-  if(k.status==='otvoren')
-    akcija += ' <button class="btn-mini role-write" onclick="app.rijesiKvar(\''+k.id+'\')">'+(zadatak?'Gotovo':'Riješi')+'</button>';
-  var foto = k.foto ? '<img class="kthumb" src="'+k.foto+'" alt="foto kvara" onclick="app.viewFoto(\''+k.id+'\')">' : '';
-  return '<div class="kvar-item"'+(k.status==='otkazan'?' style="opacity:.55"':'')+'>'+
-    '<div class="kvar-top"><span>'+(showMachine?'<b style="color:var(--text)">'+esc(m.name)+'</b> &middot; ':'')+fmtDate(k.date)+'</span>'+
-    '<span style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end">'+pChip+chip+akcija+'</span></div>'+
+  /* kompaktna kartica — klik otvara fokusirani prozor kvara */
+  var ind = [];
+  if(brKom) ind.push('💬 '+brKom);
+  if(k.foto) ind.push('📷');
+  return '<div class="kvar-item click"'+(k.status==='otkazan'?' style="opacity:.55"':'')+
+    ' onclick="app.detaljKvara(\''+k.id+'\')">'+
+    '<div class="kvar-top"><span>'+(showMachine?'<b style="color:var(--text)">'+esc(m.name)+'</b> &middot; ':'')+fmtDate(k.date)+
+      (ind.length ? ' &middot; '+ind.join(' ') : '')+'</span>'+
+    '<span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">'+pChip+chip+'</span></div>'+
     '<div class="kvar-opis">'+esc(k.opis)+rep+'</div>'+
-    '<div class="kvar-meta">'+meta+'</div>'+foto+'</div>';
+    '<div class="kvar-meta">'+meta+'</div></div>';
 }
 
 /* =====================  render: Kvarovi  ===================== */
-var FILTER = { stroj:'svi', status:'svi', majstor:'svi', od:'', do:'', q:'' };
+var FILTER = { stroj:'svi', status:'svi', majstor:'svi', od:'', do:'', q:'', vrsta:'svi' };
 var PENDING_FOTO = '';
 function renderKvarovi(){
   var list = DATA.kvarovi.filter(function(k){
@@ -993,6 +1027,7 @@ function renderKvarovi(){
     if(FILTER.status!=='svi' && k.status!==FILTER.status) return false;
     if(FILTER.majstor==='nedodijeljeno'){ if(k.dodijeljen || k.status!=='otvoren') return false; }
     else if(FILTER.majstor!=='svi' && k.dodijeljen!==FILTER.majstor) return false;
+    if(FILTER.vrsta!=='svi' && (k.tip||'kvar')!==FILTER.vrsta) return false;
     if(FILTER.od && k.date < FILTER.od) return false;
     if(FILTER.do && k.date > FILTER.do) return false;
     if(FILTER.q && (k.opis+' '+(k.zam||'')+' '+(k.kategorija||'')).toLowerCase().indexOf(FILTER.q.toLowerCase()) === -1) return false;
@@ -1033,6 +1068,10 @@ function renderKvarovi(){
       '<select onchange="app.setFilter(\'stroj\',this.value)">'+strojOpts+'</select>'+
       '<select onchange="app.setFilter(\'status\',this.value)">'+statusOpts+'</select>'+
       '<select onchange="app.setFilter(\'majstor\',this.value)">'+majstorOpts+'</select>'+
+      '<select onchange="app.setFilter(\'vrsta\',this.value)" style="grid-column:1/-1">'+
+        '<option value="svi"'+(FILTER.vrsta==='svi'?' selected':'')+'>Kvarovi i zadaci</option>'+
+        '<option value="kvar"'+(FILTER.vrsta==='kvar'?' selected':'')+'>Samo kvarovi</option>'+
+        '<option value="zadatak"'+(FILTER.vrsta==='zadatak'?' selected':'')+'>Samo zadaci</option></select>'+
       '<input type="search" value="'+esc(FILTER.q)+'" placeholder="Pretraži opis…" oninput="app.setFilterTiho(\'q\',this.value)" style="grid-column:1/-1">'+
       '<input type="date" value="'+FILTER.od+'" onchange="app.setFilter(\'od\',this.value)" title="Od datuma">'+
       '<input type="date" value="'+FILTER.do+'" onchange="app.setFilter(\'do\',this.value)" title="Do datuma">'+
@@ -1254,34 +1293,66 @@ function renderAnalitika(){
     '<button class="btn sec block" style="margin-top:8px" onclick="app.analitikaIspis()">📄 Ispis / PDF analitike</button>';
 }
 
-/* =====================  render: Raspored preventive  ===================== */
+/* =====================  render: Raspored preventive (vizualni kalendar)  ===================== */
+var RASP_GOD = null, RASP_MJ = null, RASP_DAN = null;
+function prevZaDan(iso){
+  return DATA.preventiva.filter(function(p){ return p.next === iso; });
+}
+function prevRedak(p){
+  var m = machineById(p.m) || {name:'—'};
+  var kasni = p.next < todayISO();
+  return '<div class="row click" onclick="app.openStroj(\''+p.m+'\')">'+
+    '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(p.opis)+'</div>'+
+    '<div class="row-sub">'+esc(m.name)+' &middot; '+fmtDate(p.next)+
+      ((p.izv && p.izv!=='interno') ? ' &middot; <b>'+esc(p.izv)+'</b>' : '')+
+      (kasni ? ' &middot; <b style="color:var(--red)">kasni</b>' : '')+'</div></div>'+
+    '<button class="okbtn role-write" onclick="event.stopPropagation();app.obaviPreventivu(\''+p.id+'\')">✓</button>'+
+  '</div>';
+}
 function renderRaspored(){
-  var danas = todayISO();
-  var t7 = isoShift(7), t14 = isoShift(14), t31 = isoShift(31);
-  var grupe = [
-    { naslov:'⚠ Kasni', boja:'var(--red)', f:function(p){ return p.next < danas; } },
-    { naslov:'Ovaj tjedan', f:function(p){ return p.next >= danas && p.next <= t7; } },
-    { naslov:'Sljedeći tjedan', f:function(p){ return p.next > t7 && p.next <= t14; } },
-    { naslov:'Ovaj mjesec', f:function(p){ return p.next > t14 && p.next <= t31; } },
-    { naslov:'Kasnije', f:function(p){ return p.next > t31; } }
-  ];
-  var sve = DATA.preventiva.slice().sort(function(a,b){ return a.next < b.next ? -1 : 1; });
+  var danas = new Date();
+  if(RASP_GOD===null){ RASP_GOD = danas.getFullYear(); RASP_MJ = danas.getMonth(); }
+  var prvi = new Date(RASP_GOD, RASP_MJ, 1);
+  var danaUMj = new Date(RASP_GOD, RASP_MJ+1, 0).getDate();
+  var pomak = (prvi.getDay()+6)%7;  /* ponedjeljak prvi */
+  var danasISO = todayISO();
+  var celije = '';
+  ['P','U','S','Č','P','S','N'].forEach(function(d){ celije += '<div class="cal-h">'+d+'</div>'; });
+  for(var i=0;i<pomak;i++) celije += '<div class="cal-d prazan"></div>';
+  for(var dan=1; dan<=danaUMj; dan++){
+    var iso = RASP_GOD+'-'+pad2(RASP_MJ+1)+'-'+pad2(dan);
+    var stavke = prevZaDan(iso);
+    var tocke = stavke.slice(0,3).map(function(p){
+      var boja = iso < danasISO ? 'var(--red)' : ((p.izv && p.izv!=='interno') ? 'var(--gold)' : 'var(--accent)');
+      return '<span class="cal-t" style="background:'+boja+'"></span>';
+    }).join('');
+    celije += '<div class="cal-d'+(iso===danasISO?' danas':'')+(iso===RASP_DAN?' odabran':'')+
+      (stavke.length?' ima':'')+'" onclick="app.rasporedDan(\''+iso+'\')">'+
+      '<span>'+dan+'</span><div class="cal-tocke">'+tocke+'</div></div>';
+  }
+  var kasne = DATA.preventiva.filter(function(p){ return p.next < danasISO; })
+    .sort(function(a,b){ return a.next < b.next ? -1 : 1; });
+  var odabranog = RASP_DAN ? prevZaDan(RASP_DAN) : [];
+  var sljedecih = DATA.preventiva.filter(function(p){ return p.next >= danasISO; })
+    .sort(function(a,b){ return a.next < b.next ? -1 : 1; }).slice(0,8);
   $('#screen-raspored').innerHTML =
     '<button class="back" onclick="app.go(\'pregled\')">‹ Pregled</button>'+
-    grupe.map(function(g){
-      var stavke = sve.filter(g.f);
-      if(!stavke.length) return '';
-      return '<h2'+(g.boja?' style="color:'+g.boja+'"':'')+'>'+g.naslov+' ('+stavke.length+')</h2>'+
-        '<div class="card">'+stavke.map(function(p){
-          var m = machineById(p.m) || {name:'—'};
-          return '<div class="row click" onclick="app.openStroj(\''+p.m+'\')">'+
-            '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(p.opis)+'</div>'+
-            '<div class="row-sub">'+esc(m.name)+' &middot; '+fmtDate(p.next)+
-              ((p.izv && p.izv!=='interno') ? ' &middot; <b>'+esc(p.izv)+'</b>' : '')+'</div></div>'+
-            '<button class="okbtn role-write" onclick="event.stopPropagation();app.obaviPreventivu(\''+p.id+'\')">✓</button>'+
-          '</div>';
-        }).join('')+'</div>';
-    }).join('') || '<div class="card"><div class="empty">Nema planiranih stavki.</div></div>';
+    '<div class="cal-nav">'+
+      '<button class="qbtn" onclick="app.rasporedMjesec(-1)">‹</button>'+
+      '<div class="cal-naslov">'+MJESECI[RASP_MJ]+' '+RASP_GOD+'.</div>'+
+      '<button class="qbtn" onclick="app.rasporedMjesec(1)">›</button>'+
+    '</div>'+
+    '<div class="card" style="padding:8px"><div class="cal">'+celije+'</div>'+
+      '<div class="row-sub" style="padding:6px 4px 2px;text-align:center">'+
+      '<span class="cal-t" style="background:var(--accent);vertical-align:0"></span> interno &nbsp; '+
+      '<span class="cal-t" style="background:var(--gold);vertical-align:0"></span> vanjski servis &nbsp; '+
+      '<span class="cal-t" style="background:var(--red);vertical-align:0"></span> kasni</div></div>'+
+    (RASP_DAN && odabranog.length
+      ? '<h2>'+fmtDate(RASP_DAN)+' ('+odabranog.length+')</h2><div class="card">'+odabranog.map(prevRedak).join('')+'</div>' : '')+
+    (kasne.length
+      ? '<h2 style="color:var(--red)">⚠ Kasni ('+kasne.length+')</h2><div class="card">'+kasne.map(prevRedak).join('')+'</div>' : '')+
+    '<h2>Sljedeće na redu</h2><div class="card">'+
+      (sljedecih.length ? sljedecih.map(prevRedak).join('') : '<div class="empty">Nema planiranih stavki.</div>')+'</div>';
 }
 
 /* =====================  render: Poruke (zajednički kanal)  ===================== */
@@ -1396,6 +1467,61 @@ var app = {
     if(!initHash()) showScreen('pregled');
     dobrodoslica();
   },
+  detaljKvara: function(kId){
+    var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
+    if(!k) return;
+    var zadatak = (k.tip||'kvar')==='zadatak';
+    var m = machineById(k.m) || {name: zadatak ? 'Opći zadatak' : '—'};
+    var chips = '';
+    if(zadatak) chips += '<span class="chip" style="background:var(--accent-soft);color:var(--accent);border:1px solid #d5d2ef">Zadatak</span> ';
+    if(k.status==='otkazan') chips += '<span class="chip rijesen">Otkazan</span>';
+    else if(k.status==='otvoren'){
+      if(k.prioritet==='hitno') chips += '<span class="chip kvar">HITNO</span> ';
+      else if(k.prioritet==='visok') chips += '<span class="chip upoz">Visok</span> ';
+      if(k.ceka_dio) chips += '<span class="chip upoz">Čeka dio</span> ';
+      chips += k.upoz ? '<span class="chip upoz">Upozorenje</span>' : '<span class="chip kvar">Otvoren</span>';
+    } else chips += '<span class="chip rijesen">Riješen</span>';
+    var red = function(l, v){ return v ? '<div class="row-sub" style="margin-top:4px"><b style="color:var(--text)">'+l+':</b> '+v+'</div>' : ''; };
+    var info =
+      red('Datum', fmtDate(k.date)) +
+      (zadatak ? red('Rok', k.rok ? fmtDate(k.rok) : '—')
+               : red('Zastoj', H(k.sati) + (vidiFinancije() ? ' &middot; '+EUR(kvarCost(k)) : ''))) +
+      (zadatak ? '' : red('Kategorija', esc(k.kategorija||'Ostalo'))) +
+      red('Smjena', k.smjena ? esc(k.smjena) : '') +
+      red('Dodijeljeno', k.dodijeljen ? esc(k.dodijeljen) : '') +
+      red('Riješio', k.tko ? esc(k.tko) : '') +
+      red('Sudjelovali', k.sudjelovali ? esc(k.sudjelovali) : '') +
+      red('Zamijenjeno', k.zam ? esc(k.zam) : '') +
+      (k.status==='otkazan' ? red('Razlog storna', esc(k.storno_razlog||'')) : '');
+    var kom = (DATA.komentari||[]).filter(function(c){ return c.kvar_id===kId; });
+    var komHtml = kom.length ? kom.map(function(c){
+      return '<div class="kvar-item"><div class="kvar-top"><span><b style="color:var(--text)">'+esc(c.tko)+'</b></span>'+
+        '<span>'+fmtDateTime(c.created_at)+'</span></div>'+
+        '<div style="font-size:13.5px;margin-top:3px">'+esc(c.tekst)+'</div></div>';
+    }).join('') : '<div class="empty" style="padding:12px">Još nema komentara.</div>';
+    var akcije = '';
+    if(k.status==='otvoren')
+      akcije += '<button class="btn primary block role-write" style="margin-top:14px" onclick="app.rijesiKvar(\''+kId+'\')">'+(zadatak?'✔ Označi obavljeno':'✔ Riješi kvar')+'</button>';
+    if(k.status!=='otkazan')
+      akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.urediKvar(\''+kId+'\')">Uredi</button>';
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
+      '<div class="modal-head"><h3>'+esc(m.name)+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<div style="margin-bottom:8px">'+chips+'</div>'+
+      '<div style="font-size:15.5px;font-weight:600;line-height:1.4">'+esc(k.opis)+'</div>'+
+      info+
+      (k.foto ? '<img src="'+k.foto+'" alt="fotografija kvara" onclick="app.viewFoto(\''+kId+'\')" '+
+        'style="margin-top:10px;max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--border);cursor:pointer;display:block">' : '')+
+      '<h2 style="margin-top:16px">Komentari ('+kom.length+')</h2>'+
+      '<div class="card">'+komHtml+'</div>'+
+      '<form class="role-write" onsubmit="app.dodajKomentar(event,\''+kId+'\',\'detalj\')">'+
+        '<label>Novi komentar</label>'+
+        '<textarea name="tekst" rows="2" required placeholder="što je napravljeno, što čeka, kome je predano…"></textarea>'+
+        '<button class="btn sec block" type="submit" style="margin-top:8px">Dodaj komentar</button>'+
+      '</form>'+
+      akcije+
+      '</div></div>';
+  },
   komentariKvara: function(kId){
     if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
@@ -1469,7 +1595,7 @@ var app = {
     renderPoruke();
     await apiInsert('poruke', { tko:p.tko, tekst:p.tekst }, p);
   },
-  dodajKomentar: async function(e, kId){
+  dodajKomentar: async function(e, kId, pogled){
     e.preventDefault();
     var f = new FormData(e.target);
     var kom = { id:'ko'+Date.now(), kvar_id:kId, tekst:String(f.get('tekst')||'').trim(),
@@ -1477,10 +1603,18 @@ var app = {
     if(!kom.tekst) return;
     if(!DATA.komentari) DATA.komentari = [];
     DATA.komentari.push(kom);
-    app.komentariKvara(kId);  /* osvježi popis u modalu */
+    if(pogled==='detalj') app.detaljKvara(kId); else app.komentariKvara(kId);
     await apiInsert('komentari', { kvar_id:kId, tekst:kom.tekst, tko:kom.tko }, kom);
   },
   anaPeriod: function(v){ ANA_DANA = parseInt(v,10)||0; renderAnalitika(); },
+  rasporedMjesec: function(smjer){
+    RASP_MJ += smjer;
+    if(RASP_MJ < 0){ RASP_MJ = 11; RASP_GOD--; }
+    if(RASP_MJ > 11){ RASP_MJ = 0; RASP_GOD++; }
+    RASP_DAN = null;
+    renderRaspored();
+  },
+  rasporedDan: function(iso){ RASP_DAN = (RASP_DAN===iso ? null : iso); renderRaspored(); },
   analitikaIspis: function(){
     /* analitika u modal (print CSS ispisuje samo modal) pa na pisač/PDF */
     var d = anaPodaci();
@@ -1493,6 +1627,10 @@ var app = {
       '<div class="modal-head"><h3>Analitika kvarova</h3>'+
         '<span><button class="btn sec sm" onclick="window.print()">📄 PDF</button> '+
         '<button class="x" onclick="app.closeModal()">✕</button></span></div>'+
+      '<div class="print-head"><img src="'+document.querySelector('.hdr-logo').src+'" alt="Clarum">'+
+        '<div><div class="ph-naslov">Analitika kvarova</div>'+
+        '<div class="ph-sub">Clarum d.o.o. &middot; Sektor održavanja &middot; '+fmtDate(todayISO())+
+        ' &middot; period: '+(ANA_DANA?('zadnjih '+ANA_DANA+' dana'):'cijela evidencija')+'</div></div></div>'+
       '<div class="a-meta">Generirano: '+fmtDate(todayISO())+' &middot; period: '+(ANA_DANA?('zadnjih '+ANA_DANA+' dana'):'sve')+' &middot; Clarum &middot; Sektor održavanja</div>'+
       '<h4>Kvarovi po stroju</h4>'+
       redovi.map(function(x){
@@ -1554,7 +1692,7 @@ var app = {
       if(inp){ inp.focus(); var v=inp.value; inp.setSelectionRange(v.length,v.length); }
     }
   },
-  resetFiltere: function(){ FILTER = { stroj:'svi', status:'svi', majstor:'svi', od:'', do:'', q:'' }; renderKvarovi(); },
+  resetFiltere: function(){ FILTER = { stroj:'svi', status:'svi', majstor:'svi', od:'', do:'', q:'', vrsta:'svi' }; renderKvarovi(); },
   qty: async function(id, delta){
     var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
     if(!p) return;
@@ -2170,6 +2308,10 @@ var app = {
         '<span style="display:flex;gap:8px;align-items:center">'+
         '<button class="btn sec sm" onclick="window.print()">📄 PDF</button>'+
         '<button class="x" onclick="app.closeModal()">✕</button></span></div>'+
+      '<div class="print-head"><img src="'+document.querySelector('.hdr-logo').src+'" alt="Clarum">'+
+        '<div><div class="ph-naslov">Izvještaj za audit (IFS)</div>'+
+        '<div class="ph-sub">Clarum d.o.o. &middot; Sektor održavanja &middot; '+fmtDate(todayISO())+
+        ' &middot; ref. IFS Food v8, t. 4.16 / 4.17 / 5.4</div></div></div>'+
       '<div class="a-meta">Generirano: '+fmtDate(todayISO())+' &middot; Clarum &middot; Sektor održavanja &middot; ref. IFS Food v8, t. 4.16 / 4.17 / 5.4</div>'+
       '<label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Razdoblje zahvata</label>'+
       '<select onchange="app.audit(this.value)" style="margin:4px 0 6px">'+
