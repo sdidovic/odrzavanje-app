@@ -270,6 +270,36 @@ async function testovi(W, D){
   jednako('pretraga kontakata', D.querySelectorAll('#kontakti-list .row').length, 1);
   app.traziKontakt('');
 
+  grupa('Status "u radu"');
+  var otv = W.DATA.kvarovi.filter(function(k){ return k.status === 'otvoren'; })[0];
+  W.SESSION = { ime:'Majstor 2', role:'majstor' };
+  await app.preuzmiKvar(otv.id); await cekaj(200);
+  jednako('preuzimanje postavlja status', otv.status, 'u_radu');
+  jednako('preuzimatelj postaje dodijeljen', otv.dodijeljen, 'Majstor 2');
+  ok('zapis o preuzimanju je u kanalu',
+     W.DATA.poruke.some(function(p){ return p.tko === 'Sustav' && p.tekst.indexOf('radi na') > -1; }));
+  ok('kvar u radu i dalje broji kao otvoren', W.jeOtvoren(otv) === true);
+  W.SESSION = { ime:'Voditelj', role:'voditelj' };
+  W.showScreen('kvarovi');
+  ok('u listi se vidi oznaka "U radu"',
+     D.querySelector('#screen-kvarovi').innerHTML.indexOf('U radu') > -1);
+  app.setFilter('status','u_radu');
+  jednako('filter "u radu" nalazi kvar', D.querySelectorAll('#screen-kvarovi .kvar-item').length, 1);
+  app.resetFiltere();
+
+  grupa('Usporedba razdoblja');
+  W.ANA_DANA = 30;
+  var sada = W.zbroji(W.anaKvarovi());
+  var prije = W.anaKvaroviPrethodno();
+  ok('prethodno razdoblje se izračunava', Array.isArray(prije));
+  ok('zbroj vraća sve mjere', typeof sada.n === 'number' && typeof sada.cost === 'number' && typeof sada.mttr === 'number');
+  ok('pad troška je označen zeleno', W.deltaChip(50, 100, true).indexOf('dobro') > -1);
+  ok('rast troška je označen crveno', W.deltaChip(150, 100, true).indexOf('lose') > -1);
+  app.go('analitika'); await cekaj(150);
+  ok('analitika prikazuje usporedbu',
+     D.querySelector('#screen-analitika').textContent.indexOf('usporedba s prethodnih') > -1);
+  W.ANA_DANA = 90;
+
   grupa('Poruke i obavijesti');
   app.go('poruke'); await cekaj(200);
   var svih = W.DATA.poruke.length;
@@ -291,6 +321,17 @@ async function testovi(W, D){
   jednako('poruka je dodana u kanal', W.DATA.poruke.length, svih + 1);
   ok('sistemski zapis o kvaru ima vezu na kvar',
      W.DATA.poruke.some(function(p){ return p.tko === 'Sustav' && p.kvar_id; }));
+  /* komentar na kvaru mora ostaviti kratak trag u zajedničkom kanalu */
+  var porukaPrije = W.DATA.poruke.length;
+  var neki = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k); })[0];
+  app.detaljKvara(neki.id); await cekaj(120);
+  var kf = D.querySelector('#modal-root form');
+  kf.elements.tekst.value = 'TEST komentar za kanal';
+  posalji(kf); await cekaj(250);
+  jednako('komentar je stvorio zapis u kanalu', W.DATA.poruke.length, porukaPrije + 1);
+  var zadnja = W.DATA.poruke[W.DATA.poruke.length - 1];
+  ok('zapis je kratak i vodi na kvar', zadnja.kvar_id === neki.id && zadnja.tekst.length < 160);
+  app.closeModal();
   ok('nepročitane se broje', typeof W.brojNeprocitanih() === 'number');
 
   grupa('Otpornost');
