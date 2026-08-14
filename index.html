@@ -15,7 +15,7 @@
 :root{
   /* --- boje tvrtke (postavljaju se iz baze) --- */
   --accent:#3a3285; --accent-dark:#282465; --accent-soft:#edecf7; --accent-rub:#cdc9ec;
-  --gold:#ffd749;
+  --gold:#ffd749; --gold-tamni:#8a7427;
   /* --- podloge i tekst --- */
   --bg:#f2f4f7; --card:#ffffff; --border:#e4e7ec; --border-jaci:#d3d8e0;
   --text:#141c2b; --text-2:#3d4657; --muted:#68727f;
@@ -53,16 +53,18 @@ header{position:sticky;top:0;z-index:30;color:#fff;padding-top:env(safe-area-ins
   filter:drop-shadow(0 1px 3px rgba(0,0,0,.28))}
 h1{font-size:17px;font-weight:700;letter-spacing:-.2px;line-height:1.15}
 .hdr-sub{font-size:11px;opacity:.7;margin-top:2px;letter-spacing:.3px;text-transform:uppercase;font-weight:600}
+.hdr-akcije{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .btn-audit{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.32);color:#fff;
   font-size:12px;font-weight:600;line-height:1.25;padding:9px 12px;border-radius:var(--radius-xs);
-  max-width:140px;text-align:center;cursor:pointer;flex-shrink:0;backdrop-filter:blur(2px);
+  text-align:center;cursor:pointer;flex-shrink:0;white-space:nowrap;backdrop-filter:blur(2px);
   transition:background .14s ease}
 .btn-audit:active{background:rgba(255,255,255,.24)}
 
 /* ---------- layout ---------- */
 main{max-width:760px;margin:0 auto;padding:16px 16px calc(86px + env(safe-area-inset-bottom))}
 .screen.hidden{display:none}
-h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted);
+/* --text-2, ne --muted: 11.5px se ne broji kao "veliki tekst", a radi se u hali na suncu */
+h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--text-2);
   font-weight:700;margin:var(--r5) 0 var(--r2);display:flex;align-items:center;gap:var(--r2)}
 h2:first-child{margin-top:var(--r1)}
 h2:after{content:'';flex:1;height:1px;background:var(--border)}
@@ -90,7 +92,7 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .chip.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
 .chip.upoz{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-border)}
 .chip.kvar{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
-.chip.rijesen{background:#eef0f3;color:var(--muted);border:1px solid var(--border)}
+.chip.rijesen{background:#eef0f3;color:#4a545f;border:1px solid var(--border)}
 .chip.rad{background:var(--accent-soft);color:var(--accent);border:1px solid #cdc9ec}
 .chip.fg{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);text-transform:none;letter-spacing:.2px}
 
@@ -115,6 +117,8 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
   font-variant-numeric:tabular-nums}
 .stat-label{display:block;font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.3;
   font-weight:600;letter-spacing:.1px}
+/* 4 KPI broja na Analitici — ista veličina, jer su jednako važni */
+.stat-num.kpi{font-size:17px;letter-spacing:-.3px;overflow-wrap:anywhere}
 .stat.red{background:var(--red-bg);border-color:var(--red-border)}   .stat.red .stat-num{color:var(--red)}
 .stat.yellow{background:var(--yellow-bg);border-color:var(--yellow-border)} .stat.yellow .stat-num{color:var(--yellow)}
 .stat.green{background:var(--green-bg);border-color:var(--green-border)} .stat.green .stat-num{color:var(--green)}
@@ -132,10 +136,20 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .bar-name{width:98px;flex-shrink:0;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar-track{flex:1;height:13px;background:#edf0f4;border-radius:4px;overflow:hidden}
 .bar-fill{height:100%;background:var(--accent);border-radius:0 4px 4px 0}
+/* mjesec koji još traje — stupac je nepotpun i ne smije se čitati kao pad */
+.bar-fill.u-tijeku{background:repeating-linear-gradient(135deg,
+  var(--accent) 0 5px, var(--accent-rub) 5px 10px)}
+.nepotpun{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
 .bar-val{width:58px;text-align:right;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
 
 /* ---------- ponovljeni kvar ---------- */
 .rep{color:var(--red);font-size:11px;font-weight:700;white-space:nowrap}
+
+/* ---------- "Trenutno stoji" ---------- */
+.stoji-cijena{text-align:right;font-size:14px;font-weight:800;color:var(--red);
+  font-variant-numeric:tabular-nums;line-height:1.15}
+.stoji-cijena span{display:block;font-size:9.5px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
 
 /* ---------- usporedba razdoblja ---------- */
 .delta{display:block;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:.2px}
@@ -231,6 +245,13 @@ body[data-role="majstor"] .btn-audit{display:none}
 .btn-mini.opasno{color:var(--red);border-color:var(--red-border)}
 .btn-mini.opasno:active{background:var(--red-bg)}
 
+/* ---------- prekidač HITNO u brzoj prijavi (rukavice, hala, jedan dodir) ---------- */
+.hitno-prekidac{display:flex;align-items:center;gap:11px;margin-top:14px;padding:13px 14px;
+  border:1.5px solid var(--red-border);background:var(--red-bg);border-radius:var(--radius-s);
+  font-size:15px;font-weight:700;color:var(--red);cursor:pointer;
+  text-transform:none;letter-spacing:0}
+.hitno-prekidac input{width:24px;height:24px;flex-shrink:0;accent-color:var(--red);margin:0}
+
 /* ---------- fotografije kvara ---------- */
 .kthumb{margin-top:7px;max-width:170px;max-height:120px;border-radius:6px;border:1px solid var(--border);display:block;cursor:pointer}
 .foto-prev{display:none;margin-top:8px;max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--border)}
@@ -246,6 +267,8 @@ body[data-role="majstor"] .btn-audit{display:none}
 .login-title{font-size:12px;font-weight:700;margin-bottom:var(--r5);color:var(--muted);
   text-transform:uppercase;letter-spacing:1px}
 .user-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--r2);margin-bottom:var(--r4)}
+/* neparan broj ljudi: zadnja pločica preko cijele širine, da ne visi pola reda */
+.user-tile:last-child:nth-child(odd){grid-column:1 / -1}
 .user-tile{padding:16px 8px;background:var(--card);border:1.5px solid var(--border);
   border-radius:var(--radius-s);font-size:15px;font-weight:650;cursor:pointer;box-shadow:var(--sjena-1);
   transition:border-color .14s ease, background .14s ease, transform .1s ease}
@@ -311,10 +334,16 @@ body:not([data-role="voditelj"]) .role-voditelj{display:none !important}
 .kvar-item:last-child{border-bottom:none}
 .kvar-item.click{cursor:pointer}
 .kvar-item.click:active{background:#f7f8fa}
-.kvar-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;color:var(--muted)}
+.kvar-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:12px;color:var(--muted)}
 .kvar-opis{font-size:14px;font-weight:600;margin-top:3px}
 .kvar-meta{font-size:12px;color:var(--muted);margin-top:3px}
 .kvar-meta b{color:var(--text)}
+/* brze radnje na kartici: dodjela i "čeka dio" bez otvaranja punog obrasca */
+.kvar-brzo{display:flex;gap:7px;align-items:center;margin-top:8px}
+.kvar-brzo select{width:auto;flex:1;min-width:0;font-size:13px;padding:7px 26px 7px 9px;
+  min-height:34px;border-radius:7px;background-position:right 8px center}
+.kvar-brzo .btn-mini{flex-shrink:0}
+.kvar-brzo .btn-mini.aktivan{background:var(--yellow-bg);color:var(--yellow);border-color:var(--yellow-border)}
 
 /* ---------- filters / buttons ---------- */
 .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
@@ -418,7 +447,10 @@ form .btn{margin-top:20px}
       <img class="hdr-logo" src="data:image/png;base64,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" alt="Clarum">
       <h1>Održavanje</h1>
     </div>
-    <button class="btn-audit" onclick="app.audit()">Izvještaj za audit (IFS)</button>
+    <div class="hdr-akcije">
+      <button class="btn-audit" onclick="app.audit()">IFS izvještaj</button>
+      <button class="btn-audit role-voditelj" onclick="app.otvoriSustav()">Sustav</button>
+    </div>
   </div>
 </header>
 
@@ -514,11 +546,12 @@ var TVRTKA = {
 };
 /* pločice na prijavi — popis dolazi iz baze (prijava_popis) */
 var KORISNICI = [
-  { naziv:'Majstor 1', email:'marko@odrzavanje.local' },
-  { naziv:'Majstor 2', email:'ivica@odrzavanje.local' },
-  { naziv:'Majstor 3', email:'damir@odrzavanje.local' },
-  { naziv:'Voditelj',  email:'stjepan@odrzavanje.local' },
-  { naziv:'Direktor',  email:'direktor@odrzavanje.local' }
+  { naziv:'Majstor 1',   email:'marko@odrzavanje.local' },
+  { naziv:'Majstor 2',   email:'ivica@odrzavanje.local' },
+  { naziv:'Majstor 3',   email:'damir@odrzavanje.local' },
+  { naziv:'Voditelj',    email:'stjepan@odrzavanje.local' },
+  { naziv:'Proizvodnja', email:'proizvodnja@odrzavanje.local' },
+  { naziv:'Direktor',    email:'direktor@odrzavanje.local' }
 ];
 var MAJSTORI = ['Majstor 1','Majstor 2','Majstor 3'];
 
@@ -545,6 +578,9 @@ function primijeniIdentitet(){
   k.setProperty('--accent-soft', hexUSvjetlije(TVRTKA.boja, 0.90));
   k.setProperty('--accent-rub', hexUSvjetlije(TVRTKA.boja, 0.68));
   k.setProperty('--gold', TVRTKA.boja_akcent);
+  /* zlatna je pretamna za rub zaglavlja, ali presvijetla za točku od 6 px na bijelom
+     (izmjereno 1,39:1) — za oznake u kalendaru koristimo potamnjenu inačicu */
+  k.setProperty('--gold-tamni', hexUTamnije(TVRTKA.boja_akcent, 0.54));
   document.title = TVRTKA.naziv + ' — Održavanje';
   var meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', TVRTKA.boja);
@@ -643,7 +679,7 @@ var SEED_PARTNERI = [
 
 /* ---------- seed: kvarovi (d = prije koliko dana) ---------- */
 var SEED_KVAROVI = [
-  {m:'p2', d:0,  opis:'Folija se zaglavljuje u čeljustima za varenje — linija stoji', sati:1.5, status:'otvoren', dod:'Majstor 1', pri:'hitno', ceka:true, smj:'1. smjena'},
+  {m:'p2', d:0,  opis:'Folija se zaglavljuje u čeljustima za varenje — linija stoji', sati:1.5, status:'otvoren', dod:'Majstor 1', pri:'hitno', ceka:true, smj:'1. smjena', priv:true, roks:12},
   {m:'k1', d:1,  opis:'Postupni pad tlaka — sumnja na propuštanje rashladne tvari na usisnom vodu', sati:2, status:'otvoren', upoz:true, dod:'Majstor 3', pri:'visok', smj:'2. smjena'},
   {m:'e1', d:3,  opis:'Puknuti pogonski remen puža', sati:3, tko:'Majstor 1', zam:'Remen HTD 1440-8M'},
   {m:'s1', d:5,  opis:'Senzor temperature zone 2 daje nestabilna očitanja', sati:2.5, tko:'Majstor 2', zam:'Senzor PT100'},
@@ -653,7 +689,7 @@ var SEED_KVAROVI = [
   {m:'v1', d:16, opis:'Povećana zračnost ležaja gornjeg valjka — vibracije', sati:2.5, tko:'Majstor 3', zam:'Ležaj 6208 2RS'},
   {m:'p2', d:18, opis:'Folija se zaglavljuje — istrošen nož za rezanje', sati:1, tko:'Majstor 1', zam:'Nož za rezanje folije'},
   {m:'s1', d:21, opis:'Kvar grijača zone 3 — sušara ne postiže temperaturu', sati:4, tko:'Majstor 2', zam:'Grijač sušare 3 kW'},
-  {m:'k1', d:24, opis:'Pad tlaka — propuštanje brtve na glavi kompresora', sati:3, tko:'Majstor 3', zam:'Brtva glave kompresora'},
+  {m:'k1', d:24, opis:'Pad tlaka — propuštanje brtve na glavi kompresora', sati:3, tko:'Majstor 3', zam:'Brtva glave kompresora', otp:false},
   {m:'l1', d:27, opis:'Transportna traka klizi — istegnuta', sati:1.5, tko:'Majstor 1'},
   {m:'e1', d:31, opis:'Propuštanje brtve na glavi ekstrudera', sati:2, tko:'Majstor 2', zam:'Brtva EPDM (prehrambena klasa)'},
   {m:'t1', d:34, opis:'Naslage leda na ventilatoru isparivača — vibracije', sati:1, tko:'Majstor 3'},
@@ -663,7 +699,7 @@ var SEED_KVAROVI = [
   {m:'s1', d:44, opis:'Senzor temperature zone 2 — pogrešna očitanja', sati:2, tko:'Majstor 2', zam:'Senzor PT100'},
   {m:'p2', d:48, opis:'Zaglavljena folija, oštećen dozator', sati:3, tko:'Majstor 3', zam:'Dozator folije'},
   {m:'v1', d:52, opis:'Propuštanje ulja iz reduktora valjaka', sati:2, tko:'Majstor 2', zam:'Brtva reduktora'},
-  {m:'k1', d:56, opis:'Zaprljan kondenzator — povišena temperatura kondenzacije', sati:2, tko:'Majstor 3', zam:'Filter ulja kompresora'},
+  {m:'k1', d:56, opis:'Zaprljan kondenzator — povišena temperatura kondenzacije', sati:2, tko:'Majstor 3', zam:'Filter ulja kompresora', otp:false},
   {m:'e2', d:60, opis:'Začepljena matrica', sati:1.5, tko:'Majstor 1'},
   {m:'p1', d:64, opis:'Nedosljedno varenje vrećice — istrošena teflonska traka', sati:2, tko:'Majstor 2', zam:'Teflonska traka'},
   {m:'t1', d:68, opis:'Alarm visokog tlaka rashladne jedinice tunela', sati:4, tko:'Majstor 3', zam:'Ekspanzijski ventil'},
@@ -744,12 +780,32 @@ function fmtDate(iso){
 }
 function EUR(n){ return Math.round(n).toLocaleString('hr-HR')+' €'; }
 function H(n){ return n.toLocaleString('hr-HR',{maximumFractionDigits:1})+' h'; }
+/* od kada kvar traje: poceo_at (preuzet) → created_at (prijavljen) → date (dan prijave) */
+function pocetakKvara(k){
+  var t = k.poceo_at || k.created_at;
+  if(t){ var d = new Date(t); if(!isNaN(d.getTime())) return d; }
+  if(k.date){ var d2 = new Date(k.date+'T06:00:00'); if(!isNaN(d2.getTime())) return d2; }
+  return null;
+}
+/* koliko kvar traje SADA — "Zastoj 0h" dok linija stoji je suprotno od istine */
+function trajanjeKvara(k){
+  var p = pocetakKvara(k);
+  if(!p) return '';
+  var sati = (Date.now() - p.getTime()) / 3600000;
+  if(sati < 0) sati = 0;
+  if(sati < 1)  return 'traje već '+Math.max(1, Math.round(sati*60))+' min';
+  if(sati < 24) return 'traje već '+H(Math.round(sati*10)/10);
+  var dana = Math.floor(sati/24);
+  return 'traje već '+dana+(dana===1 ? ' dan' : (dana<5 ? ' dana' : ' dana'));
+}
 function esc(s){
   return String(s==null?'':s).replace(/[&<>"']/g,function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
   });
 }
 var MJESECI = ['siječanj','veljača','ožujak','travanj','svibanj','lipanj','srpanj','kolovoz','rujan','listopad','studeni','prosinac'];
+/* genitiv — „prvih 14 dana srpnja", ne „…srpanj" */
+var MJESECI_G = ['siječnja','veljače','ožujka','travnja','svibnja','lipnja','srpnja','kolovoza','rujna','listopada','studenoga','prosinca'];
 function monthLabel(){ var d=new Date(); return MJESECI[d.getMonth()]+' '+d.getFullYear()+'.'; }
 function intervalDays(s){
   var m = /([0-9]+)/.exec(s||'');
@@ -815,11 +871,14 @@ function buildSeed(){
                status:k.status||'rijesen', upoz:!!k.upoz, tko:k.tko||null, zam:k.zam||null,
                foto:null, dodijeljen:k.dod||null, prioritet:k.pri||'normalno',
                ceka_dio:!!k.ceka, smjena:k.smj||null, sudjelovali:null,
-               tip:'kvar', rok:null, storno_razlog:null, kategorija:autoKat(k.opis) };
+               tip:'kvar', rok:null, storno_razlog:null, kategorija:autoKat(k.opis),
+               /* IFS: otpuštanje se bilježi kad je zahvat bio u zoni proizvoda */
+               otpusteno: (k.status||'rijesen')==='rijesen' && k.otp !== false,
+               privremeni: !!k.priv, rok_sanacije: k.roks ? isoShift(k.roks) : null };
     }),
     dijelovi: SEED_DIJELOVI.map(function(p,i){
+      /* "naručeno" nije polje na dijelu — izvodi se iz otvorene narudžbe u Nabavi (nb1 niže) */
       return { id:'d'+(i+1), naziv:p.naziv, stroj:p.stroj, stanje:p.stanje, min:p.min, dob:p.dob, cijena:p.cijena,
-               naruceno: p.naziv.indexOf('Brtva glave')===0 ? isoShift(-1) : null,
                kategorija: p.kat||'Ostalo' };
     }),
     preventiva: SEED_PREVENTIVA.map(function(p,i){
@@ -1208,6 +1267,15 @@ async function posaljiObavijest(naslov, tekst, ruta, samoZa){
   }catch(e){ /* obavijest je dodatak, ne smije rušiti tok */ }
 }
 
+/* Jedno pravilo za obavijest o novom kvaru — isto u brzoj i u detaljnoj prijavi.
+   Prije je brza prijava javljala SVIMA i UVIJEK, pa su se obavijesti prestale čitati. */
+function obavijestNoviKvar(kvar, stroj){
+  var gdje = (stroj ? stroj.name+': ' : '') + kvar.opis;
+  if(kvar.prioritet === 'hitno')      posaljiObavijest('HITAN KVAR', gdje, '#kvarovi');
+  else if(kvar.dodijeljen)            posaljiObavijest('Novo za tebe', gdje, '#kvarovi', kvar.dodijeljen);
+  else                                posaljiObavijest('Novi kvar — nedodijeljen', gdje, '#kvarovi');
+}
+
 /* ---------- dnevnik grešaka (monitoring) ---------- */
 /* zapisi koje sam ja upravo napravio — da mi realtime ne javlja vlastiti unos */
 var MOJI_UNOSI = {};
@@ -1263,16 +1331,21 @@ function renderPregled(){
   var late = DATA.preventiva.filter(function(p){ return p.next < todayISO(); });
   var last3 = aktivni().slice().sort(byDateDesc).slice(0,3);
 
-  /* usporedba s prošlim mjesecom */
+  /* usporedba s prošlim mjesecom — samo do istog dana u mjesecu.
+     Inače nepuni tekući mjesec ide protiv cijelog prošlog i svaki mjesec lažno pokazuje pad. */
   var now = new Date();
+  var danMj = now.getDate();
   var pm = new Date(now.getFullYear(), now.getMonth()-1, 1);
   var pmKey = pm.getFullYear()+'-'+pad2(pm.getMonth()+1);
   var prevCost = 0;
-  KV.forEach(function(k){ if(k.date.slice(0,7)===pmKey) prevCost += kvarCost(k); });
+  KV.forEach(function(k){
+    if(k.date.slice(0,7)===pmKey && parseInt(k.date.slice(8,10),10) <= danMj) prevCost += kvarCost(k);
+  });
   var trend = '';
   if(prevCost > 0){
     var pct = Math.round((cost - prevCost) / prevCost * 100);
-    trend = '<span class="trend '+(pct>=0?'up':'down')+'">'+(pct>=0?'▲ +':'▼ ')+Math.abs(pct)+'% vs '+esc(MJESECI[pm.getMonth()])+'</span>';
+    trend = '<span class="trend '+(pct>=0?'up':'down')+'" title="usporedba s istim brojem dana prošlog mjeseca">'+
+      (pct>=0?'▲ +':'▼ ')+Math.abs(pct)+'% vs prvih '+danMj+' dana '+esc(MJESECI_G[pm.getMonth()])+'</span>';
   }
 
   /* najskuplji strojevi u zadnja 3 mjeseca */
@@ -1305,37 +1378,68 @@ function renderPregled(){
       '<button class="okbtn role-write" title="Označi obavljeno" onclick="event.stopPropagation();app.obaviPreventivu(\''+p.id+'\')">✓</button></div></div>';
   }).join('') : '<div class="empty">Sve preventive su u roku.</div>';
   if(dueAll.length > 5){
-    dueHtml += '<div class="row click" onclick="app.go(\'strojevi\')">'+
-      '<div class="row-sub">… još '+(dueAll.length-5)+' stavki u planu — otvori Strojevi</div></div>';
+    dueHtml += '<div class="row click" onclick="app.go(\'raspored\')">'+
+      '<div class="row-sub">… još '+(dueAll.length-5)+' stavki u planu — otvori Raspored</div></div>';
   }
 
-  /* trend troška po mjesecima (zadnja 3) */
+  /* trend troška po mjesecima (zadnja 3) — zadnji stupac je nepotpun i tako je i označen */
   var mjeseci3 = [2,1,0].map(function(off){
     var d0 = new Date(); var md = new Date(d0.getFullYear(), d0.getMonth()-off, 1);
     var key = md.getFullYear()+'-'+pad2(md.getMonth()+1);
     var c = 0;
     KV.forEach(function(k){ if(k.date.slice(0,7)===key) c += kvarCost(k); });
-    return { label: MJESECI[md.getMonth()], c: c };
+    return { label: MJESECI[md.getMonth()], c: c, uTijeku: off === 0 };
   });
   var maxM = Math.max.apply(null, mjeseci3.map(function(x){ return x.c; }).concat([1]));
   var trendHtml = mjeseci3.map(function(x){
     return '<div class="bar-row" style="cursor:default">'+
-      '<div class="bar-name">'+esc(x.label)+'</div>'+
-      '<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(x.c/maxM*100)+'%"></div></div>'+
+      '<div class="bar-name">'+esc(x.label)+(x.uTijeku ? ' <span class="nepotpun">u tijeku</span>' : '')+'</div>'+
+      '<div class="bar-track"><div class="bar-fill'+(x.uTijeku?' u-tijeku':'')+
+        '" style="width:'+Math.round(x.c/maxM*100)+'%"></div></div>'+
       '<div class="bar-val">'+EUR(x.c)+'</div></div>';
   }).join('');
 
+  /* "Trenutno stoji" — jedina sekcija koja odgovara i direktoru i voditelju proizvodnje.
+     Samo pravi kvarovi (ne upozorenja), koliko već stoje i koliko je to do sada koštalo.
+     Prazna lista → sekcija se ne prikazuje uopće. */
+  var stoje = open.filter(function(k){ return !k.upoz && k.m; })
+    .sort(function(a,b){
+      var pa = pocetakKvara(a), pb = pocetakKvara(b);
+      return (pa?pa.getTime():0) - (pb?pb.getTime():0);   /* najdulji zastoj na vrh */
+    });
+  var stojiHtml = stoje.length
+    ? '<h2>Trenutno stoji ('+stoje.length+')</h2><div class="card">'+stoje.map(function(k){
+        var sm = machineById(k.m) || {name:'—', rate:350};
+        var p = pocetakKvara(k);
+        var sati = p ? Math.max(0, (Date.now() - p.getTime())/3600000) : 0;
+        return '<div class="row click" onclick="app.detaljKvara(\''+k.id+'\')">'+
+          '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(sm.name)+
+            (k.prioritet==='hitno' ? ' <span class="chip kvar">HITNO</span>' : '')+
+            (k.ceka_dio ? ' <span class="chip upoz">Čeka dio</span>' : '')+'</div>'+
+          '<div class="row-sub">'+esc(k.opis)+'</div>'+
+          '<div class="row-sub">'+(trajanjeKvara(k) || 'u tijeku')+
+            (k.dodijeljen ? ' &middot; <b>'+esc(k.dodijeljen)+'</b>' : ' &middot; nedodijeljen')+'</div></div>'+
+          (vidiFinancije()
+            ? '<div class="row-right"><div class="stoji-cijena">'+EUR(sati * (sm.rate||350))+
+              '<span>do sada</span></div></div>'
+            : '')+
+        '</div>';
+      }).join('')+'</div>'
+    : '';
+
   /* majstor ne vidi financije — njegov pregled počinje zadacima */
+  /* mjesec još traje — to mora pisati, inače broj izgleda kao konačan */
+  var mjesecSub = esc(monthLabel())+' — prvih '+danMj+' dana';
   var bigCard = vidiFinancije()
     ? '<div class="big-card" onclick="app.go(\'kvarovi\')">'+
         '<div class="big-label">Trošak zastoja ovaj mjesec</div>'+
         '<div class="big-num">'+EUR(cost)+trend+'</div>'+
-        '<div class="big-sub">'+esc(monthLabel())+' &middot; '+mk.length+' zastoja &middot; ukupno '+H(hrs)+'</div>'+
+        '<div class="big-sub">'+mjesecSub+' &middot; '+mk.length+' zastoja &middot; ukupno '+H(hrs)+'</div>'+
       '</div>'
     : '<div class="big-card" onclick="app.go(\'kvarovi\')">'+
         '<div class="big-label">Zastoji ovaj mjesec</div>'+
         '<div class="big-num">'+mk.length+'</div>'+
-        '<div class="big-sub">'+esc(monthLabel())+' &middot; ukupno '+H(hrs)+' zastoja</div>'+
+        '<div class="big-sub">'+mjesecSub+' &middot; ukupno '+H(hrs)+' zastoja</div>'+
       '</div>';
   $('#screen-pregled').innerHTML =
     bigCard+
@@ -1344,6 +1448,7 @@ function renderPregled(){
       statCard(low.length,  'Dijelovi ispod minimuma', low.length  ? 'red'    : 'green', "app.go('dijelovi')")+
       statCard(late.length, 'Preventive kasne',        late.length ? 'yellow' : 'green', "app.skociNaObaveze()")+
     '</div>'+
+    stojiHtml+
     (vidiFinancije() ? '<button class="btn sec sm block" style="margin-top:10px" onclick="app.go(\'analitika\')">Analitika i izvoz</button>' : '')+
     (function(){
       /* majstoru odmah pokaži njegove zadatke na vrhu */
@@ -1366,8 +1471,7 @@ function renderPregled(){
     '<div class="session-row">'+
       (REMOTE ? 'Prijavljen: <b>'+esc(SESSION.ime)+'</b> ('+esc(SESSION.role)+') &middot; <a onclick="app.odjava()">Odjava</a> &middot; ' : '')+
       '<a class="role-voditelj" onclick="app.izvoz()">Izvoz podataka</a>'+
-      '<span class="role-voditelj"> &middot; <a onclick="app.izvozCSV()">Izvoz CSV</a>'+
-      ' &middot; <a onclick="app.otvoriSustav()">Sustav</a></span>'+
+      '<span class="role-voditelj"> &middot; <a onclick="app.izvozCSV()">Izvoz CSV</a></span>'+
       ' &middot; <a onclick="app.pomoc()">Pomoć</a>'+
     '</div>';
 }
@@ -1495,6 +1599,10 @@ function kvarItem(k, showMachine){
   var meta;
   if(zadatak){
     meta = k.rok ? ('Rok: '+(k.rok < todayISO() && jeOtvoren(k) ? '<b style="color:var(--red)">'+fmtDate(k.rok)+'</b>' : fmtDate(k.rok))) : 'Bez roka';
+  } else if(jeOtvoren(k)){
+    /* dok linija stoji, "Zastoj 0h" je suprotno od istine — pokazujemo koliko već traje */
+    meta = (trajanjeKvara(k) || 'u tijeku')+(k.sati > 0 ? ' &middot; upisano '+H(k.sati) : '');
+    if(k.kategorija && k.kategorija!=='Ostalo') meta += ' &middot; '+esc(k.kategorija);
   } else {
     meta = 'Zastoj '+H(k.sati)+(vidiFinancije() ? ' &middot; <b>'+EUR(kvarCost(k))+'</b>' : '');
     if(k.kategorija && k.kategorija!=='Ostalo') meta += ' &middot; '+esc(k.kategorija);
@@ -1519,13 +1627,25 @@ function kvarItem(k, showMachine){
   var ind = [];
   if(brKom) ind.push('💬 '+brKom);
   if(k.foto) ind.push('📷');
+  /* dvije najčešće radnje voditelja bez otvaranja punog obrasca Uredi */
+  var brzeAkcije = '';
+  if(jeOtvoren(k)){
+    var majOpts = '<option value="">Dodijeli…</option>'+MAJSTORI.map(function(mj){
+      return '<option'+(k.dodijeljen===mj?' selected':'')+'>'+esc(mj)+'</option>'; }).join('');
+    brzeAkcije = '<div class="kvar-brzo role-write" onclick="event.stopPropagation()">'+
+      '<select onchange="app.brzoDodijeli(\''+k.id+'\',this.value)" '+
+        'aria-label="Dodijeli majstora">'+majOpts+'</select>'+
+      '<button class="btn-mini'+(k.ceka_dio?' aktivan':'')+
+        '" onclick="event.stopPropagation();app.brzoCekaDio(\''+k.id+'\')">'+
+        (k.ceka_dio ? '✓ Čeka dio' : 'Čeka dio')+'</button></div>';
+  }
   return '<div class="kvar-item click"'+(k.status==='otkazan'?' style="opacity:.55"':'')+
     ' onclick="app.detaljKvara(\''+k.id+'\')">'+
     '<div class="kvar-top"><span>'+(showMachine?'<b style="color:var(--text)">'+esc(m.name)+'</b> &middot; ':'')+fmtDate(k.date)+
       (ind.length ? ' &middot; '+ind.join(' ') : '')+'</span>'+
     '<span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">'+pChip+chip+'</span></div>'+
     '<div class="kvar-opis">'+esc(k.opis)+rep+'</div>'+
-    '<div class="kvar-meta">'+meta+'</div></div>';
+    '<div class="kvar-meta">'+meta+'</div>'+brzeAkcije+'</div>';
 }
 
 /* =====================  render: Kvarovi  ===================== */
@@ -1536,7 +1656,9 @@ function renderKvarovi(){
   var list = DATA.kvarovi.filter(function(k){
     if(FILTER.status==='svi' && k.status==='otkazan') return false;  /* otkazane samo na izričit zahtjev */
     if(FILTER.stroj!=='svi' && k.m!==FILTER.stroj) return false;
-    if(FILTER.status!=='svi' && k.status!==FILTER.status) return false;
+    /* "aktivni" = otvoren + u radu — isto što broji kartica "Otvoreni kvarovi" na Pregledu */
+    if(FILTER.status==='aktivni'){ if(!jeOtvoren(k)) return false; }
+    else if(FILTER.status!=='svi' && k.status!==FILTER.status) return false;
     if(FILTER.majstor==='nedodijeljeno'){ if(k.dodijeljen || !jeOtvoren(k)) return false; }
     else if(FILTER.majstor!=='svi' && k.dodijeljen!==FILTER.majstor) return false;
     if(FILTER.vrsta!=='svi' && (k.tip||'kvar')!==FILTER.vrsta) return false;
@@ -1562,6 +1684,7 @@ function renderKvarovi(){
   }).join('');
   var statusOpts =
     '<option value="svi"'+(FILTER.status==='svi'?' selected':'')+'>Svi statusi</option>'+
+    '<option value="aktivni"'+(FILTER.status==='aktivni'?' selected':'')+'>Otvoreni + u radu</option>'+
     '<option value="otvoren"'+(FILTER.status==='otvoren'?' selected':'')+'>Otvoreni</option>'+
     '<option value="u_radu"'+(FILTER.status==='u_radu'?' selected':'')+'>U radu</option>'+
     '<option value="rijesen"'+(FILTER.status==='rijesen'?' selected':'')+'>Riješeni</option>'+
@@ -1601,13 +1724,16 @@ function renderKvarovi(){
 var PART_Q = '';
 function partRow(p){
   var low = p.stanje < p.min;
+  /* "naručeno" se izvodi iz stvarne narudžbe u Nabavi — ne drži se drugi put na dijelu */
+  var nar = narudzbaZaDio(p.id);
   var chip = '';
-  if(p.naruceno) chip = ' <span class="chip upoz">Naručeno '+fmtDate(p.naruceno)+'</span>';
-  else if(low)   chip = ' <span class="chip kvar">'+(p.stanje===0?'Naruči odmah':'Naruči')+'</span>';
+  if(nar) chip = ' <span class="chip upoz">Naručeno '+fmtDate(nar.narucen)+'</span>';
+  else if(low) chip = ' <span class="chip kvar">'+(p.stanje===0?'Naruči odmah':'Naruči')+'</span>';
   var akcija = '<div style="margin-top:5px">'+
-    ((low || p.naruceno)
-      ? '<button class="btn-mini role-write" onclick="app.toggleNaruceno(\''+p.id+'\')">'+
-        (p.naruceno?'Poništi narudžbu':'Označi naručeno')+'</button> ' : '')+
+    (nar
+      ? '<button class="btn-mini role-write" onclick="app.go(\'nabava\')">U dolasku &times;'+nar.kolicina+
+        (nar.ocekivano ? ' do '+fmtDate(nar.ocekivano) : '')+'</button> '
+      : (low ? '<button class="btn-mini role-write" onclick="app.naruciDio(\''+p.id+'\')">Naruči</button> ' : ''))+
     '<button class="btn-mini role-voditelj" onclick="app.urediDio(\''+p.id+'\')">Uredi</button></div>';
   return '<div class="row"><div class="grow">'+
     '<div class="row-title" style="font-size:13.5px">'+esc(p.naziv)+chip+'</div>'+
@@ -1655,6 +1781,10 @@ function otvoreneNarudzbe(){
     .sort(function(a,b){ return String(a.ocekivano||'9999').localeCompare(String(b.ocekivano||'9999')); });
 }
 function dioPoId(id){ return DATA.dijelovi.filter(function(x){ return x.id===id; })[0] || null; }
+/* jedan izvor istine za "je li dio naručen": otvorena narudžba u Nabavi */
+function narudzbaZaDio(id){
+  return otvoreneNarudzbe().filter(function(n){ return n.dio_id === id; })[0] || null;
+}
 function nabavaRedak(n){
   var d = dioPoId(n.dio_id) || { naziv:'—' };
   var kasni = n.ocekivano && n.ocekivano < todayISO();
@@ -1873,10 +2003,11 @@ function renderAnalitika(){
       '<select onchange="app.anaPeriod(this.value)">'+perOpts+'</select>'+
     '</div>'+
     '<div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">'+
-      '<div class="stat"><span class="stat-num">'+uk.n+'</span><span class="stat-label">kvarova</span>'+deltaChip(uk.n, prethodno?prethodno.n:null, true)+'</div>'+
-      '<div class="stat"><span class="stat-num" style="font-size:19px">'+H(uk.sati)+'</span><span class="stat-label">zastoja</span>'+deltaChip(uk.sati, prethodno?prethodno.sati:null, true)+'</div>'+
-      '<div class="stat"><span class="stat-num" style="font-size:17px">'+EUR(uk.cost)+'</span><span class="stat-label">trošak</span>'+deltaChip(uk.cost, prethodno?prethodno.cost:null, true)+'</div>'+
-      '<div class="stat"><span class="stat-num" style="font-size:19px">'+(mttr?H(mttr):'—')+'</span><span class="stat-label">popravak</span>'+deltaChip(mttr, prethodno?prethodno.mttr:null, true)+'</div>'+
+      /* sva četiri broja na isti font — različite veličine su sugerirale različitu važnost */
+      '<div class="stat"><span class="stat-num kpi">'+uk.n+'</span><span class="stat-label">kvarova</span>'+deltaChip(uk.n, prethodno?prethodno.n:null, true)+'</div>'+
+      '<div class="stat"><span class="stat-num kpi">'+H(uk.sati)+'</span><span class="stat-label">zastoja</span>'+deltaChip(uk.sati, prethodno?prethodno.sati:null, true)+'</div>'+
+      '<div class="stat"><span class="stat-num kpi">'+EUR(uk.cost)+'</span><span class="stat-label">trošak</span>'+deltaChip(uk.cost, prethodno?prethodno.cost:null, true)+'</div>'+
+      '<div class="stat"><span class="stat-num kpi">'+(mttr?H(mttr):'—')+'</span><span class="stat-label">popravak</span>'+deltaChip(mttr, prethodno?prethodno.mttr:null, true)+'</div>'+
     '</div>'+
     (prethodno
       ? '<div class="row-sub" style="text-align:center;margin-top:7px">usporedba s prethodnih '+ANA_DANA+' dana'+
@@ -1925,7 +2056,7 @@ function renderRaspored(){
     var iso = RASP_GOD+'-'+pad2(RASP_MJ+1)+'-'+pad2(dan);
     var stavke = prevZaDan(iso);
     var tocke = stavke.slice(0,3).map(function(p){
-      var boja = iso < danasISO ? 'var(--red)' : ((p.izv && p.izv!=='interno') ? 'var(--gold)' : 'var(--accent)');
+      var boja = iso < danasISO ? 'var(--red)' : ((p.izv && p.izv!=='interno') ? 'var(--gold-tamni)' : 'var(--accent)');
       return '<span class="cal-t" style="background:'+boja+'"></span>';
     }).join('');
     celije += '<div class="cal-d'+(iso===danasISO?' danas':'')+(iso===RASP_DAN?' odabran':'')+
@@ -1947,7 +2078,7 @@ function renderRaspored(){
     '<div class="card" style="padding:8px"><div class="cal">'+celije+'</div>'+
       '<div class="row-sub" style="padding:6px 4px 2px;text-align:center">'+
       '<span class="cal-t" style="background:var(--accent);vertical-align:0"></span> interno &nbsp; '+
-      '<span class="cal-t" style="background:var(--gold);vertical-align:0"></span> vanjski servis &nbsp; '+
+      '<span class="cal-t" style="background:var(--gold-tamni);vertical-align:0"></span> vanjski servis &nbsp; '+
       '<span class="cal-t" style="background:var(--red);vertical-align:0"></span> kasni</div></div>'+
     (RASP_DAN && odabranog.length
       ? '<h2>'+fmtDate(RASP_DAN)+' ('+odabranog.length+')</h2><div class="card">'+odabranog.map(prevRedak).join('')+'</div>' : '')+
@@ -2031,7 +2162,7 @@ function appBaseUrl(){
 }
 function renderQR(){
   $('#screen-qr').innerHTML =
-    '<button class="back noprint" onclick="app.go(\'sustav\')">‹ Sustav</button>'+
+    '<button class="back noprint" onclick="app.go(\'strojevi\')">‹ Strojevi</button>'+
     '<div class="noprint"><h2>Naljepnice za strojeve</h2>'+
       '<div class="card"><div style="padding:11px 13px">'+
         '<div class="row-sub">Ispiši, plastificiraj i zalijepi na stroj. Majstor skenira mobitelom i '+
@@ -2172,8 +2303,9 @@ function showScreen(name){
   });
   REPS = repCounts();
   RENDERERS[name]();
-  var tabName = name==='stroj' ? 'strojevi'
-    : ((name==='analitika'||name==='raspored'||name==='sustav'||name==='qr') ? 'pregled'
+  /* pod-ekrani osvjetljavaju karticu iz koje su otvoreni (QR je pod Strojevima) */
+  var tabName = (name==='stroj'||name==='qr') ? 'strojevi'
+    : ((name==='analitika'||name==='raspored'||name==='sustav') ? 'pregled'
        : (name==='nabava' ? 'dijelovi' : name));
   document.querySelectorAll('.tab').forEach(function(t){
     t.classList.toggle('active', t.getAttribute('data-tab')===tabName);
@@ -2285,7 +2417,7 @@ var app = {
         '<label>PIN (min. 6 znamenki)</label><input name="pin" required inputmode="numeric" minlength="6">'+
         '<label>Uloga</label><select name="role">'+
           '<option value="majstor">Majstor</option><option value="voditelj">Voditelj</option>'+
-          '<option value="readonly">Samo čitanje</option></select>'+
+          '<option value="readonly">Samo čitanje (direktor, proizvodnja)</option></select>'+
         '<button class="btn primary block" type="submit">Kreiraj korisnika</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
@@ -2298,7 +2430,7 @@ var app = {
       email:user+'@odrzavanje.local', pin:String(f.get('pin')||''), role:f.get('role') });
     if(o){
       app.closeModal();
-      alert('Korisnik kreiran.\n\nVAŽNO: dodaj ga i u popis na prijavi — u datoteci index.html, blok KORISNICI.');
+      alert('Korisnik kreiran — pločica se pojavljuje na prijavi nakon osvježavanja stranice.');
       app.ucitajKorisnike();
     }
   },
@@ -2444,7 +2576,7 @@ var app = {
           if(c.length < 2) { greske++; continue; }
           var d = { id:'d'+Date.now()+i, naziv:c[0], stroj:c[1]||'', stanje:parseInt(c[2],10)||0,
                     min:parseInt(c[3],10)||0, dob:c[4]||'', cijena:parseFloat(c[5])||0,
-                    kategorija:c[6]||'Ostalo', naruceno:null };
+                    kategorija:c[6]||'Ostalo' };
           DATA.dijelovi.push(d);
           await apiInsert('dijelovi', { naziv:d.naziv, stroj:d.stroj, stanje:d.stanje, min:d.min,
             dob:d.dob, cijena:d.cijena, kategorija:d.kategorija }, d);
@@ -2490,14 +2622,25 @@ var app = {
     var red = function(l, v){ return v ? '<div class="row-sub" style="margin-top:4px"><b style="color:var(--text)">'+l+':</b> '+v+'</div>' : ''; };
     var info =
       red('Datum', fmtDate(k.date)) +
-      (zadatak ? red('Rok', k.rok ? fmtDate(k.rok) : '—')
-               : red('Zastoj', H(k.sati) + (vidiFinancije() ? ' &middot; '+EUR(kvarCost(k)) : ''))) +
+      (zadatak
+        ? red('Rok', k.rok ? fmtDate(k.rok) : '—')
+        : (jeOtvoren(k)
+            ? red('Zastoj', (trajanjeKvara(k) || 'u tijeku') + (k.sati > 0 ? ' &middot; upisano '+H(k.sati) : ''))
+            : red('Zastoj', H(k.sati) + (vidiFinancije() ? ' &middot; '+EUR(kvarCost(k)) : '')))) +
       (zadatak ? '' : red('Kategorija', esc(k.kategorija||'Ostalo'))) +
       red('Smjena', k.smjena ? esc(k.smjena) : '') +
       red('Dodijeljeno', k.dodijeljen ? esc(k.dodijeljen) : '') +
       red('Riješio', k.tko ? esc(k.tko) : '') +
       red('Sudjelovali', k.sudjelovali ? esc(k.sudjelovali) : '') +
       red('Zamijenjeno', k.zam ? esc(k.zam) : '') +
+      red('Privremeni popravak', k.privremeni
+        ? ('da &middot; rok trajne sanacije: '+(k.rok_sanacije
+            ? (k.rok_sanacije < todayISO() && k.status!=='rijesen'
+                ? '<b style="color:var(--red)">'+fmtDate(k.rok_sanacije)+' — kasni</b>'
+                : fmtDate(k.rok_sanacije))
+            : 'nije određen'))
+        : '') +
+      red('Linija otpuštena', k.otpusteno ? 'čišćenje i pregled na strana tijela — '+esc(k.tko||'') : '') +
       (k.status==='otkazan' ? red('Razlog storna', esc(k.storno_razlog||'')) : '');
     var kom = (DATA.komentari||[]).filter(function(c){ return c.kvar_id===kId; });
     var komHtml = kom.length ? kom.map(function(c){
@@ -2571,22 +2714,27 @@ var app = {
         '<input type="file" accept="image/*" capture="environment" onchange="app.fotoOdabrana(event)">'+
         '<img id="foto-prev" class="foto-prev" alt="pregled fotografije">'+
         '<label>Što se dogodilo</label><textarea name="opis" rows="2" required placeholder="kratko — npr. puca remen, stroj stoji"></textarea>'+
+        /* jedini prekidač u brzoj prijavi: hitan kvar se prijavljuje baš ovim obrascem */
+        '<label class="hitno-prekidac"><input type="checkbox" name="hitno">'+
+          '<span>HITNO — stoji linija</span></label>'+
         '<button class="btn primary block" type="submit">Prijavi kvar</button>'+
       '</form></div></div>';
   },
   saveBrza: async function(e){
     e.preventDefault();
     var f = new FormData(e.target);
+    var hitno = !!f.get('hitno');
     var kvar = {
       id:'kv'+Date.now(), m:f.get('m'), date:todayISO(),
       opis:String(f.get('opis')||'').trim(), sati:0,
       status:'otvoren', upoz:false, tko:null, zam:null,
       foto:PENDING_FOTO || null, dodijeljen:null,
-      prioritet:'normalno',
+      prioritet: hitno ? 'hitno' : 'normalno',
       smjena:(function(){ var sm=TVRTKA.smjene||['1. smjena','2. smjena']; var h=new Date().getHours();
                           return (h>=6&&h<14)?sm[0]:(sm[1]||sm[0]); })(),
       ceka_dio:false, sudjelovali:null, tip:'kvar', rok:null,
-      kategorija:autoKat(f.get('opis'))
+      kategorija:autoKat(f.get('opis')),
+      otpusteno:false, privremeni:false, rok_sanacije:null
     };
     var pendingFoto = PENDING_FOTO; PENDING_FOTO = '';
     DATA.kvarovi.push(kvar);
@@ -2595,17 +2743,17 @@ var app = {
     if(REMOTE){
       kvar.foto = await uploadFoto(pendingFoto) || null;
       var spremljen = await apiInsert('kvarovi', { m:kvar.m, date:kvar.date, opis:kvar.opis, sati:0,
-        status:'otvoren', upoz:false, foto:kvar.foto, prioritet:'normalno', smjena:kvar.smjena,
+        status:'otvoren', upoz:false, foto:kvar.foto, prioritet:kvar.prioritet, smjena:kvar.smjena,
         kategorija:kvar.kategorija, tip:'kvar' }, kvar);
       /* zapis i obavijest tek NAKON sto je kvar stvarno u bazi — inace javljamo nesto sto ne postoji */
       if(spremljen){
         zapamtiMojUnos(kvar.id);
-        sysPoruka('⚠ Prijavljen kvar: '+bm.name+' — '+kvar.opis+' ('+(SESSION.ime||'')+')', kvar.id);
-        posaljiObavijest('Novi kvar', bm.name+': '+kvar.opis, '#kvarovi');
+        sysPoruka((hitno?'🔴 HITNO — ':'⚠ ')+'Prijavljen kvar: '+bm.name+' — '+kvar.opis+' ('+(SESSION.ime||'')+')', kvar.id);
+        obavijestNoviKvar(kvar, bm);
       }
     } else {
       save();
-      sysPoruka('⚠ Prijavljen kvar: '+bm.name+' — '+kvar.opis+' ('+(SESSION.ime||'')+')', kvar.id);
+      sysPoruka((hitno?'🔴 HITNO — ':'⚠ ')+'Prijavljen kvar: '+bm.name+' — '+kvar.opis+' ('+(SESSION.ime||'')+')', kvar.id);
     }
   },
   porukeFilter: function(f){ PORUKE_FILTER = f; renderPoruke(); },
@@ -2695,13 +2843,15 @@ var app = {
   izvozCSV: function(dani){
     dani = parseInt(dani,10)||0;
     var od = dani ? isoShift(-dani) : '0000-00-00';
-    var glava = 'datum;stroj;vrsta;kategorija;opis;status;prioritet;smjena;sati_zastoja;trosak_eur;dodijeljen;rijesio;sudjelovali;zamijenjeno;ceka_dio';
+    var glava = 'datum;stroj;vrsta;kategorija;opis;status;prioritet;smjena;sati_zastoja;trosak_eur;'+
+                'dodijeljen;rijesio;sudjelovali;zamijenjeno;ceka_dio;linija_otpustena;privremeni_popravak;rok_sanacije';
     var redovi = DATA.kvarovi.filter(function(k){ return k.date >= od; }).sort(byDateDesc).map(function(k){
       var m = machineById(k.m) || {name:''};
       var c = function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; };
       return [k.date, m.name, k.tip||'kvar', k.kategorija||'', k.opis, k.status, k.prioritet||'', k.smjena||'', k.sati,
               Math.round(kvarCost(k)), k.dodijeljen||'', k.tko||'', k.sudjelovali||'', k.zam||'',
-              k.ceka_dio?'da':'ne'].map(c).join(';');
+              k.ceka_dio?'da':'ne', k.otpusteno?'da':'ne', k.privremeni?'da':'ne',
+              k.rok_sanacije||''].map(c).join(';');
     });
     var blob = new Blob(['﻿'+glava+'\n'+redovi.join('\n')], {type:'text/csv;charset=utf-8'});
     var a = document.createElement('a');
@@ -2716,7 +2866,8 @@ var app = {
     a.download = 'odrzavanje-izvoz-' + todayISO() + '.json';
     document.body.appendChild(a); a.click(); a.remove();
   },
-  goKvaroviOtvoreni: function(){ FILTER.status='otvoren'; FILTER.stroj='svi'; showScreen('kvarovi'); },
+  /* kartica broji jeOtvoren() = otvoren + u radu — filtar mora dati točno to */
+  goKvaroviOtvoreni: function(){ FILTER.status='aktivni'; FILTER.stroj='svi'; showScreen('kvarovi'); },
   skociNaObaveze: function(){
     var el = document.getElementById('za-obaviti');
     if(el) el.scrollIntoView({behavior:'smooth'});
@@ -2921,11 +3072,9 @@ var app = {
     };
     if(!DATA.nabava) DATA.nabava = [];
     DATA.nabava.push(n);
-    if(p){ p.naruceno = todayISO(); }
     app.closeModal(); showScreen('nabava');
     var spremljeno = await apiInsert('nabava', { dio_id:n.dio_id, kolicina:n.kolicina, dobavljac:n.dobavljac,
       narucen:n.narucen, ocekivano:n.ocekivano, cijena:n.cijena, napomena:n.napomena, tko:n.tko }, n);
-    if(p) await apiUpdate('dijelovi', p.id, { naruceno: p.naruceno });
     if(spremljeno || !REMOTE)
       sysPoruka('🧾 Naručeno: '+(p?p.naziv:'dio')+' ×'+n.kolicina+' kod '+(n.dobavljac||'—')+
         (n.ocekivano ? ', očekivano '+fmtDate(n.ocekivano) : '')+' ('+(SESSION.ime||'')+')');
@@ -2941,7 +3090,7 @@ var app = {
     if(!kol) return;
     n.primljeno = todayISO();
     n.primljena_kolicina = kol;
-    if(p) { p.stanje = p.stanje + kol; p.naruceno = null; }
+    if(p) p.stanje = p.stanje + kol;
     showScreen('nabava');
     if(REMOTE && naMrezi()){
       try{
@@ -2950,22 +3099,14 @@ var app = {
         else throw rpc.error || new Error('rpc');
       }catch(e){
         await apiUpdate('nabava', id, { primljeno:n.primljeno, primljena_kolicina:kol });
-        if(p) await apiUpdate('dijelovi', p.id, { stanje:p.stanje, naruceno:null });
+        if(p) await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
       }
     } else {
       await apiUpdate('nabava', id, { primljeno:n.primljeno, primljena_kolicina:kol });
-      if(p) await apiUpdate('dijelovi', p.id, { stanje:p.stanje, naruceno:null });
+      if(p) await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
     }
     sysPoruka('📦 Primljeno: '+(p?p.naziv:'dio')+' ×'+kol+' — na skladištu '+(p?p.stanje:'?')+' ('+(SESSION.ime||'')+')');
     showScreen('nabava');
-  },
-  toggleNaruceno: async function(id){
-    var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
-    if(!p) return;
-    p.naruceno = p.naruceno ? null : todayISO();
-    var el = $('#parts-list');
-    if(el) el.innerHTML = partsListHtml();
-    await apiUpdate('dijelovi', p.id, { naruceno:p.naruceno });
   },
   traziDio: function(v){
     PART_Q = v;
@@ -3000,7 +3141,7 @@ var app = {
       stroj:String(f.get('stroj')||'').trim() || strojeviNazivi(odabraniStrojevi),
       stanje:Math.max(0, parseInt(f.get('stanje'),10)||0), min:Math.max(0, parseInt(f.get('min'),10)||0),
       dob:f.get('dob'), cijena:Math.max(0, parseFloat(f.get('cijena'))||0),
-      kategorija:f.get('kat')||'Ostalo', naruceno:null,
+      kategorija:f.get('kat')||'Ostalo',
       strojevi:odabraniStrojevi, partner_id: ptNovi ? ptNovi.id : null
     };
     DATA.dijelovi.push(dio);
@@ -3110,7 +3251,8 @@ var app = {
       smjena: tip==='zadatak' ? null : (f.get('smjena') || null),
       ceka_dio: false, sudjelovali: null,
       tip: tip, rok: tip==='zadatak' ? (f.get('rok') || null) : null,
-      kategorija: tip==='zadatak' ? 'Ostalo' : (f.get('kategorija') || autoKat(f.get('opis')))
+      kategorija: tip==='zadatak' ? 'Ostalo' : (f.get('kategorija') || autoKat(f.get('opis'))),
+      otpusteno: false, privremeni: false, rok_sanacije: null
     };
     var pendingFoto = PENDING_FOTO; PENDING_FOTO = '';
     DATA.kvarovi.push(kvar);
@@ -3129,10 +3271,9 @@ var app = {
       if(spremljen){
         zapamtiMojUnos(kvar.id);
         sysPoruka(zapis, kvar.id);
-        if(kvar.prioritet === 'hitno')
-          posaljiObavijest('HITAN KVAR', (nm?nm.name+': ':'')+kvar.opis, '#kvarovi');
+        if(tip !== 'zadatak') obavijestNoviKvar(kvar, nm);
         else if(kvar.dodijeljen)
-          posaljiObavijest('Novo za tebe', (nm?nm.name+': ':'')+kvar.opis, '#kvarovi', kvar.dodijeljen);
+          posaljiObavijest('📋 Dodijeljeno tebi', (nm?nm.name+': ':'')+kvar.opis, '#kvarovi', kvar.dodijeljen);
       }
     } else {
       save();
@@ -3208,6 +3349,9 @@ var app = {
         '<label>Utrošeni dio sa skladišta</label><select name="dio">'+dioOpts+'</select>'+
         '<label>Količina</label><input type="number" name="kol" min="1" step="1" value="1">'+
         '<label>Zamijenjeno (opis, ako dio nije sa skladišta)</label><input name="zam" placeholder="npr. remen, brtva… (prazno ako ništa)">'+
+        '<div style="margin-top:12px"><label style="display:inline;text-transform:none;letter-spacing:0">'+
+          '<input type="checkbox" name="otpusteno"'+(k.otpusteno?' checked':'')+'> '+
+          'Linija otpuštena nakon čišćenja i pregleda na strana tijela</label></div>'+
         '<button class="btn primary block" type="submit">Zatvori kvar</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
@@ -3221,6 +3365,8 @@ var app = {
     if(isNaN(sh) || sh < 0 || sh > 72){ alert('Trajanje zastoja mora biti između 0 i 72 sata.'); return; }
     k.sati = sh;
     k.status = 'rijesen'; k.upoz = false; k.ceka_dio = false;
+    /* IFS: u izvještaj ide samo ono što je netko stvarno potvrdio */
+    k.otpusteno = !!f.get('otpusteno');
     k.tko = f.get('tko');
     k.sudjelovali = String(f.get('sudjelovali')||'').trim() || null;
     k.zam = String(f.get('zam')||'').trim() || null;
@@ -3254,7 +3400,8 @@ var app = {
     sysPoruka('✅ '+(k.tip==='zadatak'?'Zadatak obavljen':'Kvar riješen')+': '+
       (rm ? rm.name+' — ' : '')+k.opis+' ('+esc(k.tko||'')+')', k.id);
     await apiUpdate('kvarovi', k.id, { sati:k.sati, status:k.status, upoz:false, ceka_dio:false,
-      tko:k.tko, zam:k.zam, sudjelovali:k.sudjelovali, closed_at:new Date().toISOString() });
+      otpusteno:k.otpusteno, tko:k.tko, zam:k.zam, sudjelovali:k.sudjelovali,
+      closed_at:new Date().toISOString() });
   },
   urediKvar: function(kId){
     if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
@@ -3291,6 +3438,14 @@ var app = {
           ? '<div style="margin-top:12px"><label style="display:inline;text-transform:none;letter-spacing:0">'+
             '<input type="checkbox" name="ceka"'+(k.ceka_dio?' checked':'')+'> Čeka dio (naručeno, popravak stoji)</label></div>'
           : '')+
+        /* privremeni popravak ide u IFS odjeljak 3. — vrijedi i dok kvar traje i nakon zatvaranja */
+        '<div style="margin-top:10px"><label style="display:inline;text-transform:none;letter-spacing:0">'+
+          '<input type="checkbox" name="privremeni"'+(k.privremeni?' checked':'')+
+          ' onchange="app.prekidacSanacije(this.checked)"> Privremeni popravak (traži trajnu sanaciju)</label></div>'+
+        '<div id="polje-sanacije" style="margin-top:8px'+(k.privremeni?'':';display:none')+'">'+
+          '<label>Rok trajne sanacije</label>'+
+          '<input type="date" name="rok_sanacije" value="'+esc(k.rok_sanacije||'')+'">'+
+        '</div>'+
         '<button class="btn primary block" type="submit">Spremi izmjene</button>'+
         '<button class="btn sec block role-voditelj" type="button" style="margin-top:8px" onclick="app.stornirajKvar(\''+kId+'\')">Storniraj (pogrešan unos)</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
@@ -3317,6 +3472,8 @@ var app = {
     } else {
       k.ceka_dio = !!f.get('ceka');
     }
+    k.privremeni = !!f.get('privremeni');
+    k.rok_sanacije = k.privremeni ? (f.get('rok_sanacije') || null) : null;
     if(k.dodijeljen && k.dodijeljen !== prijeDodijeljen && jeOtvoren(k)){
       var dm = machineById(k.m);
       posaljiObavijest('📋 Dodijeljeno tebi', (dm?dm.name+': ':'')+k.opis, '#kvarovi', k.dodijeljen);
@@ -3325,7 +3482,34 @@ var app = {
     showScreen($('#screen-stroj').classList.contains('hidden') ? 'kvarovi' : 'stroj');
     await apiUpdate('kvarovi', k.id, { m:k.m, opis:k.opis, date:k.date, sati:k.sati,
       kategorija:k.kategorija, dodijeljen:k.dodijeljen, prioritet:k.prioritet,
-      smjena:k.smjena, ceka_dio:k.ceka_dio, tko:k.tko, sudjelovali:k.sudjelovali, zam:k.zam });
+      smjena:k.smjena, ceka_dio:k.ceka_dio, tko:k.tko, sudjelovali:k.sudjelovali, zam:k.zam,
+      privremeni:k.privremeni, rok_sanacije:k.rok_sanacije });
+  },
+  brzoDodijeli: async function(kId, ime){
+    var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
+    if(!k) return;
+    if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
+    var prije = k.dodijeljen;
+    k.dodijeljen = ime || null;
+    rerender();
+    if(k.dodijeljen && k.dodijeljen !== prije){
+      var dm = machineById(k.m);
+      sysPoruka('👤 '+(dm?dm.name+' — ':'')+k.opis+' → '+k.dodijeljen+' ('+(SESSION.ime||'')+')', k.id);
+      posaljiObavijest('📋 Dodijeljeno tebi', (dm?dm.name+': ':'')+k.opis, '#kvarovi', k.dodijeljen);
+    }
+    await apiUpdate('kvarovi', k.id, { dodijeljen:k.dodijeljen });
+  },
+  brzoCekaDio: async function(kId){
+    var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
+    if(!k) return;
+    if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
+    k.ceka_dio = !k.ceka_dio;
+    rerender();
+    await apiUpdate('kvarovi', k.id, { ceka_dio:k.ceka_dio });
+  },
+  prekidacSanacije: function(ukljucen){
+    var el = $('#polje-sanacije');
+    if(el) el.style.display = ukljucen ? '' : 'none';
   },
   stornirajKvar: async function(kId){
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
@@ -3466,8 +3650,31 @@ var app = {
       return '<div class="a-item"><b>'+fmtDate(k.date)+'</b> — '+esc(m.name)+': '+esc(k.opis)+
         '<div class="a-sub">zastoj '+H(k.sati)+' &middot; izvršio: '+esc(k.tko||'—')+
         (k.zam?' &middot; zamijenjeno: '+esc(k.zam):'')+'</div>'+
-        '<div class="a-sub">otpuštanje linije: čišćenje i pregled na strana tijela — '+esc(k.tko||'—')+', '+fmtDate(k.date)+'</div></div>';
-    }).join('') : '<div class="a-sub">Nema zahvata u zadnjih 30 dana.</div>';
+        /* samo ono što je majstor stvarno potvrdio pri zatvaranju kvara */
+        (k.otpusteno
+          ? '<div class="a-sub">otpuštanje linije: čišćenje i pregled na strana tijela — '+esc(k.tko||'—')+', '+fmtDate(k.date)+'</div>'
+          : '')+
+        '</div>';
+    }).join('') : '<div class="a-sub">Nema zahvata u zadnjih '+dani+' dana.</div>';
+
+    /* 3. Privremeni popravci — iz stvarnih zapisa, ne iz fiksnog teksta */
+    var privremeni = DATA.kvarovi.filter(function(k){
+      return k.privremeni && k.status !== 'rijesen' && k.status !== 'otkazan';
+    }).sort(function(a,b){
+      return String(a.rok_sanacije||'9999').localeCompare(String(b.rok_sanacije||'9999'));
+    });
+    var privremeniHtml = privremeni.length
+      ? privremeni.map(function(k){
+          var m = machineById(k.m) || {name: (k.tip==='zadatak' ? 'Zadatak' : '—')};
+          var kasni = k.rok_sanacije && k.rok_sanacije < todayISO();
+          return '<div class="a-item"><b>'+esc(m.name)+'</b> — '+esc(k.opis)+
+            '<div class="a-sub">privremeni popravak od '+fmtDate(k.date)+
+              ' &middot; '+(k.dodijeljen||k.tko ? 'zadužen: '+esc(k.dodijeljen||k.tko) : 'nije zadužen nitko')+
+              ' &middot; rok trajne sanacije: '+(k.rok_sanacije ? fmtDate(k.rok_sanacije) : 'nije određen')+
+              (kasni ? ' <span class="late">— KASNI</span>' : '')+'</div></div>';
+        }).join('')
+      : '<div class="a-sub">Nema aktivnih privremenih popravaka. Privremeni popravak se označava, '+
+        'procjenjuje s aspekta sigurnosti hrane i dobiva rok trajne sanacije.</div>';
 
     var mjernaHtml = MJERNA.map(function(u){
       return '<div class="a-item">'+esc(u.naziv)+'<div class="a-sub">'+esc(u.rezim)+'</div></div>';
@@ -3505,8 +3712,7 @@ var app = {
       '</select>'+
       '<h4>1. Plan preventivnog održavanja po stroju</h4>'+prevHtml+
       '<h4>2. Zahvati u zadnjih '+dani+' dana (s otpuštanjem linije)</h4>'+zahvatiHtml+
-      '<h4>3. Privremeni popravci</h4>'+
-      '<div class="a-sub">Nema aktivnih privremenih popravaka. Privremeni popravak se označava, procjenjuje s aspekta sigurnosti hrane i dobiva rok trajne sanacije.</div>'+
+      '<h4>3. Privremeni popravci ('+privremeni.length+')</h4>'+privremeniHtml+
       '<h4>4. Mjerna i kontrolna oprema</h4>'+mjernaHtml+
       '<h4>5. Korištena maziva</h4>'+mazivaHtml+
       '<div class="a-sub" style="margin-top:6px">Sva maziva u zoni proizvoda su prehrambene klase (NSF H1); skladište maziva odvojeno i označeno, primjena se bilježi po točki podmazivanja.</div>'+
@@ -3562,7 +3768,7 @@ function dobrodoslica(){
   /* pri dolasku u smjenu: odmah reci što je bitno */
   var mojih = DATA.kvarovi.filter(function(k){ return jeOtvoren(k) && k.dodijeljen===SESSION.ime; }).length;
   var nep = brojNeprocitanih();
-  var dijelovi_min = DATA.dijelovi.filter(function(p){ return p.stanje < p.min && !p.naruceno; }).length;
+  var dijelovi_min = DATA.dijelovi.filter(function(p){ return p.stanje < p.min && !narudzbaZaDio(p.id); }).length;
   var dio = [];
   if(mojih) dio.push(mojih + (mojih===1?' tvoj zadatak':' tvoja zadatka/zadataka'));
   if(nep) dio.push(nep + ' nepročitanih poruka');

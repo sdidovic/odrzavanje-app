@@ -359,7 +359,9 @@ async function testovi(W, D){
   posalji(nf); await cekaj(250);
   jednako('narudžba je zabilježena', W.DATA.nabava.length, brNarudzbi + 1);
   var nova = W.DATA.nabava[W.DATA.nabava.length-1];
-  jednako('dio je označen kao naručen', W.dioPoId(kritican.id).naruceno, W.todayISO());
+  /* "naručeno" se izvodi iz otvorene narudžbe — ne drži se drugi put na dijelu */
+  ok('stanje "naručeno" se izvodi iz narudžbe, ne iz polja na dijelu',
+     !!W.narudzbaZaDio(kritican.id) && W.dioPoId(kritican.id).naruceno === undefined);
   ok('zapis o narudžbi je u kanalu',
      W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Naručeno') > -1; }));
   var stanjePrijePrimitka = W.dioPoId(kritican.id).stanje;
@@ -368,14 +370,187 @@ async function testovi(W, D){
   W.prompt = sp;
   jednako('primitak povećava stanje', W.dioPoId(kritican.id).stanje, stanjePrijePrimitka + 3);
   jednako('narudžba je zatvorena', nova.primljeno, W.todayISO());
-  ok('oznaka "naručeno" je maknuta', !W.dioPoId(kritican.id).naruceno);
+  ok('oznaka "naručeno" nestaje s dijela nakon primitka', !W.narudzbaZaDio(kritican.id));
   ok('primljena narudžba više nije u dolasku',
      W.otvoreneNarudzbe().every(function(x){ return x.id !== nova.id; }));
+
+  /* narudžba pokrenuta s ekrana Dijelovi mora završiti u Nabavi — ne kao gola oznaka */
+  var kritican2 = W.DATA.dijelovi.filter(function(p){
+    return p.stanje < p.min && !W.narudzbaZaDio(p.id); })[0];
+  ok('postoji dio ispod minimuma bez narudžbe', !!kritican2);
+  app.go('dijelovi'); await cekaj(150);
+  ok('redak dijela nudi "Naruči", ne "Označi naručeno"',
+     D.querySelector('#parts-list').innerHTML.indexOf('toggleNaruceno') === -1);
+  var brPrijeD = W.DATA.nabava.length;
+  app.naruciDio(kritican2.id); await cekaj(150);
+  var nf2 = D.querySelector('#modal-root form');
+  nf2.elements.kolicina.value = '2';
+  posalji(nf2); await cekaj(250);
+  jednako('narudžba s Dijelova je zabilježena u Nabavi', W.DATA.nabava.length, brPrijeD + 1);
+  ok('dio je sada "u dolasku"', !!W.narudzbaZaDio(kritican2.id));
+  ok('dio više nije na popisu "Za naručiti"',
+     D.querySelector('#screen-nabava').innerHTML.indexOf('app.naruciDio(\''+kritican2.id+'\')') === -1);
 
   grupa('Iskustvo na stroju');
   app.openStroj('e1'); await cekaj(150);
   ok('kartica iskustva prikazuje ponovljene kvarove i rješenja',
      D.querySelector('#screen-stroj').textContent.indexOf('Iskustvo') > -1);
+
+  grupa('IFS — stvarna polja, ne fiksni tekst');
+  /* otpuštanje linije: ispisuje se samo ako ga je netko stvarno potvrdio */
+  var zaIfs = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && k.m; })[0];
+  app.rijesiKvar(zaIfs.id);
+  var rf = D.querySelector('#modal-root form');
+  ok('obrazac rješavanja ima kvačicu otpuštanja', !!rf.elements.otpusteno);
+  rf.elements.otpusteno.checked = false;      /* namjerno NE potvrđujemo */
+  posalji(rf); await cekaj(200);
+  ok('kvar zatvoren bez kvačice nije označen kao otpušten', zaIfs.otpusteno === false);
+  app.audit(90); await cekaj(120);
+  var ifsTekst = D.querySelector('#modal-root').textContent;
+  ok('zahvat je u odjeljku 2.', ifsTekst.indexOf(zaIfs.opis) > -1);
+  /* redak o otpuštanju smije se pojaviti točno onoliko puta koliko ima potvrđenih zahvata */
+  var t90 = W.isoShift(-90);
+  var ocekivanoOtp = W.DATA.kvarovi.filter(function(k){
+    return k.status==='rijesen' && k.date >= t90 && k.otpusteno; }).length;
+  var stvarnoOtp = ifsTekst.split('otpuštanje linije').length - 1;
+  jednako('otpuštanje se ispisuje samo za potvrđene zahvate', stvarnoOtp, ocekivanoOtp);
+  ok('zahvat bez kvačice nije među njima', ocekivanoOtp < W.DATA.kvarovi.filter(function(k){
+       return k.status==='rijesen' && k.date >= t90; }).length);
+  app.closeModal();
+
+  /* privremeni popravak s prošlim rokom mora doći u odjeljak 3. s oznakom KASNI */
+  var zaPriv = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && k.m && !k.privremeni; })[0];
+  app.urediKvar(zaPriv.id);
+  var pf = D.querySelector('#modal-root form');
+  ok('obrazac uređivanja ima privremeni popravak i rok', !!pf.elements.privremeni && !!pf.elements.rok_sanacije);
+  pf.elements.privremeni.checked = true;
+  pf.elements.rok_sanacije.value = W.isoShift(-3);   /* rok je prošao */
+  posalji(pf); await cekaj(200);
+  jednako('privremeni popravak je spremljen', zaPriv.privremeni, true);
+  app.audit(90); await cekaj(120);
+  var ifs2 = D.querySelector('#modal-root').textContent;
+  ok('privremeni popravak je u odjeljku 3.', ifs2.indexOf('3. Privremeni popravci (') > -1 &&
+     ifs2.indexOf(zaPriv.opis) > -1);
+  ok('prekoračen rok sanacije nosi oznaku KASNI', ifs2.indexOf('KASNI') > -1);
+  ok('fiksna rečenica "Nema aktivnih privremenih popravaka" je nestala',
+     ifs2.indexOf('Nema aktivnih privremenih popravaka') === -1);
+  app.closeModal();
+  /* i natrag — kad se kvačica makne, odjeljak 3 je opet prazan */
+  app.urediKvar(zaPriv.id);
+  pf = D.querySelector('#modal-root form');
+  pf.elements.privremeni.checked = false;
+  posalji(pf); await cekaj(200);
+  ok('gašenje kvačice briše i rok sanacije', zaPriv.privremeni === false && !zaPriv.rok_sanacije);
+
+  grupa('Trajanje otvorenog kvara');
+  var otvKv = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && k.m; })[0];
+  otvKv.sati = 0;
+  otvKv.poceo_at = new Date(Date.now() - 5*3600000).toISOString();   /* stoji 5 sati */
+  ok('otvoren kvar prijavljuje koliko već traje', W.trajanjeKvara(otvKv).indexOf('traje već') === 0);
+  ok('trajanje se ne prikazuje kao 0 h', W.trajanjeKvara(otvKv).indexOf('0 h') === -1);
+  W.showScreen('kvarovi'); await cekaj(120);
+  var kartica = D.querySelector('#screen-kvarovi').innerHTML;
+  ok('kartica otvorenog kvara ne piše "Zastoj 0 h"', kartica.indexOf('Zastoj 0 h') === -1);
+  ok('kartica otvorenog kvara piše "traje već"', kartica.indexOf('traje već') > -1);
+  otvKv.poceo_at = null;
+  ok('bez poceo_at trajanje se računa iz datuma prijave', W.trajanjeKvara(otvKv).indexOf('traje već') === 0);
+
+  grupa('Poštena usporedba mjeseci');
+  var danMj = new Date().getDate();
+  /* prošli mjesec: jedan kvar u prvom danu, jedan na 28. — drugi NE smije ući u usporedbu
+     ako je danas prije 28. */
+  var pmD = new Date(); pmD.setDate(1); pmD.setMonth(pmD.getMonth()-1);
+  var pmKey = pmD.getFullYear()+'-'+W.pad2(pmD.getMonth()+1);
+  W.DATA.kvarovi.push({id:'kvPM1', m:'e1', date:pmKey+'-01', opis:'TEST prošli mjesec rano', sati:1,
+                       status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});
+  W.DATA.kvarovi.push({id:'kvPM2', m:'e1', date:pmKey+'-28', opis:'TEST prošli mjesec kasno', sati:10,
+                       status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});
+  W.showScreen('pregled'); await cekaj(150);
+  var pregled = D.querySelector('#screen-pregled').textContent;
+  ok('velika kartica kaže da mjesec još traje', pregled.indexOf('prvih '+danMj+' dana') > -1);
+  if(danMj < 28){
+    ok('usporedba se veže na isti broj dana', pregled.indexOf('vs prvih '+danMj+' dana') > -1);
+    ok('kasniji dio prošlog mjeseca ne ulazi u usporedbu',
+       pregled.indexOf('TEST prošli mjesec kasno') === -1);
+  } else {
+    ok('usporedba se veže na isti broj dana', pregled.indexOf('vs prvih '+danMj+' dana') > -1);
+  }
+  ok('graf označava tekući mjesec kao nepotpun',
+     D.querySelector('#screen-pregled').innerHTML.indexOf('u tijeku') > -1);
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id!=='kvPM1' && k.id!=='kvPM2'; });
+
+  grupa('Trenutno stoji');
+  W.showScreen('pregled'); await cekaj(120);
+  var stojiIma = D.querySelector('#screen-pregled').textContent.indexOf('Trenutno stoji') > -1;
+  var imaPravihKvarova = W.DATA.kvarovi.some(function(k){ return W.jeOtvoren(k) && !k.upoz && k.m; });
+  jednako('sekcija se prikazuje točno kad nešto stoji', stojiIma, imaPravihKvarova);
+  ok('upozorenja se ne broje kao zastoj', (function(){
+    var upoz = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && k.upoz; })[0];
+    if(!upoz) return true;
+    var html = D.querySelector('#screen-pregled').innerHTML;
+    var od = html.indexOf('Trenutno stoji');
+    if(od === -1) return true;
+    return html.slice(od, html.indexOf('<h2', od+5)).indexOf(upoz.opis) === -1;
+  })());
+
+  grupa('Filtar "otvoreni + u radu"');
+  W.SESSION = { ime:'Voditelj', role:'voditelj' };
+  D.body.dataset.role = 'voditelj';
+  app.resetFiltere();
+  var brojNaKartici = W.samoKvarovi().filter(function(k){ return W.jeOtvoren(k); }).length;
+  app.goKvaroviOtvoreni(); await cekaj(150);
+  jednako('klik na karticu postavlja filtar "aktivni"', W.FILTER.status, 'aktivni');
+  jednako('filtar vraća isti broj kao kartica',
+     D.querySelectorAll('#screen-kvarovi .kvar-item').length,
+     W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k); }).length);
+  ok('kartica i filtar se slažu i po broju kvarova (bez zadataka)',
+     W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; }).length === brojNaKartici);
+  app.resetFiltere();
+
+  grupa('Brze radnje i HITNO');
+  var zaBrzo = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k); })[0];
+  W.showScreen('kvarovi'); await cekaj(120);
+  ok('kartica nudi dodjelu i "Čeka dio"',
+     D.querySelector('#screen-kvarovi').innerHTML.indexOf('kvar-brzo') > -1);
+  var cekaPrije = !!zaBrzo.ceka_dio;
+  await app.brzoCekaDio(zaBrzo.id); await cekaj(150);
+  jednako('"Čeka dio" se prebacuje s kartice', !!zaBrzo.ceka_dio, !cekaPrije);
+  await app.brzoDodijeli(zaBrzo.id, 'Majstor 2'); await cekaj(150);
+  jednako('dodjela s kartice je spremljena', zaBrzo.dodijeljen, 'Majstor 2');
+  /* brza prijava: prekidač HITNO stvarno postavlja prioritet */
+  app.brzaPrijava();
+  var bf = D.querySelector('#modal-root form');
+  ok('brza prijava ima prekidač HITNO', !!bf.elements.hitno);
+  bf.elements.m.value = 'e1';
+  bf.elements.opis.value = 'TEST hitna brza prijava';
+  bf.elements.hitno.checked = true;
+  posalji(bf); await cekaj(250);
+  var hitniKvar = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST hitna brza prijava'; })[0];
+  ok('hitan kvar iz brze prijave je spremljen kao hitan', !!hitniKvar && hitniKvar.prioritet==='hitno');
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k !== hitniKvar; });
+
+  grupa('Peta uloga — proizvodnja (readonly)');
+  ok('Proizvodnja je na popisu za prijavu',
+     W.KORISNICI.some(function(u){ return u.naziv==='Proizvodnja'; }));
+  W.SESSION = { ime:'Proizvodnja', role:'readonly' };
+  D.body.dataset.role = 'readonly';
+  W.showScreen('pregled'); await cekaj(120);
+  ok('proizvodnja vidi Pregled', D.querySelector('#screen-pregled').innerHTML.length > 200);
+  ok('proizvodnja nema nijedan gumb za unos', (function(){
+    var ekrani = ['pregled','kvarovi','dijelovi','strojevi'];
+    for(var i=0;i<ekrani.length;i++){
+      W.showScreen(ekrani[i]);
+      var pisi = D.querySelectorAll('#screen-'+ekrani[i]+' .role-write');
+      for(var j=0;j<pisi.length;j++)
+        if(W.getComputedStyle(pisi[j]).display !== 'none') return false;
+    }
+    return true;
+  })());
+  ok('proizvodnja ne vidi gumb Sustav',
+     W.getComputedStyle(D.querySelector('.btn-audit.role-voditelj')).display === 'none');
+  W.SESSION = { ime:'Voditelj', role:'voditelj' };
+  D.body.dataset.role = 'voditelj';
+  W.showScreen('pregled');
 
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
