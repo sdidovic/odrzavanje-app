@@ -343,6 +343,40 @@ async function testovi(W, D){
   app.closeModal();
   ok('nepročitane se broje', typeof W.brojNeprocitanih() === 'number');
 
+  grupa('Nabava');
+  app.go('dijelovi'); await cekaj(150);
+  ok('Dijelovi imaju ulaz u nabavu', D.querySelector('#screen-dijelovi').innerHTML.indexOf('Nabava') > -1);
+  app.go('nabava'); await cekaj(200);
+  ok('nabava prikazuje što treba naručiti',
+     D.querySelector('#screen-nabava').textContent.indexOf('Za naručiti') > -1);
+  var brNarudzbi = W.DATA.nabava.length;
+  var kritican = W.DATA.dijelovi.filter(function(p){ return p.stanje < p.min; })[0];
+  app.naruciDio(kritican.id); await cekaj(150);
+  var nf = D.querySelector('#modal-root form');
+  ok('narudžba predlaže količinu do dvostrukog minimuma',
+     parseInt(nf.elements.kolicina.value,10) >= kritican.min);
+  nf.elements.kolicina.value = '3';
+  posalji(nf); await cekaj(250);
+  jednako('narudžba je zabilježena', W.DATA.nabava.length, brNarudzbi + 1);
+  var nova = W.DATA.nabava[W.DATA.nabava.length-1];
+  jednako('dio je označen kao naručen', W.dioPoId(kritican.id).naruceno, W.todayISO());
+  ok('zapis o narudžbi je u kanalu',
+     W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Naručeno') > -1; }));
+  var stanjePrijePrimitka = W.dioPoId(kritican.id).stanje;
+  var sp = W.prompt; W.prompt = function(){ return '3'; };
+  await app.primiNabavu(nova.id); await cekaj(250);
+  W.prompt = sp;
+  jednako('primitak povećava stanje', W.dioPoId(kritican.id).stanje, stanjePrijePrimitka + 3);
+  jednako('narudžba je zatvorena', nova.primljeno, W.todayISO());
+  ok('oznaka "naručeno" je maknuta', !W.dioPoId(kritican.id).naruceno);
+  ok('primljena narudžba više nije u dolasku',
+     W.otvoreneNarudzbe().every(function(x){ return x.id !== nova.id; }));
+
+  grupa('Iskustvo na stroju');
+  app.openStroj('e1'); await cekaj(150);
+  ok('kartica iskustva prikazuje ponovljene kvarove i rješenja',
+     D.querySelector('#screen-stroj').textContent.indexOf('Iskustvo') > -1);
+
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
                        sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});
