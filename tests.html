@@ -270,6 +270,29 @@ async function testovi(W, D){
   jednako('pretraga kontakata', D.querySelectorAll('#kontakti-list .row').length, 1);
   app.traziKontakt('');
 
+  grupa('Poruke i obavijesti');
+  app.go('poruke'); await cekaj(200);
+  var svih = W.DATA.poruke.length;
+  ok('kanal prikazuje poruke', D.querySelectorAll('#screen-poruke .msg').length > 0);
+  ok('poruke su grupirane po danu', D.querySelectorAll('#screen-poruke .msg-dan').length >= 1);
+  app.porukeFilter('ljudi'); await cekaj(200);
+  ok('filter "samo ljudi" skriva sistemske',
+     Array.prototype.every.call(D.querySelectorAll('#screen-poruke .msg'), function(el){
+       return !el.classList.contains('sustav'); }));
+  app.porukeFilter('sustav'); await cekaj(200);
+  ok('filter "samo sustav" prikazuje samo sistemske',
+     D.querySelectorAll('#screen-poruke .msg').length > 0 &&
+     Array.prototype.every.call(D.querySelectorAll('#screen-poruke .msg'), function(el){
+       return el.classList.contains('sustav'); }));
+  app.porukeFilter('sve'); await cekaj(200);
+  var forma = D.querySelector('#screen-poruke form');
+  forma.elements.tekst.value = 'TEST poruka iz testa';
+  posalji(forma); await cekaj(250);
+  jednako('poruka je dodana u kanal', W.DATA.poruke.length, svih + 1);
+  ok('sistemski zapis o kvaru ima vezu na kvar',
+     W.DATA.poruke.some(function(p){ return p.tko === 'Sustav' && p.kvar_id; }));
+  ok('nepročitane se broje', typeof W.brojNeprocitanih() === 'number');
+
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
                        sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});

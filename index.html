@@ -134,6 +134,11 @@ h2:first-child{margin-top:2px}
   display:inline-block;max-width:88%;text-align:left}
 .msg.moja{text-align:right}
 .msg.moja .msg-txt{background:var(--accent-soft);border-radius:10px 0 10px 10px}
+.msg-dan{text-align:center;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.6px;margin:10px 0 4px}
+.msg-nove{display:flex;align-items:center;gap:8px;color:var(--red);font-size:10.5px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.6px;margin:8px 12px 4px}
+.msg-nove:before,.msg-nove:after{content:'';flex:1;height:1px;background:var(--red-border)}
 .msg.sustav{text-align:center;padding:4px 13px}
 .msg.sustav .msg-txt{background:none;border:none;font-size:12px;color:var(--muted);padding:2px 0;max-width:100%}
 .msg.sustav .msg-meta{display:none}
@@ -912,6 +917,83 @@ function mreznaGreska(err){
          m.indexOf('failed to') > -1 || m.indexOf('load failed') > -1;
 }
 
+/* =====================================================================
+   PUSH OBAVIJESTI — stižu na mobitel i kad je aplikacija zatvorena.
+   ===================================================================== */
+var VAPID_PUB = 'BHFE8J6blBatRrkvb7mCK8LErrSNMieIUA3IifazylyENNc58UhvSPO_bEyB81kIR5WCQsiox00RKn7ZBaRldJ4';
+function b64uUArray(b64){
+  var pad = '='.repeat((4 - b64.length % 4) % 4);
+  var s = (b64 + pad).replace(/-/g,'+').replace(/_/g,'/');
+  var raw = atob(s), arr = new Uint8Array(raw.length);
+  for(var i=0;i<raw.length;i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+function pushPodrzan(){
+  return REMOTE && 'serviceWorker' in navigator && 'PushManager' in window &&
+         location.protocol === 'https:';
+}
+async function pushStanje(){
+  if(!pushPodrzan()) return 'nepodrzano';
+  if(Notification.permission === 'denied') return 'blokirano';
+  try{
+    var reg = await navigator.serviceWorker.ready;
+    var sub = await reg.pushManager.getSubscription();
+    return sub ? 'ukljuceno' : 'iskljuceno';
+  }catch(e){ return 'iskljuceno'; }
+}
+async function pushUkljuci(){
+  if(!pushPodrzan()){
+    alert('Obavijesti rade kad je aplikacija dodana na početni zaslon i otvorena preko interneta (https).');
+    return false;
+  }
+  var dozvola = await Notification.requestPermission();
+  if(dozvola !== 'granted'){ toast('Obavijesti nisu dopuštene'); return false; }
+  try{
+    var reg = await navigator.serviceWorker.ready;
+    var sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: b64uUArray(VAPID_PUB)
+      });
+    }
+    var j = sub.toJSON();
+    await sb.from('push_pretplate').upsert({
+      korisnik: SESSION.ime,
+      endpoint: j.endpoint,
+      p256dh: j.keys.p256dh,
+      auth: j.keys.auth
+    }, { onConflict:'endpoint' });
+    toast('Obavijesti uključene ✓');
+    return true;
+  }catch(e){ zapisiGresku('Push pretplata nije uspjela', String(e)); toast('Ne mogu uključiti obavijesti'); return false; }
+}
+async function pushIskljuci(){
+  try{
+    var reg = await navigator.serviceWorker.ready;
+    var sub = await reg.pushManager.getSubscription();
+    if(sub){
+      await sb.from('push_pretplate').delete().eq('endpoint', sub.endpoint);
+      await sub.unsubscribe();
+    }
+    toast('Obavijesti isključene');
+  }catch(e){}
+}
+/* pošalji obavijest ostalima (samoZa = ime, ili prazno = svima) */
+async function posaljiObavijest(naslov, tekst, ruta, samoZa){
+  if(!REMOTE) return;
+  try{
+    var sesija = (await sb.auth.getSession()).data.session;
+    if(!sesija) return;
+    await fetch(SUPA_CFG.url + '/functions/v1/obavijest', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'apikey':SUPA_CFG.anonKey,
+                'Authorization':'Bearer '+sesija.access_token },
+      body: JSON.stringify({ naslov:naslov, tekst:tekst, ruta:ruta||'', samoZa:samoZa||null })
+    });
+  }catch(e){ /* obavijest je dodatak, ne smije rušiti tok */ }
+}
+
 /* ---------- dnevnik grešaka (monitoring) ---------- */
 var GRESKE_POSLANO = 0;
 function zapisiGresku(poruka, detalji){
@@ -1603,26 +1685,73 @@ function oznaciProcitano(){
   var zadnja = (DATA.poruke||[]).reduce(function(m,p){ return String(p.created_at) > m ? String(p.created_at) : m; }, '');
   try{ if(zadnja) localStorage.setItem('porukeSeen', zadnja); }catch(e){}
 }
-function renderPoruke(){
-  var lista = (DATA.poruke||[]).slice().sort(function(a,b){
+var PORUKE_FILTER = 'sve';   /* sve | ljudi | sustav */
+async function renderPoruke(){
+  var seenPrije = '';
+  try{ seenPrije = localStorage.getItem('porukeSeen') || ''; }catch(e){}
+  var sve = (DATA.poruke||[]).slice().sort(function(a,b){
     return String(a.created_at).localeCompare(String(b.created_at));
   });
+  var lista = sve.filter(function(p){
+    if(PORUKE_FILTER === 'ljudi')  return p.tko !== 'Sustav';
+    if(PORUKE_FILTER === 'sustav') return p.tko === 'Sustav';
+    return true;
+  });
+  var zadnjiDan = '', crtaPostavljena = false;
   var html = lista.length ? lista.map(function(p){
+    var out = '';
+    var dan = String(p.created_at).slice(0,10);
+    if(dan && dan !== zadnjiDan){
+      zadnjiDan = dan;
+      out += '<div class="msg-dan">'+(dan===todayISO() ? 'Danas' : fmtDate(dan))+'</div>';
+    }
+    if(!crtaPostavljena && seenPrije && String(p.created_at) > seenPrije && p.tko !== SESSION.ime){
+      crtaPostavljena = true;
+      out += '<div class="msg-nove">nove poruke</div>';
+    }
     var sustav = p.tko === 'Sustav';
     var moja = !sustav && p.tko === SESSION.ime;
-    return '<div class="msg'+(moja?' moja':'')+(sustav?' sustav':'')+'">'+
-      '<div class="msg-meta">'+esc(p.tko)+' &middot; '+fmtDateTime(p.created_at)+'</div>'+
-      '<div class="msg-txt">'+esc(p.tekst)+(sustav?' <span style="opacity:.6">('+fmtDateTime(p.created_at).split(' ').pop()+')</span>':'')+'</div></div>';
-  }).join('') : '<div class="empty">Još nema poruka.</div>';
+    var vrijeme = String(p.created_at).length > 11 ? String(p.created_at).slice(11,16) : '';
+    var veza = p.kvar_id ? ' <a class="clink" onclick="app.izPoruke(\''+p.kvar_id+'\')">otvori kvar ›</a>' : '';
+    out += '<div class="msg'+(moja?' moja':'')+(sustav?' sustav':'')+'">'+
+      (sustav ? '' : '<div class="msg-meta">'+esc(p.tko)+' &middot; '+vrijeme+'</div>')+
+      '<div class="msg-txt">'+esc(p.tekst)+(sustav?' <span style="opacity:.6">'+vrijeme+'</span>':'')+veza+'</div></div>';
+    return out;
+  }).join('') : '<div class="empty">Nema poruka za odabrani prikaz.</div>';
+
+  var stanjePusha = await pushStanje();
+  var pushRed = '<div class="row" style="padding:9px 13px"><div class="grow">'+
+      '<div class="row-title" style="font-size:13px">Obavijesti na mobitel</div>'+
+      '<div class="row-sub">'+
+        (stanjePusha==='ukljuceno' ? 'Uključene — javljam hitne kvarove, dodjele i poruke.' :
+         stanjePusha==='blokirano' ? 'Blokirane u postavkama preglednika — uključi ih u postavkama stranice.' :
+         stanjePusha==='nepodrzano' ? 'Dostupno kad je app dodana na početni zaslon (preko interneta).' :
+         'Isključene — nećeš znati za hitan kvar dok ne otvoriš app.')+
+      '</div></div>'+
+      (stanjePusha==='ukljuceno'
+        ? '<button class="btn-mini" onclick="app.pushIskljuci()">Isključi</button>'
+        : (stanjePusha==='iskljuceno' ? '<button class="btn-mini" onclick="app.pushUkljuci()">Uključi</button>' : ''))+
+    '</div>';
+
   $('#screen-poruke').innerHTML =
-    '<h2>Zajedničke poruke — vide ih svi</h2>'+
+    '<div class="filters" style="grid-template-columns:repeat(3,1fr)">'+
+      ['sve','ljudi','sustav'].map(function(f){
+        var nazivi = {sve:'Sve', ljudi:'Samo ljudi', sustav:'Samo sustav'};
+        return '<button class="btn '+(PORUKE_FILTER===f?'primary':'sec')+' sm" onclick="app.porukeFilter(\''+f+'\')">'+nazivi[f]+'</button>';
+      }).join('')+
+    '</div>'+
+    '<div class="card">'+pushRed+'</div>'+
+    '<h2>Zajednički kanal — vide ga svi</h2>'+
     '<div class="card" style="padding:5px 0">'+html+'</div>'+
     '<form class="msg-form" onsubmit="app.posaljiPoruku(event)">'+
       '<textarea name="tekst" rows="2" required placeholder="Poruka svima — primopredaja, obavijest, upozorenje…"></textarea>'+
       '<button class="btn primary block" type="submit" style="margin-top:8px">Pošalji</button>'+
     '</form>';
   oznaciProcitano();
-  window.scrollTo(0, document.body.scrollHeight);
+  updateBadge();
+  var crta = document.querySelector('.msg-nove');
+  if(crta) crta.scrollIntoView({block:'center'});
+  else window.scrollTo(0, document.body.scrollHeight);
 }
 
 /* =====================  navigacija  ===================== */
@@ -1975,7 +2104,8 @@ var app = {
     DATA.kvarovi.push(kvar);
     app.closeModal(); showScreen('kvarovi');
     var bm = machineById(kvar.m) || {name:''};
-    sysPoruka('⚠ Prijavljen kvar: '+bm.name+' — '+kvar.opis+' ('+(SESSION.ime||'')+')');
+    sysPoruka('⚠ Prijavljen kvar: '+bm.name+' — '+kvar.opis+' ('+(SESSION.ime||'')+')', kvar.id);
+    posaljiObavijest('⚠ Novi kvar', bm.name+': '+kvar.opis, '#kvarovi');
     if(REMOTE){
       kvar.foto = await uploadFoto(pendingFoto) || null;
       await apiInsert('kvarovi', { m:kvar.m, date:kvar.date, opis:kvar.opis, sati:0,
@@ -1983,16 +2113,25 @@ var app = {
         kategorija:kvar.kategorija, tip:'kvar' }, kvar);
     } else { save(); }
   },
+  porukeFilter: function(f){ PORUKE_FILTER = f; renderPoruke(); },
+  izPoruke: function(kvarId){
+    var k = DATA.kvarovi.filter(function(x){ return x.id===kvarId; })[0];
+    if(!k){ toast('Kvar nije u učitanom razdoblju'); return; }
+    app.detaljKvara(kvarId);
+  },
+  pushUkljuci: async function(){ if(await pushUkljuci()) renderPoruke(); },
+  pushIskljuci: async function(){ await pushIskljuci(); renderPoruke(); },
   posaljiPoruku: async function(e){
     e.preventDefault();
     var f = new FormData(e.target);
     var txt = String(f.get('tekst')||'').trim();
     if(!txt) return;
-    var p = { id:'po'+Date.now(), tko:SESSION.ime||'Voditelj', tekst:txt, created_at:new Date().toISOString() };
+    var p = { id:'po'+Date.now(), tko:SESSION.ime||'Voditelj', tekst:txt, kvar_id:null, created_at:new Date().toISOString() };
     if(!DATA.poruke) DATA.poruke = [];
     DATA.poruke.push(p);
     renderPoruke();
     await apiInsert('poruke', { tko:p.tko, tekst:p.tekst }, p);
+    posaljiObavijest('💬 '+p.tko, txt.slice(0,120), '#poruke');
   },
   dodajKomentar: async function(e, kId, pogled){
     e.preventDefault();
@@ -2004,6 +2143,9 @@ var app = {
     DATA.komentari.push(kom);
     if(pogled==='detalj') app.detaljKvara(kId); else app.komentariKvara(kId);
     await apiInsert('komentari', { kvar_id:kId, tekst:kom.tekst, tko:kom.tko }, kom);
+    var kk = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
+    if(kk && kk.dodijeljen && kk.dodijeljen !== kom.tko)
+      posaljiObavijest('💬 Komentar na tvom kvaru', kom.tko+': '+kom.tekst.slice(0,110), '#kvarovi', kk.dodijeljen);
   },
   anaPeriod: function(v){ ANA_DANA = parseInt(v,10)||0; renderAnalitika(); },
   rasporedMjesec: function(smjer){
@@ -2393,7 +2535,11 @@ var app = {
     var nm = machineById(kvar.m);
     sysPoruka((tip==='zadatak' ? '📋 Novi zadatak: ' : '⚠ Prijavljen kvar: ')+
       (nm ? nm.name+' — ' : '')+kvar.opis+
-      (kvar.dodijeljen ? ' → '+kvar.dodijeljen : '')+' ('+(SESSION.ime||'')+')');
+      (kvar.dodijeljen ? ' → '+kvar.dodijeljen : '')+' ('+(SESSION.ime||'')+')', kvar.id);
+    if(kvar.prioritet === 'hitno')
+      posaljiObavijest('🔴 HITAN KVAR', (nm?nm.name+': ':'')+kvar.opis, '#kvarovi');
+    else if(kvar.dodijeljen)
+      posaljiObavijest('📋 Novo za tebe', (nm?nm.name+': ':'')+kvar.opis, '#kvarovi', kvar.dodijeljen);
     if(REMOTE){
       kvar.foto = await uploadFoto(pendingFoto) || null;
       await apiInsert('kvarovi', { m:kvar.m, date:kvar.date, opis:kvar.opis, sati:kvar.sati,
@@ -2491,7 +2637,7 @@ var app = {
     showScreen($('#screen-stroj').classList.contains('hidden') ? 'kvarovi' : 'stroj');
     var rm = machineById(k.m);
     sysPoruka('✅ '+(k.tip==='zadatak'?'Zadatak obavljen':'Kvar riješen')+': '+
-      (rm ? rm.name+' — ' : '')+k.opis+' ('+esc(k.tko||'')+')');
+      (rm ? rm.name+' — ' : '')+k.opis+' ('+esc(k.tko||'')+')', k.id);
     await apiUpdate('kvarovi', k.id, { sati:k.sati, status:k.status, upoz:false, ceka_dio:false,
       tko:k.tko, zam:k.zam, sudjelovali:k.sudjelovali, closed_at:new Date().toISOString() });
   },
@@ -2540,6 +2686,7 @@ var app = {
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
     if(!k) return;
     var f = new FormData(e.target);
+    var prijeDodijeljen = k.dodijeljen;
     k.m = f.get('m') || null;
     k.opis = String(f.get('opis')||'').trim() || k.opis;
     k.date = f.get('date') || k.date;
@@ -2554,6 +2701,10 @@ var app = {
       k.zam = String(f.get('zam')||'').trim() || null;
     } else {
       k.ceka_dio = !!f.get('ceka');
+    }
+    if(k.dodijeljen && k.dodijeljen !== prijeDodijeljen && k.status==='otvoren'){
+      var dm = machineById(k.m);
+      posaljiObavijest('📋 Dodijeljeno tebi', (dm?dm.name+': ':'')+k.opis, '#kvarovi', k.dodijeljen);
     }
     app.closeModal();
     showScreen($('#screen-stroj').classList.contains('hidden') ? 'kvarovi' : 'stroj');
@@ -2838,12 +2989,13 @@ function autoKat(opis){
   if(/remen|ležaj|matric|brtv|nož|folij|traka|valj|dozator|reduktor/.test(o)) return 'Mehanički';
   return 'Ostalo';
 }
-function sysPoruka(tekst){
+function sysPoruka(tekst, kvarId){
   /* automatski sistemski zapis u zajedničkom kanalu — živa knjiga smjene */
-  var p = { id:'po'+Date.now(), tko:'Sustav', tekst:tekst, created_at:new Date().toISOString() };
+  var veza = (kvarId && !jeTempId(kvarId)) ? kvarId : null;
+  var p = { id:'po'+Date.now(), tko:'Sustav', tekst:tekst, kvar_id:veza, created_at:new Date().toISOString() };
   if(!DATA.poruke) DATA.poruke = [];
   DATA.poruke.push(p);
-  if(REMOTE){ try{ sb.from('poruke').insert({ tko:'Sustav', tekst:tekst }).then(function(){}); }catch(e){} }
+  if(REMOTE){ try{ sb.from('poruke').insert({ tko:'Sustav', tekst:tekst, kvar_id:veza }).then(function(){}, function(){}); }catch(e){} }
   else save();
   updateBadge();
 }
