@@ -166,9 +166,11 @@ async function testovi(W, D){
   posalji(f); await cekaj(150);
   jednako('ispravljeni sati su spremljeni', novi.sati, 5);
   var stariPrompt = W.prompt; W.prompt = function(){ return 'dupli unos'; };
-  app.stornirajKvar(novi.id); await cekaj(150);
-  W.prompt = stariPrompt;
+  var stariConfirm = W.confirm; W.confirm = function(){ return true; };  /* potvrda upozorenja o utrošenom dijelu */
+  app.stornirajKvar(novi.id); await cekaj(200);
+  W.prompt = stariPrompt; W.confirm = stariConfirm;
   jednako('storno postavlja status', novi.status, 'otkazan');
+  ok('storno upozorava kad je dio bio utrošen', (novi.zam||'').length > 0);
   ok('stornirani kvar ne ulazi u izračune',
      W.samoKvarovi().every(function(k){ return k.id !== novi.id; }));
 
