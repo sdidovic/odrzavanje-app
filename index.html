@@ -817,7 +817,18 @@ var RED = [];
 var SYNC_U_TIJEKU = false;
 
 function redUcitaj(){ try{ RED = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]') || []; }catch(e){ RED = []; } }
-function redSpremi(){ try{ localStorage.setItem(QUEUE_KEY, JSON.stringify(RED)); }catch(e){} }
+var RED_NESPREMLJEN = false;
+function redSpremi(){
+  try{ localStorage.setItem(QUEUE_KEY, JSON.stringify(RED)); RED_NESPREMLJEN = false; }
+  catch(e){
+    /* memorija uređaja je puna (najčešće fotografije) — korisnik to MORA vidjeti,
+       inače misli da je unos siguran, a nestat će zatvaranjem aplikacije */
+    RED_NESPREMLJEN = true;
+    osvjeziOfflineTraku();
+    alert('PAŽNJA: memorija uređaja je puna pa se unos nije mogao sigurno spremiti.\n\n'+
+          'Nemoj zatvarati aplikaciju dok se ne uspostavi mreža, ili zapiši kvar na papir.');
+  }
+}
 function cacheSpremi(){
   if(!REMOTE || !DATA) return;
   try{ localStorage.setItem(CACHE_KEY, JSON.stringify(DATA)); }
@@ -904,6 +915,12 @@ async function sinkroniziraj(rucno){
 function osvjeziOfflineTraku(){
   var el = $('#offline-traka'); if(!el) return;
   var n = RED.length;
+  if(RED_NESPREMLJEN){
+    el.style.display = '';
+    el.className = 'off-traka';
+    el.innerHTML = '⚠ Memorija uređaja je puna — <b>unos nije trajno spremljen</b>. Ne zatvaraj aplikaciju.';
+    return;
+  }
   if(!REMOTE || (naMrezi() && !n)){ el.style.display = 'none'; return; }
   el.style.display = '';
   el.className = 'off-traka' + (naMrezi() ? ' ceka' : '');

@@ -2,7 +2,7 @@
    Kešira statiku (ljuska aplikacije) da se app otvara brzo i da ikona na
    home screenu radi kao aplikacija. Podaci se NE keširaju — svježina ima
    prednost; bez mreže app jasno javi grešku (papirnati fallback u pogonu). */
-var CACHE = 'odrzavanje-static-v12';
+var CACHE = 'odrzavanje-static-v13';
 var STATIKA = ['./index.html', './manifest.json', './vendor/supabase-js.js',
                './assets/icon-192.png', './assets/icon-512.png'];
 
