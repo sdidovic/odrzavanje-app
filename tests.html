@@ -63,17 +63,24 @@ function posalji(form){ form.dispatchEvent(new Event('submit', {cancelable:true}
   var iframe = document.getElementById('app');
   /* uvijek svježa verzija — inače service worker servira staru iz cachea */
   iframe.src = 'index.html?test=' + Date.now();
+  /* cekamo da se kod digne; DATA jos ne mora postojati — na objavljenoj verziji
+     aplikacija prvo trazi prijavu, pa testove vrtimo kroz demo nacin */
   for(var i=0; i<100; i++){
-    var W = iframe.contentWindow;
-    if(W && W.app && W.DATA && W.buildSeed) break;
+    var W0 = iframe.contentWindow;
+    if(W0 && W0.app && W0.buildSeed && typeof W0.app.demoUlaz === 'function') break;
     await cekaj(100);
   }
   var W = iframe.contentWindow, D = iframe.contentDocument;
-  if(!W || !W.app){
+  if(!W || !W.app || typeof W.app.demoUlaz !== 'function'){
     ok('Aplikacija se nije pokrenula u iframeu', false,
-       'Otvori ovu stranicu preko http:// (npr. python -m http.server), ne preko file://');
+       'Otvori ovu stranicu preko http(s)://, ne preko file://');
     ispisi(); return;
   }
+  /* testovi uvijek rade u demo nacinu — nikad ne diraju pravu bazu */
+  W.app.demoUlaz();
+  for(var j=0; j<50; j++){ if(W.DATA) break; await cekaj(100); }
+  if(!W.DATA){ ok('Demo podaci se nisu ucitali', false, 'app.demoUlaz() nije postavio DATA'); ispisi(); return; }
+  if(W.REMOTE){ ok('Testovi moraju raditi u demo nacinu', false, 'REMOTE je ostao true'); ispisi(); return; }
   try{ await testovi(W, D); }
   catch(e){ ok('Testovi su se srušili', false, String(e && e.stack || e)); }
   ispisi();
