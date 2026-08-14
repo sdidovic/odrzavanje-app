@@ -191,6 +191,12 @@ body[data-role="majstor"] .btn-audit{display:none}
 .demo-banner{background:var(--yellow-bg);color:var(--yellow);border-bottom:1px solid var(--yellow-border);
   font-size:11.5px;font-weight:600;text-align:center;padding:5px 10px}
 
+/* ---------- offline traka ---------- */
+.off-traka{position:sticky;top:0;z-index:29;background:#3d4452;color:#fff;font-size:12px;font-weight:600;
+  text-align:center;padding:6px 10px}
+.off-traka.ceka{background:var(--yellow-bg);color:var(--yellow);border-bottom:1px solid var(--yellow-border)}
+.off-traka a{color:inherit;text-decoration:underline;cursor:pointer;font-weight:700}
+
 /* ---------- uloge ---------- */
 body[data-role="readonly"] .role-write{display:none !important}
 body:not([data-role="voditelj"]) .role-voditelj{display:none !important}
@@ -320,6 +326,7 @@ form .btn{margin-top:18px}
 </header>
 
 <div id="demo-banner" class="demo-banner" style="display:none">DEMO NAČIN — podaci se spremaju samo na ovom uređaju (vidi README za uključenje baze)</div>
+<div id="offline-traka" class="off-traka" style="display:none"></div>
 
 <div id="screen-login"><div class="login-box">
   <img class="login-logo" id="login-logo" alt="Clarum">
@@ -341,6 +348,7 @@ form .btn{margin-top:18px}
   <section id="screen-poruke"   class="screen hidden"></section>
   <section id="screen-analitika" class="screen hidden"></section>
   <section id="screen-raspored" class="screen hidden"></section>
+  <section id="screen-sustav"   class="screen hidden"></section>
   <section id="screen-stroj"    class="screen hidden"></section>
 </main>
 
@@ -668,18 +676,22 @@ function localLoad(){
   DATA = buildSeedSFotkom();
   save();
 }
+var KV_LIMIT = 1000;   /* početno učitavanje — "Učitaj cijelu povijest" diže na sve */
+var KV_SVE = false;
 async function load(tiho){
   if(!REMOTE){ localLoad(); return; }
   if(!tiho) pokaziLoader();
   try{
+  var qKv = sb.from('kvarovi').select('*').order('date', {ascending:false});
+  if(!KV_SVE) qKv = qKv.limit(KV_LIMIT);
   var r = await Promise.all([
     sb.from('machines').select('*').order('id'),
-    sb.from('kvarovi').select('*').order('date', {ascending:false}),
+    qKv,
     sb.from('dijelovi').select('*'),
     sb.from('preventiva').select('*'),
     sb.from('partneri').select('*'),
     sb.from('komentari').select('*').order('created_at'),
-    sb.from('poruke').select('*').order('created_at')
+    sb.from('poruke').select('*').order('created_at').limit(300)
   ]);
   for(var i=0;i<r.length;i++){ if(r[i].error) throw r[i].error; }
   DATA = {
@@ -691,6 +703,8 @@ async function load(tiho){
     komentari: r[5].data,
     poruke: r[6].data
   };
+  primijeniRed();     /* nesinkronizirani lokalni unosi ostaju vidljivi */
+  cacheSpremi();      /* da app radi i kad mreža padne */
   }finally{ if(!tiho) sakrijLoader(); }
 }
 function save(){
@@ -725,26 +739,145 @@ document.addEventListener('submit', function(ev){
     setTimeout(function(){ b.disabled = false; b.textContent = b.dataset.txt || 'Spremi'; }, 1600);
   }
 }, true);
-function jeTempId(id){ return REMOTE && /^(kv|pr|d|pt)\d+$/.test(String(id)); }
+function jeTempId(id){ return REMOTE && /^(kv|pr|d|pt|ko|po)\d+$/.test(String(id)); }
+
+/* =====================================================================
+   OFFLINE RED — pogon nema uvijek mrežu, a kvar se mora moći prijaviti.
+   Svaki neuspjeli/offline upis ide u red u localStorage i šalje se sam
+   čim se veza vrati. Podaci se keširaju da app radi i bez mreže.
+   ===================================================================== */
+var CACHE_KEY = 'odrzavanje-cache-v1';
+var QUEUE_KEY = 'odrzavanje-queue-v1';
+var RED = [];
+var SYNC_U_TIJEKU = false;
+
+function redUcitaj(){ try{ RED = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]') || []; }catch(e){ RED = []; } }
+function redSpremi(){ try{ localStorage.setItem(QUEUE_KEY, JSON.stringify(RED)); }catch(e){} }
+function cacheSpremi(){
+  if(!REMOTE || !DATA) return;
+  try{ localStorage.setItem(CACHE_KEY, JSON.stringify(DATA)); }
+  catch(e){ /* pun localStorage (fotografije) — cache je nice-to-have */ }
+}
+function cacheUcitaj(){
+  try{
+    var raw = localStorage.getItem(CACHE_KEY);
+    if(!raw) return false;
+    var d = JSON.parse(raw);
+    if(d && d.machines && d.kvarovi){ DATA = d; return true; }
+  }catch(e){}
+  return false;
+}
+function naMrezi(){ return navigator.onLine !== false; }
+function uRed(table, op, row, localObj){
+  RED.push({ qid:'q'+Date.now()+Math.floor(Math.random()*1000), table:table, op:op,
+             row:row, tempId: localObj ? localObj.id : (row && row.id) || null });
+  redSpremi();
+  osvjeziOfflineTraku();
+}
+/* kad zapis dobije pravi ID iz baze, prepiši ga u ostatku reda (npr. komentar na taj kvar) */
+function zamijeniIdURedu(stari, novi){
+  if(!stari || !novi || stari===novi) return;
+  RED.forEach(function(z){
+    if(z.tempId === stari) z.tempId = novi;
+    if(z.row){
+      Object.keys(z.row).forEach(function(k){ if(z.row[k] === stari) z.row[k] = novi; });
+    }
+  });
+  redSpremi();
+}
+function primijeniRed(){
+  /* lokalni zapisi koji još nisu u bazi ne smiju nestati nakon osvježavanja */
+  RED.forEach(function(z){
+    var kljuc = TABLE2KEY[z.table]; if(!kljuc || !DATA[kljuc]) return;
+    if(z.op === 'insert'){
+      var vec = DATA[kljuc].some(function(x){ return x.id === z.tempId; });
+      if(!vec){
+        var kopija = JSON.parse(JSON.stringify(z.row));
+        kopija.id = z.tempId;
+        if(z.table==='preventiva' && kopija.tko_zadnji) kopija.tkoZadnji = kopija.tko_zadnji;
+        DATA[kljuc].push(kopija);
+      }
+    } else {
+      var zapis = DATA[kljuc].filter(function(x){ return x.id === z.tempId; })[0];
+      if(zapis) Object.keys(z.row).forEach(function(k){
+        zapis[k] = z.row[k];
+        if(k==='tko_zadnji') zapis.tkoZadnji = z.row[k];
+      });
+    }
+  });
+}
+async function sinkroniziraj(rucno){
+  if(!REMOTE || SYNC_U_TIJEKU || !RED.length) { if(rucno) toast('Sve je sinkronizirano ✓'); return; }
+  if(!naMrezi()){ if(rucno) toast('Nema mreže — pokušat ću sam kad se vrati'); return; }
+  SYNC_U_TIJEKU = true;
+  var poslano = 0, zapelo = false;
+  try{
+    while(RED.length){
+      var z = RED[0];
+      var res = z.op === 'insert'
+        ? await sb.from(z.table).insert(z.row).select().single()
+        : await sb.from(z.table).update(z.row).eq('id', z.tempId);
+      if(res.error){
+        /* trajna greška (npr. RLS) — makni iz reda da ne blokira ostalo, zabilježi */
+        if(res.error.code && res.error.code !== 'PGRST301' && naMrezi()){
+          zapisiGresku('Sinkronizacija odbijena ('+z.table+')', res.error.message);
+          RED.shift(); redSpremi(); continue;
+        }
+        zapelo = true; break;   /* mreža — probaj kasnije */
+      }
+      if(z.op === 'insert' && res.data && res.data.id) zamijeniIdURedu(z.tempId, res.data.id);
+      RED.shift(); redSpremi(); poslano++;
+    }
+  }catch(e){ zapelo = true; }
+  SYNC_U_TIJEKU = false;
+  osvjeziOfflineTraku();
+  if(poslano){
+    toast('Sinkronizirano: '+poslano+' zapisa ✓');
+    try{ await load(true); rerender(); }catch(e){}
+  } else if(rucno && zapelo){ toast('Mreža još nije dostupna'); }
+}
+function osvjeziOfflineTraku(){
+  var el = $('#offline-traka'); if(!el) return;
+  var n = RED.length;
+  if(!REMOTE || (naMrezi() && !n)){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.className = 'off-traka' + (naMrezi() ? ' ceka' : '');
+  el.innerHTML = naMrezi()
+    ? '⏳ Nespremljeno: <b>'+n+'</b> — <a onclick="app.sinkroniziraj()">pošalji sada</a>'
+    : '📴 Nema mreže — radi se lokalno'+(n ? ', <b>'+n+'</b> za slanje' : '')+'. Sve se šalje samo kad se veza vrati.';
+}
+window.addEventListener('online',  function(){ osvjeziOfflineTraku(); sinkroniziraj(); });
+window.addEventListener('offline', function(){ osvjeziOfflineTraku(); });
+
 async function apiInsert(table, row, localObj){
   if(!REMOTE){ save(); toast('Spremljeno ✓'); return localObj; }
+  if(!naMrezi()){ uRed(table, 'insert', row, localObj); toast('Spremljeno lokalno — čeka mrežu'); cacheSpremi(); return null; }
   PENDING_OPS++;
   try{
     var res = await sb.from(table).insert(row).select().single();
     if(res.error) throw res.error;
     if(localObj && res.data && res.data.id && localObj.id !== res.data.id){
+      zamijeniIdURedu(localObj.id, res.data.id);
       localObj.id = res.data.id;  /* pravi ID iz baze */
       rerender();                 /* osvježi onclick atribute na novi ID */
     }
     toast('Spremljeno ✓');
+    cacheSpremi();
     return res.data;
   }catch(err){
+    if(mreznaGreska(err)){
+      uRed(table, 'insert', row, localObj);   /* ne gubi unos — pošalji kasnije */
+      toast('Mreža nedostupna — spremljeno lokalno');
+      cacheSpremi();
+      return null;
+    }
     if(localObj){
       var arr = DATA[TABLE2KEY[table]] || [];
       var idx = arr.indexOf(localObj);
-      if(idx > -1) arr.splice(idx, 1);  /* rollback optimističkog unosa */
+      if(idx > -1) arr.splice(idx, 1);  /* rollback: baza je odbila zapis */
     }
-    alert('Spremanje NIJE uspjelo — zapis nije u bazi. Provjeri mrežu i pokušaj ponovno.\n('+((err&&err.message)||err)+')');
+    zapisiGresku('Upis odbijen ('+table+')', (err && err.message) || String(err));
+    alert('Spremanje NIJE uspjelo — zapis nije u bazi.\n('+((err&&err.message)||err)+')');
     try{ await load(); }catch(e2){}
     rerender();
     return null;
@@ -752,17 +885,54 @@ async function apiInsert(table, row, localObj){
 }
 async function apiUpdate(table, id, patch){
   if(!REMOTE){ save(); toast('Spremljeno ✓'); return; }
+  if(!naMrezi()){ uRed(table, 'update', patch, {id:id}); toast('Spremljeno lokalno — čeka mrežu'); cacheSpremi(); return; }
   PENDING_OPS++;
   try{
     var res = await sb.from(table).update(patch).eq('id', id);
     if(res.error) throw res.error;
     toast('Spremljeno ✓');
+    cacheSpremi();
   }catch(err){
+    if(mreznaGreska(err)){
+      uRed(table, 'update', patch, {id:id});
+      toast('Mreža nedostupna — spremljeno lokalno');
+      cacheSpremi();
+      return;
+    }
+    zapisiGresku('Izmjena odbijena ('+table+')', (err && err.message) || String(err));
     alert('Spremanje NIJE uspjelo — promjena nije u bazi.\n('+((err&&err.message)||err)+')');
     try{ await load(); }catch(e2){}  /* vrati se na stanje iz baze */
     rerender();
   }finally{ PENDING_OPS--; }
 }
+function mreznaGreska(err){
+  if(!naMrezi()) return true;
+  var m = ((err && (err.message || err.msg)) || String(err)).toLowerCase();
+  return m.indexOf('fetch') > -1 || m.indexOf('network') > -1 || m.indexOf('timeout') > -1 ||
+         m.indexOf('failed to') > -1 || m.indexOf('load failed') > -1;
+}
+
+/* ---------- dnevnik grešaka (monitoring) ---------- */
+var GRESKE_POSLANO = 0;
+function zapisiGresku(poruka, detalji){
+  if(!REMOTE || GRESKE_POSLANO >= 20) return;   /* bez petlji i poplave */
+  GRESKE_POSLANO++;
+  try{
+    sb.from('greske').insert({
+      poruka: String(poruka).slice(0,300),
+      detalji: String(detalji||'').slice(0,2000),
+      korisnik: SESSION.ime || '',
+      url: location.hash || location.pathname
+    }).then(function(){}, function(){});
+  }catch(e){}
+}
+window.addEventListener('error', function(ev){
+  zapisiGresku(ev.message || 'JS greška', (ev.filename||'')+':'+(ev.lineno||'')+' '+((ev.error&&ev.error.stack)||''));
+});
+window.addEventListener('unhandledrejection', function(ev){
+  var r = ev.reason;
+  zapisiGresku('Neuhvaćena greška', (r && (r.message || r.stack)) || String(r));
+});
 async function uploadFoto(dataUrl){
   if(!REMOTE || !dataUrl) return dataUrl;
   try{
@@ -889,7 +1059,9 @@ function renderPregled(){
     '<div class="session-row">'+
       (REMOTE ? 'Prijavljen: <b>'+esc(SESSION.ime)+'</b> ('+esc(SESSION.role)+') &middot; <a onclick="app.odjava()">Odjava</a> &middot; ' : '')+
       '<a class="role-voditelj" onclick="app.izvoz()">Izvoz podataka</a>'+
-      '<span class="role-voditelj"> &middot; <a onclick="app.izvozCSV()">Izvoz CSV (kvarovi)</a></span>'+
+      '<span class="role-voditelj"> &middot; <a onclick="app.izvozCSV()">Izvoz CSV</a>'+
+      ' &middot; <a onclick="app.otvoriSustav()">⚙ Sustav</a></span>'+
+      ' &middot; <a onclick="app.pomoc()">? Pomoć</a>'+
     '</div>';
 }
 function statCard(n, label, color, onclick){
@@ -1355,6 +1527,68 @@ function renderRaspored(){
       (sljedecih.length ? sljedecih.map(prevRedak).join('') : '<div class="empty">Nema planiranih stavki.</div>')+'</div>';
 }
 
+/* =====================  render: Sustav (voditelj)  ===================== */
+var SUS_KORISNICI = null, SUS_GRESKE = null;
+function renderSustav(){
+  var korHtml = SUS_KORISNICI
+    ? (SUS_KORISNICI.length ? SUS_KORISNICI.map(function(k){
+        return '<div class="row"><div class="grow">'+
+          '<div class="row-title" style="font-size:13.5px">'+esc(k.ime)+
+            (k.aktivan ? '' : ' <span class="chip rijesen">Neaktivan</span>')+'</div>'+
+          '<div class="row-sub">'+esc(k.role)+' &middot; '+esc(k.email)+'</div>'+
+          '<div style="margin-top:5px">'+
+            '<button class="btn-mini" onclick="app.korisnikUloga(\''+k.id+'\')">Uloga</button> '+
+            '<button class="btn-mini" onclick="app.korisnikPin(\''+k.id+'\')">Novi PIN</button> '+
+            '<button class="btn-mini" onclick="app.korisnikAktivan(\''+k.id+'\','+(!k.aktivan)+')">'+
+              (k.aktivan?'Deaktiviraj':'Aktiviraj')+'</button>'+
+          '</div></div></div>';
+      }).join('') : '<div class="empty">Nema korisnika.</div>')
+    : '<div class="empty">Učitavanje…</div>';
+
+  var greskeHtml = SUS_GRESKE
+    ? (SUS_GRESKE.length ? SUS_GRESKE.map(function(g){
+        return '<div class="kvar-item"><div class="kvar-top"><span>'+esc(g.korisnik||'—')+'</span>'+
+          '<span>'+fmtDateTime(g.created_at)+'</span></div>'+
+          '<div class="kvar-opis" style="font-size:13px">'+esc(g.poruka)+'</div>'+
+          (g.detalji ? '<div class="kvar-meta" style="word-break:break-word">'+esc(String(g.detalji).slice(0,220))+'</div>' : '')+
+          '</div>';
+      }).join('') : '<div class="empty">Nema zabilježenih grešaka ✓</div>')
+    : '<div class="empty">Klikni "Učitaj greške"</div>';
+
+  $('#screen-sustav').innerHTML =
+    '<button class="back" onclick="app.go(\'pregled\')">‹ Pregled</button>'+
+    '<h2>Korisnici</h2>'+
+    '<div class="card">'+korHtml+'</div>'+
+    '<button class="btn sec sm block" style="margin-top:8px" onclick="app.noviKorisnik()">+ Novi korisnik</button>'+
+    '<h2>Podaci</h2>'+
+    '<div class="card"><div class="row"><div class="grow">'+
+      '<div class="row-title" style="font-size:13.5px">Stanje</div>'+
+      '<div class="row-sub">'+DATA.machines.length+' strojeva &middot; '+DATA.kvarovi.length+' kvarova'+
+        (KV_SVE?' (cijela povijest)':' (zadnjih '+KV_LIMIT+')')+' &middot; '+DATA.dijelovi.length+' dijelova &middot; '+
+        DATA.partneri.length+' kontakata</div>'+
+      '<div style="margin-top:6px">'+
+        (KV_SVE ? '' : '<button class="btn-mini" onclick="app.ucitajSve()">Učitaj cijelu povijest</button> ')+
+        '<button class="btn-mini" onclick="app.izvoz()">Izvoz JSON</button> '+
+        '<button class="btn-mini" onclick="app.izvozCSV(0)">Izvoz CSV</button>'+
+      '</div></div></div></div>'+
+    '<button class="btn sec sm block" style="margin-top:8px" onclick="app.uvozCSV()">⬆ Uvoz strojeva / dijelova (CSV)</button>'+
+    '<h2>Dnevnik grešaka</h2>'+
+    '<div class="card">'+greskeHtml+'</div>'+
+    '<button class="btn sec sm block" style="margin-top:8px" onclick="app.ucitajGreske()">Učitaj greške</button>'+
+    '<h2 style="color:var(--red)">Opasna zona</h2>'+
+    '<div class="card"><div class="row"><div class="grow">'+
+      '<div class="row-title" style="font-size:13.5px">Brisanje demo podataka</div>'+
+      '<div class="row-sub">Prije prelaska na stvarne podatke: briše kvarove, preventivu, komentare i poruke. '+
+        'Strojevi, dijelovi i kontakti ostaju (osim ako odabereš i njih).</div>'+
+      '<div style="margin-top:6px"><button class="btn-mini" style="border-color:var(--red);color:var(--red)" '+
+        'onclick="app.obrisiDemo(false)">Obriši evidencije</button> '+
+        '<button class="btn-mini" style="border-color:var(--red);color:var(--red)" '+
+        'onclick="app.obrisiDemo(true)">Obriši baš sve</button></div>'+
+    '</div></div></div>'+
+    '<div class="session-row" style="margin-bottom:20px">Verzija podataka: '+esc(LS_KEY)+
+      (REMOTE ? ' &middot; baza spojena' : ' &middot; demo način')+'</div>';
+}
+
 /* =====================  render: Poruke (zajednički kanal)  ===================== */
 function fmtDateTime(ts){
   var s = String(ts||'');
@@ -1396,16 +1630,18 @@ var RENDERERS = {
   pregled: renderPregled, strojevi: renderStrojevi,
   kvarovi: renderKvarovi, dijelovi: renderDijelovi,
   kontakti: renderKontakti, poruke: renderPoruke,
-  analitika: renderAnalitika, raspored: renderRaspored, stroj: renderStroj
+  analitika: renderAnalitika, raspored: renderRaspored,
+  sustav: renderSustav, stroj: renderStroj
 };
 function showScreen(name){
   CURRENT_SCREEN = name;
-  ['pregled','strojevi','kvarovi','dijelovi','kontakti','poruke','analitika','raspored','stroj'].forEach(function(s){
+  ['pregled','strojevi','kvarovi','dijelovi','kontakti','poruke','analitika','raspored','sustav','stroj'].forEach(function(s){
     $('#screen-'+s).classList.toggle('hidden', s!==name);
   });
   REPS = repCounts();
   RENDERERS[name]();
-  var tabName = name==='stroj' ? 'strojevi' : (name==='analitika'||name==='raspored' ? 'pregled' : name);
+  var tabName = name==='stroj' ? 'strojevi'
+    : ((name==='analitika'||name==='raspored'||name==='sustav') ? 'pregled' : name);
   document.querySelectorAll('.tab').forEach(function(t){
     t.classList.toggle('active', t.getAttribute('data-tab')===tabName);
   });
@@ -1453,8 +1689,171 @@ var app = {
       err.textContent = 'Greška u vezi s bazom — provjeri internet pa pokušaj ponovno.';
     }finally{ LOGIN_BUSY = false; }
   },
+  sinkroniziraj: function(){ sinkroniziraj(true); },
+  otvoriSustav: function(){
+    SUS_KORISNICI = null; SUS_GRESKE = null;
+    showScreen('sustav');
+    if(REMOTE) app.ucitajKorisnike();
+  },
+  pomoc: function(){
+    var zaMajstora =
+      '<div class="a-item"><b>1. Prijava kvara</b><div class="a-sub">Kvarovi → ⚡ Brza prijava: stroj, fotografija, kratki opis. Gotovo u 15 sekundi.</div></div>'+
+      '<div class="a-item"><b>2. Moji zadaci</b><div class="a-sub">Na Pregledu, na vrhu — sve što je tebi dodijeljeno. Crveni broj na "Kvarovi" je tvoj broj zadataka.</div></div>'+
+      '<div class="a-item"><b>3. Rad na kvaru</b><div class="a-sub">Klikni kvar → prozor s detaljima. Piši komentare što je napravljeno; kad završiš: "Riješi kvar" i upiši utrošeni dio.</div></div>'+
+      '<div class="a-item"><b>4. Preventiva</b><div class="a-sub">Zelena kvačica ✓ znači obavljeno — termin se sam pomiče na sljedeći put.</div></div>'+
+      '<div class="a-item"><b>5. Bez mreže</b><div class="a-sub">Ako WiFi padne, sve i dalje radi. Unosi se spremaju na mobitel i šalju sami kad se veza vrati (traka gore to pokazuje).</div></div>';
+    var zaVoditelja =
+      '<div class="a-item"><b>Analitika</b><div class="a-sub">Pregled → 📊 Analitika: trošak po stroju, smjeni i kategoriji za bilo koje razdoblje + izvoz.</div></div>'+
+      '<div class="a-item"><b>IFS izvještaj</b><div class="a-sub">Gumb gore desno → odaberi razdoblje → 📄 PDF.</div></div>'+
+      '<div class="a-item"><b>Sustav</b><div class="a-sub">Pregled → ⚙ Sustav: korisnici, PIN-ovi, dnevnik grešaka, izvoz i uvoz podataka.</div></div>';
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal audit">'+
+      '<div class="modal-head"><h3>Kako se koristi</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<h4>Svakodnevni rad</h4>'+zaMajstora+
+      (vidiFinancije() ? '<h4>Za voditelja</h4>'+zaVoditelja : '')+
+      '<div class="a-sub" style="margin-top:10px">Pravilo: sve što se dogovori — dogovara se u alatu (komentar na kvaru ili Poruke), ne usmeno.</div>'+
+      '<button class="btn primary block" style="margin-top:16px" onclick="app.closeModal()">Jasno</button>'+
+      '</div></div>';
+  },
+  ucitajSve: async function(){
+    KV_SVE = true;
+    try{ await load(); rerender(); toast('Učitana cijela povijest ✓'); }
+    catch(e){ toast('Ne mogu učitati — provjeri mrežu'); }
+  },
+  /* ---- upravljanje korisnicima (preko sigurne edge funkcije) ---- */
+  fnKorisnici: async function(payload){
+    if(!REMOTE){ alert('Upravljanje korisnicima radi samo sa spojenom bazom (ne u demo načinu).'); return null; }
+    try{
+      var sesija = (await sb.auth.getSession()).data.session;
+      if(!sesija){ alert('Sesija je istekla — prijavi se ponovno.'); return null; }
+      var r = await fetch(SUPA_CFG.url + '/functions/v1/korisnici', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'apikey':SUPA_CFG.anonKey,
+                  'Authorization':'Bearer '+sesija.access_token },
+        body: JSON.stringify(payload)
+      });
+      var o = await r.json();
+      if(o.greska){ alert('Greška: '+o.greska); return null; }
+      return o;
+    }catch(e){ alert('Ne mogu doći do servera — provjeri mrežu.'); return null; }
+  },
+  ucitajKorisnike: async function(){
+    var o = await app.fnKorisnici({akcija:'popis'});
+    if(o){ SUS_KORISNICI = o.korisnici || []; renderSustav(); }
+  },
+  noviKorisnik: function(){
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
+      '<div class="modal-head"><h3>Novi korisnik</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<form onsubmit="app.saveKorisnik(event)">'+
+        '<label>Ime u aplikaciji</label><input name="ime" required placeholder="npr. Majstor 4">'+
+        '<label>Korisničko ime za prijavu</label><input name="user" required placeholder="npr. majstor4">'+
+        '<div class="row-sub" style="margin-top:3px">Prijava će biti: <b>ime</b>@odrzavanje.local</div>'+
+        '<label>PIN (min. 6 znamenki)</label><input name="pin" required inputmode="numeric" minlength="6">'+
+        '<label>Uloga</label><select name="role">'+
+          '<option value="majstor">Majstor</option><option value="voditelj">Voditelj</option>'+
+          '<option value="readonly">Samo čitanje</option></select>'+
+        '<button class="btn primary block" type="submit">Kreiraj korisnika</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</form></div></div>';
+  },
+  saveKorisnik: async function(e){
+    e.preventDefault();
+    var f = new FormData(e.target);
+    var user = String(f.get('user')||'').trim().toLowerCase().replace(/[^a-z0-9._-]/g,'');
+    var o = await app.fnKorisnici({ akcija:'dodaj', ime:String(f.get('ime')||'').trim(),
+      email:user+'@odrzavanje.local', pin:String(f.get('pin')||''), role:f.get('role') });
+    if(o){
+      app.closeModal();
+      alert('Korisnik kreiran.\n\nVAŽNO: dodaj ga i u popis na prijavi — u datoteci index.html, blok KORISNICI.');
+      app.ucitajKorisnike();
+    }
+  },
+  korisnikUloga: async function(id){
+    var r = prompt('Nova uloga (majstor / voditelj / readonly):');
+    if(!r) return;
+    r = r.trim().toLowerCase();
+    if(['majstor','voditelj','readonly'].indexOf(r) === -1){ alert('Nepoznata uloga.'); return; }
+    if(await app.fnKorisnici({akcija:'uloga', id:id, role:r})){ toast('Uloga promijenjena ✓'); app.ucitajKorisnike(); }
+  },
+  korisnikPin: async function(id){
+    var p = prompt('Novi PIN (najmanje 6 znamenki):');
+    if(!p) return;
+    if(await app.fnKorisnici({akcija:'pin', id:id, pin:p.trim()})){ toast('PIN promijenjen ✓'); }
+  },
+  korisnikAktivan: async function(id, aktivan){
+    if(!aktivan && !confirm('Deaktivirati korisnika? Neće se moći prijaviti, ali svi njegovi zapisi ostaju.')) return;
+    if(await app.fnKorisnici({akcija:'aktivan', id:id, aktivan:aktivan})){ toast('Spremljeno ✓'); app.ucitajKorisnike(); }
+  },
+  ucitajGreske: async function(){
+    if(!REMOTE){ SUS_GRESKE = []; renderSustav(); return; }
+    var r = await sb.from('greske').select('*').order('created_at',{ascending:false}).limit(50);
+    SUS_GRESKE = r.error ? [] : r.data;
+    renderSustav();
+  },
+  obrisiDemo: async function(sve){
+    var tekst = sve
+      ? 'Ovo briše SVE: kvarove, preventivu, komentare, poruke, dijelove, kontakte i strojeve.'
+      : 'Ovo briše kvarove, preventivu, komentare i poruke. Strojevi, dijelovi i kontakti ostaju.';
+    if(!confirm(tekst+'\n\nRadnja se NE može poništiti. Prije toga napravi Izvoz JSON.')) return;
+    var p = prompt('Za potvrdu upiši: OBRISI');
+    if(p !== 'OBRISI') return;
+    if(await app.fnKorisnici({akcija:'obrisi_demo', potvrda:'OBRISI', sve:!!sve})){
+      toast('Obrisano ✓');
+      try{ await load(); rerender(); }catch(e){}
+      renderSustav();
+    }
+  },
+  uvozCSV: function(){
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
+      '<div class="modal-head"><h3>Uvoz iz CSV-a</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<form onsubmit="app.saveUvoz(event)">'+
+        '<label>Što uvoziš</label><select name="vrsta" onchange="document.getElementById(\'uvoz-pomoc\').textContent=this.value===\'machines\'?\'šifra;naziv;program;cijena sata\':\'naziv;za koji stroj;stanje;minimum;dobavljač;cijena;kategorija\'">'+
+          '<option value="machines">Strojevi</option><option value="dijelovi">Dijelovi</option></select>'+
+        '<label>Redoslijed stupaca</label>'+
+        '<div class="row-sub" id="uvoz-pomoc" style="margin-bottom:6px">šifra;naziv;program;cijena sata</div>'+
+        '<label>Zalijepi podatke (jedan redak = jedna stavka, odvojeno s ; ili tab)</label>'+
+        '<textarea name="csv" rows="8" required placeholder="e3;Ekstruder E3;Suhi program;350"></textarea>'+
+        '<button class="btn primary block" type="submit">Uvezi</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</form></div></div>';
+  },
+  saveUvoz: async function(e){
+    e.preventDefault();
+    var f = new FormData(e.target);
+    var vrsta = f.get('vrsta');
+    var redci = String(f.get('csv')||'').split('\n').map(function(r){ return r.trim(); }).filter(Boolean);
+    var dodano = 0, greske = 0;
+    for(var i=0;i<redci.length;i++){
+      var c = redci[i].split(/[;\t]/).map(function(x){ return x.trim(); });
+      if(/^(šifra|sifra|naziv)/i.test(c[0])) continue;   /* preskoči zaglavlje */
+      try{
+        if(vrsta === 'machines'){
+          if(c.length < 2) { greske++; continue; }
+          var m = { id:c[0].toLowerCase(), name:c[1], program:c[2] || PROGRAMS[0], rate:parseFloat(c[3])||350, bilj:'' };
+          DATA.machines.push(m);
+          await apiInsert('machines', m, null);
+        } else {
+          if(c.length < 2) { greske++; continue; }
+          var d = { id:'d'+Date.now()+i, naziv:c[0], stroj:c[1]||'', stanje:parseInt(c[2],10)||0,
+                    min:parseInt(c[3],10)||0, dob:c[4]||'', cijena:parseFloat(c[5])||0,
+                    kategorija:c[6]||'Ostalo', naruceno:null };
+          DATA.dijelovi.push(d);
+          await apiInsert('dijelovi', { naziv:d.naziv, stroj:d.stroj, stanje:d.stanje, min:d.min,
+            dob:d.dob, cijena:d.cijena, kategorija:d.kategorija }, d);
+        }
+        dodano++;
+      }catch(err){ greske++; }
+    }
+    app.closeModal();
+    alert('Uvezeno: '+dodano+(greske?('\nPreskočeno (neispravan redak): '+greske):''));
+    showScreen(vrsta === 'machines' ? 'strojevi' : 'dijelovi');
+  },
   odjava: async function(){
+    if(RED.length && !confirm('Imaš '+RED.length+' nespremljenih zapisa koji čekaju mrežu. Odjava ih zadržava na ovom uređaju. Nastaviti?')) return;
     if(REMOTE){ try{ await sb.auth.signOut(); }catch(e){} }
+    try{ localStorage.removeItem(CACHE_KEY); }catch(e){}
     location.reload();
   },
   demoUlaz: function(){
@@ -1714,7 +2113,8 @@ var app = {
       '<div class="modal-head"><h3>Uredi dio</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<form onsubmit="app.saveUrediDio(event,\''+id+'\')">'+
         '<label>Naziv</label><input name="naziv" required value="'+esc(p.naziv)+'">'+
-        '<label>Za koji stroj</label><input name="stroj" value="'+esc(p.stroj)+'">'+
+        '<label>Za koje strojeve</label>'+strojeviCheckbox(p.strojevi)+
+        '<label style="margin-top:10px">Opis mjesta ugradnje (ako treba)</label><input name="stroj" value="'+esc(p.stroj)+'">'+
         '<label>Stanje</label><input type="number" name="stanje" min="0" step="1" value="'+p.stanje+'" required>'+
         '<label>Minimum</label><input type="number" name="min" min="0" step="1" value="'+p.min+'" required>'+
         '<label>Dobavljač</label><select name="dob">'+dobOpts+'</select>'+
@@ -1729,16 +2129,20 @@ var app = {
     var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
     if(!p) return;
     var f = new FormData(e.target);
+    p.strojevi = citajStrojeve(e.target);
     p.naziv = String(f.get('naziv')||'').trim() || p.naziv;
-    p.stroj = String(f.get('stroj')||'').trim();
-    p.stanje = parseInt(f.get('stanje'),10)||0;
-    p.min = parseInt(f.get('min'),10)||0;
+    p.stroj = String(f.get('stroj')||'').trim() || strojeviNazivi(p.strojevi);
+    p.stanje = Math.max(0, parseInt(f.get('stanje'),10)||0);
+    p.min = Math.max(0, parseInt(f.get('min'),10)||0);
     p.dob = f.get('dob');
     p.kategorija = f.get('kat')||'Ostalo';
-    p.cijena = parseFloat(f.get('cijena'))||0;
+    p.cijena = Math.max(0, parseFloat(f.get('cijena'))||0);
+    var pt = DATA.partneri.filter(function(x){ return x.naziv===p.dob; })[0];
+    p.partner_id = pt ? pt.id : null;
     app.closeModal(); showScreen('dijelovi');
     await apiUpdate('dijelovi', id, { naziv:p.naziv, stroj:p.stroj, stanje:p.stanje,
-      min:p.min, dob:p.dob, kategorija:p.kategorija, cijena:p.cijena });
+      min:p.min, dob:p.dob, kategorija:p.kategorija, cijena:p.cijena,
+      strojevi:p.strojevi, partner_id:p.partner_id });
   },
   urediStroj: function(mId){
     var m = machineById(mId);
@@ -1857,7 +2261,8 @@ var app = {
       '<div class="modal-head"><h3>Novi dio</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<form onsubmit="app.saveDio(event)">'+
         '<label>Naziv dijela</label><input name="naziv" required placeholder="npr. Remen, ležaj, brtva…">'+
-        '<label>Za koji stroj</label><input name="stroj" required placeholder="npr. Ekstruder E1 / E2">'+
+        '<label>Za koje strojeve</label>'+strojeviCheckbox([])+
+        '<label style="margin-top:10px">Opis mjesta ugradnje (neobavezno)</label><input name="stroj" placeholder="npr. pogon puža">'+
         '<label>Stanje na skladištu</label><input type="number" name="stanje" min="0" step="1" value="1" required>'+
         '<label>Minimum</label><input type="number" name="min" min="0" step="1" value="1" required>'+
         '<label>Dobavljač</label><select name="dob">'+dobOpts+'</select>'+
@@ -1871,16 +2276,21 @@ var app = {
   saveDio: async function(e){
     e.preventDefault();
     var f = new FormData(e.target);
+    var odabraniStrojevi = citajStrojeve(e.target);
+    var ptNovi = DATA.partneri.filter(function(x){ return x.naziv===f.get('dob'); })[0];
     var dio = {
-      id:'d'+Date.now(), naziv:String(f.get('naziv')||'').trim(), stroj:String(f.get('stroj')||'').trim(),
-      stanje:parseInt(f.get('stanje'),10)||0, min:parseInt(f.get('min'),10)||0,
-      dob:f.get('dob'), cijena:parseFloat(f.get('cijena'))||0,
-      kategorija:f.get('kat')||'Ostalo'
+      id:'d'+Date.now(), naziv:String(f.get('naziv')||'').trim(),
+      stroj:String(f.get('stroj')||'').trim() || strojeviNazivi(odabraniStrojevi),
+      stanje:Math.max(0, parseInt(f.get('stanje'),10)||0), min:Math.max(0, parseInt(f.get('min'),10)||0),
+      dob:f.get('dob'), cijena:Math.max(0, parseFloat(f.get('cijena'))||0),
+      kategorija:f.get('kat')||'Ostalo', naruceno:null,
+      strojevi:odabraniStrojevi, partner_id: ptNovi ? ptNovi.id : null
     };
     DATA.dijelovi.push(dio);
     app.closeModal(); showScreen('dijelovi');
     await apiInsert('dijelovi', { naziv:dio.naziv, stroj:dio.stroj, stanje:dio.stanje,
-      min:dio.min, dob:dio.dob, cijena:dio.cijena, kategorija:dio.kategorija }, dio);
+      min:dio.min, dob:dio.dob, cijena:dio.cijena, kategorija:dio.kategorija,
+      strojevi:dio.strojevi, partner_id:dio.partner_id }, dio);
   },
   noviPartner: function(){
     $('#modal-root').innerHTML =
@@ -1957,6 +2367,9 @@ var app = {
     var tip = f.get('tip') || 'kvar';
     var status = tip==='zadatak' ? 'otvoren' : f.get('status');
     if(tip==='kvar' && !f.get('m')){ alert('Odaberi stroj (ili promijeni vrstu u Zadatak).'); return; }
+    var satiUnos = parseFloat(f.get('sati'));
+    if(tip==='kvar' && (isNaN(satiUnos) || satiUnos < 0 || satiUnos > 72)){
+      alert('Trajanje zastoja mora biti između 0 i 72 sata.'); return; }
     if(tip==='kvar' && f.get('prioritet')==='hitno' && !PENDING_FOTO &&
        !confirm('HITAN kvar bez fotografije — nastaviti bez nje?')) return;
     var kvar = {
@@ -2052,7 +2465,9 @@ var app = {
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
     if(!k) return;
     var f = new FormData(e.target);
-    k.sati = parseFloat(f.get('sati'))||k.sati;
+    var sh = parseFloat(f.get('sati'));
+    if(isNaN(sh) || sh < 0 || sh > 72){ alert('Trajanje zastoja mora biti između 0 i 72 sata.'); return; }
+    k.sati = sh;
     k.status = 'rijesen'; k.upoz = false; k.ceka_dio = false;
     k.tko = f.get('tko');
     k.sudjelovali = String(f.get('sudjelovali')||'').trim() || null;
@@ -2362,9 +2777,17 @@ async function postLogin(){
   SESSION.role = prof.data.role;
   document.body.dataset.role = SESSION.role;
   $('#screen-login').classList.remove('show');
-  await load();
+  try{
+    await load();
+  }catch(e){
+    /* nema mreže pri pokretanju — radi iz lokalnog keša */
+    if(cacheUcitaj()){ primijeniRed(); toast('Radiš iz lokalne kopije — nema mreže'); }
+    else { $('#login-err').textContent = 'Nema veze s bazom i nema lokalne kopije.'; throw e; }
+  }
+  osvjeziOfflineTraku();
   if(!initHash()) showScreen('pregled');
   dobrodoslica();
+  sinkroniziraj();   /* pošalji što je ostalo od prošlog puta */
 }
 function dobrodoslica(){
   /* pri dolasku u smjenu: odmah reci što je bitno */
@@ -2385,6 +2808,25 @@ function majstorOpts(sel){
   }).join('');
 }
 function vidiFinancije(){ return SESSION.role !== 'majstor'; }
+/* dijelovi se vežu na strojeve preko šifri (ne slobodnog teksta) — podaci ne trunu */
+function strojeviCheckbox(odabrani){
+  odabrani = odabrani || [];
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px">'+
+    DATA.machines.map(function(m){
+      return '<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;'+
+        'font-size:13px;font-weight:500;color:var(--text);margin:0">'+
+        '<input type="checkbox" name="stroj_id" value="'+m.id+'" style="width:auto"'+
+        (odabrani.indexOf(m.id)>-1?' checked':'')+'> '+esc(m.name)+'</label>';
+    }).join('')+'</div>';
+}
+function strojeviNazivi(ids){
+  if(!ids || !ids.length) return '';
+  return ids.map(function(id){ var m = machineById(id); return m ? m.name : id; }).join(', ');
+}
+function citajStrojeve(form){
+  return Array.prototype.slice.call(form.querySelectorAll('input[name="stroj_id"]:checked'))
+    .map(function(el){ return el.value; });
+}
 var KAT_KVARA = ['Mehanički','Električni','Pneumatika i rashlada','Ostalo'];
 var TIP_PARTNERA = ['Dobavljač','Servis','Proizvođač','Ostalo'];
 function aktivni(){ return DATA.kvarovi.filter(function(k){ return k.status !== 'otkazan'; }); }
@@ -2421,6 +2863,8 @@ function initHash(){
 /* =====================  start  ===================== */
 async function start(){
   $('#login-logo').src = document.querySelector('.hdr-logo').src;
+  redUcitaj();
+  osvjeziOfflineTraku();
   if(!REMOTE){
     /* DEMO NAČIN: lokalno, bez prijave, uloga voditelj */
     $('#demo-banner').style.display = '';
@@ -2448,6 +2892,8 @@ setInterval(async function(){
   if(!DATA || $('#screen-login').classList.contains('show')) return;
   if($('#modal-root').innerHTML) return;   /* ne diraj otvorenu formu */
   if(PENDING_OPS > 0) return;              /* ne gazi unos koji još putuje u bazu */
+  if(!naMrezi()) return;
+  if(RED.length){ await sinkroniziraj(); return; }   /* prvo pošalji svoje, pa povlači tuđe */
   try{
     await load(true);                      /* tiho — bez loadera */
     rerender();

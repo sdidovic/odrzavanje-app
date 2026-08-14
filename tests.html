@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Održavanje — testovi</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f4f5f7;
+  color:#1b2430;margin:0;padding:18px;font-size:15px}
+h1{font-size:19px;margin:0 0 4px}
+.sub{color:#5b6570;font-size:13px;margin-bottom:14px}
+#sazetak{padding:12px 14px;border-radius:10px;font-weight:700;margin-bottom:12px}
+.ok{background:#e8f3ec;color:#1e6f3d;border:1px solid #cbe3d3}
+.fail{background:#fdeaea;color:#c0181c;border:1px solid #f3cbcb}
+.run{background:#edecf7;color:#3a3285;border:1px solid #d5d2ef}
+#rez{background:#fff;border:1px solid #e3e6eb;border-radius:10px;overflow:hidden}
+.t{padding:8px 12px;border-bottom:1px solid #e3e6eb;font-size:13.5px;display:flex;gap:9px;align-items:flex-start}
+.t:last-child{border-bottom:none}
+.t .z{flex-shrink:0;font-weight:700}
+.t.p .z{color:#1e6f3d}.t.f .z{color:#c0181c}
+.t .d{color:#c0181c;font-size:12px;margin-top:2px}
+.grupa{background:#f0f1f5;font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;
+  color:#5b6570;padding:7px 12px}
+iframe{width:390px;height:700px;border:1px solid #e3e6eb;border-radius:10px;margin-top:16px;background:#fff}
+</style>
+</head>
+<body>
+<h1>Održavanje — automatski testovi</h1>
+<div class="sub">Pokreće pravu aplikaciju u demo načinu i provjerava ključne tokove.
+  Pokretati nakon svake izmjene: <code>python -m http.server</code> pa otvoriti ovu stranicu.</div>
+<div id="sazetak" class="run">Pokretanje…</div>
+<div id="rez"></div>
+<iframe id="app" title="aplikacija pod testom"></iframe>
+
+<script>
+var REZ = [], GRUPA = '';
+function grupa(n){ GRUPA = n; REZ.push({grupa:n}); }
+function ok(naziv, uvjet, detalj){
+  REZ.push({naziv:naziv, prosao:!!uvjet, detalj:uvjet?'':(detalj||'')});
+}
+function jednako(naziv, dobiveno, ocekivano){
+  ok(naziv, dobiveno === ocekivano, 'dobiveno: '+JSON.stringify(dobiveno)+', očekivano: '+JSON.stringify(ocekivano));
+}
+function ispisi(){
+  var pali = REZ.filter(function(r){ return r.naziv && !r.prosao; });
+  var svi = REZ.filter(function(r){ return r.naziv; });
+  var s = document.getElementById('sazetak');
+  s.className = pali.length ? 'fail' : 'ok';
+  s.textContent = pali.length
+    ? ('PALO ' + pali.length + ' od ' + svi.length + ' testova')
+    : ('SVE PROLAZI — ' + svi.length + ' testova');
+  document.getElementById('rez').innerHTML = REZ.map(function(r){
+    if(r.grupa) return '<div class="grupa">'+r.grupa+'</div>';
+    return '<div class="t '+(r.prosao?'p':'f')+'"><span class="z">'+(r.prosao?'✓':'✕')+'</span>'+
+      '<span>'+r.naziv+(r.detalj?'<div class="d">'+r.detalj+'</div>':'')+'</span></div>';
+  }).join('');
+}
+function cekaj(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+function posalji(form){ form.dispatchEvent(new Event('submit', {cancelable:true})); }
+
+/* čekaj da se aplikacija u iframeu digne (radi i ako se učitala prije ove skripte) */
+(async function pokreni(){
+  var iframe = document.getElementById('app');
+  /* uvijek svježa verzija — inače service worker servira staru iz cachea */
+  iframe.src = 'index.html?test=' + Date.now();
+  for(var i=0; i<100; i++){
+    var W = iframe.contentWindow;
+    if(W && W.app && W.DATA && W.buildSeed) break;
+    await cekaj(100);
+  }
+  var W = iframe.contentWindow, D = iframe.contentDocument;
+  if(!W || !W.app){
+    ok('Aplikacija se nije pokrenula u iframeu', false,
+       'Otvori ovu stranicu preko http:// (npr. python -m http.server), ne preko file://');
+    ispisi(); return;
+  }
+  try{ await testovi(W, D); }
+  catch(e){ ok('Testovi su se srušili', false, String(e && e.stack || e)); }
+  ispisi();
+})();
+
+async function testovi(W, D){
+  var app = W.app;
+  W.app.demoUlaz();
+  await cekaj(120);
+  /* determinizam: svaki run kreće od netaknutog seeda */
+  try{ W.localStorage.removeItem(W.LS_KEY); }catch(e){}
+  W.DATA = W.buildSeedSFotkom();
+  W.save();
+  W.showScreen('pregled');
+  await cekaj(60);
+
+  grupa('Osnovni podaci i izračuni');
+  ok('aplikacija se pokrenula u demo načinu', W.REMOTE === false);
+  jednako('11 strojeva u šifrarniku', W.DATA.machines.length, 11);
+  ok('27 kvarova u seedu', W.DATA.kvarovi.length === 27, 'ima ' + W.DATA.kvarovi.length);
+  ok('svi kvarovi imaju stroj i opis', W.DATA.kvarovi.every(function(k){ return k.m && k.opis; }));
+  ok('svi kvarovi referenciraju postojeći stroj',
+     W.DATA.kvarovi.every(function(k){ return !k.m || !!W.machineById(k.m); }));
+  ok('preventiva referencira postojeći stroj',
+     W.DATA.preventiva.every(function(p){ return !!W.machineById(p.m); }));
+  jednako('trošak = sati × €/h (tunel 500)', W.kvarCost({m:'t1', sati:2}), 1000);
+  jednako('trošak linije (350 €/h)', W.kvarCost({m:'e1', sati:3}), 1050);
+  jednako('nepoznat stroj ne ruši izračun', W.kvarCost({m:'nema', sati:1}), 350);
+  jednako('interval "svakih 30 dana" = 30', W.intervalDays('svakih 30 dana'), 30);
+  jednako('interval "svakih 12 mjeseci" = 365', W.intervalDays('svakih 12 mjeseci'), 365);
+  jednako('pomak datuma za godinu', W.addDaysISO('2026-08-13', 365), '2027-08-13');
+  ok('kategorizacija po opisu radi', W.autoKat('puknuti remen') === 'Mehanički' &&
+     W.autoKat('senzor temperature') === 'Električni' &&
+     W.autoKat('pad tlaka kompresora') === 'Pneumatika i rashlada');
+  ok('3 dijela ispod minimuma',
+     W.DATA.dijelovi.filter(function(p){ return p.stanje < p.min; }).length === 3);
+
+  grupa('Prijava kvara');
+  app.go('kvarovi');
+  var prije = W.DATA.kvarovi.length;
+  app.noviKvar();
+  var f = D.querySelector('#modal-root form');
+  f.elements.m.value = 'e1';
+  f.elements.opis.value = 'TEST puknuti remen';
+  f.elements.sati.value = '2';
+  posalji(f); await cekaj(150);
+  jednako('novi kvar je dodan', W.DATA.kvarovi.length, prije + 1);
+  var novi = W.DATA.kvarovi[W.DATA.kvarovi.length - 1];
+  jednako('automatska kategorija iz opisa', novi.kategorija, 'Mehanički');
+  jednako('status je otvoren', novi.status, 'otvoren');
+  ok('sistemski zapis o prijavi je nastao',
+     W.DATA.poruke.some(function(p){ return p.tko === 'Sustav' && p.tekst.indexOf('TEST puknuti remen') > -1; }));
+
+  grupa('Validacije');
+  app.noviKvar();
+  f = D.querySelector('#modal-root form');
+  f.elements.m.value = 'e1'; f.elements.opis.value = 'TEST nevaljano'; f.elements.sati.value = '999';
+  var brojPrije = W.DATA.kvarovi.length;
+  var stariAlert = W.alert; W.alert = function(){};
+  posalji(f); await cekaj(120);
+  W.alert = stariAlert;
+  jednako('999 sati zastoja je odbijeno', W.DATA.kvarovi.length, brojPrije);
+  app.closeModal();
+
+  grupa('Rješavanje kvara i skladište');
+  var dio = W.DATA.dijelovi.filter(function(p){ return p.naziv.indexOf('Remen HTD') === 0; })[0];
+  var stanjePrije = dio.stanje;
+  app.rijesiKvar(novi.id);
+  f = D.querySelector('#modal-root form');
+  f.elements.tko.value = 'Majstor 1';
+  f.elements.dio.value = dio.id;
+  f.elements.kol.value = '1';
+  posalji(f); await cekaj(150);
+  jednako('kvar je riješen', novi.status, 'rijesen');
+  jednako('skladište je razduženo', dio.stanje, stanjePrije - 1);
+  ok('utrošeni dio je upisan u "zamijenjeno"', (novi.zam || '').indexOf('Remen HTD') > -1);
+
+  grupa('Uređivanje i storno');
+  app.urediKvar(novi.id);
+  f = D.querySelector('#modal-root form');
+  ok('riješen kvar se može uređivati', !!f && !!f.elements.sati);
+  f.elements.sati.value = '5';
+  posalji(f); await cekaj(150);
+  jednako('ispravljeni sati su spremljeni', novi.sati, 5);
+  var stariPrompt = W.prompt; W.prompt = function(){ return 'dupli unos'; };
+  app.stornirajKvar(novi.id); await cekaj(150);
+  W.prompt = stariPrompt;
+  jednako('storno postavlja status', novi.status, 'otkazan');
+  ok('stornirani kvar ne ulazi u izračune',
+     W.samoKvarovi().every(function(k){ return k.id !== novi.id; }));
+
+  grupa('Filteri i pretraga');
+  app.go('kvarovi');
+  app.setFilter('status', 'otvoren');
+  ok('filter otvorenih vraća samo otvorene',
+     D.querySelectorAll('#screen-kvarovi .kvar-item').length ===
+     W.DATA.kvarovi.filter(function(k){ return k.status === 'otvoren'; }).length);
+  app.setFilter('majstor', 'Majstor 1');
+  ok('filter po majstoru radi',
+     Array.prototype.every.call(D.querySelectorAll('#screen-kvarovi .kvar-item'), function(el){
+       return el.textContent.indexOf('Majstor 1') > -1; }));
+  app.resetFiltere();
+  app.setFilter('vrsta', 'zadatak');
+  jednako('nema zadataka u seedu', D.querySelectorAll('#screen-kvarovi .kvar-item').length, 0);
+  app.resetFiltere();
+
+  grupa('Zadaci');
+  app.noviKvar();
+  f = D.querySelector('#modal-root form');
+  f.elements.tip.value = 'zadatak';
+  f.elements.opis.value = 'TEST zadatak bez stroja';
+  f.elements.rok.value = W.todayISO();
+  posalji(f); await cekaj(150);
+  var zad = W.DATA.kvarovi.filter(function(k){ return k.tip === 'zadatak'; })[0];
+  ok('zadatak je spremljen bez stroja', !!zad && !zad.m);
+  jednako('zadatak ima rok', zad.rok, W.todayISO());
+  jednako('zadatak ne ulazi u trošak zastoja', W.samoKvarovi().filter(function(k){ return k.tip === 'zadatak'; }).length, 0);
+
+  grupa('Preventiva');
+  var prev = W.DATA.preventiva.filter(function(p){ return p.next < W.todayISO(); })[0];
+  ok('postoji preventiva koja kasni', !!prev);
+  var interval = W.intervalDays(prev.interval);
+  app.obaviPreventivu(prev.id);
+  f = D.querySelector('#modal-root form');
+  posalji(f); await cekaj(150);
+  jednako('zadnje obavljeno = danas', prev.zadnje, W.todayISO());
+  jednako('sljedeći termin je pomaknut za interval', prev.next, W.addDaysISO(W.todayISO(), interval));
+  ok('sistemski zapis o preventivi',
+     W.DATA.poruke.some(function(p){ return p.tko === 'Sustav' && p.tekst.indexOf('Preventiva obavljena') > -1; }));
+
+  grupa('Uloge');
+  W.SESSION = { ime:'Majstor 1', role:'majstor' };
+  D.body.dataset.role = 'majstor';
+  W.showScreen('pregled');
+  ok('majstor ne vidi eure na pregledu', D.querySelector('#screen-pregled').innerHTML.indexOf('€') === -1);
+  ok('majstor ne vidi IFS gumb', W.getComputedStyle(D.querySelector('.btn-audit')).display === 'none');
+  ok('majstor vidi svoje zadatke', D.querySelector('#screen-pregled').innerHTML.indexOf('Moji zadaci') > -1);
+  W.SESSION = { ime:'Direktor', role:'readonly' };
+  D.body.dataset.role = 'readonly';
+  W.showScreen('kvarovi');
+  var pisi = D.querySelector('#screen-kvarovi .role-write');
+  ok('direktor ne vidi gumbe za pisanje', !pisi || W.getComputedStyle(pisi).display === 'none');
+  W.SESSION = { ime:'Voditelj', role:'voditelj' };
+  D.body.dataset.role = 'voditelj';
+
+  grupa('Analitika');
+  W.ANA_DANA = 365;
+  app.go('analitika');
+  var d = W.anaPodaci();
+  ok('analitika grupira po stroju', Object.keys(d.poStroju).length > 3);
+  ok('analitika grupira po smjeni', Object.keys(d.poSmjeni).length >= 2);
+  ok('analitika grupira po kategoriji', Object.keys(d.poKat).length >= 2);
+  ok('stornirani nisu u analitici', d.KV.every(function(k){ return k.status !== 'otkazan'; }));
+  ok('tablice su iscrtane', D.querySelectorAll('#screen-analitika .tbl').length >= 3);
+
+  grupa('Offline red');
+  ok('red je prazan na početku (demo)', W.RED.length === 0);
+  W.uRed('kvarovi', 'insert', {opis:'TEST offline'}, {id:'kv999'});
+  jednako('unos je stavljen u red', W.RED.length, 1);
+  W.zamijeniIdURedu('kv999', 'uuid-pravi');
+  jednako('privremeni ID je zamijenjen pravim', W.RED[0].tempId, 'uuid-pravi');
+  W.RED = []; W.redSpremi();
+  ok('mrežna greška se prepoznaje', W.mreznaGreska({message:'Failed to fetch'}) === true);
+  ok('greška baze nije mrežna', W.mreznaGreska({message:'duplicate key value'}) === false);
+
+  grupa('Izvještaji');
+  app.audit(90);
+  ok('IFS izvještaj se otvara', !!D.querySelector('#modal-root .modal.audit'));
+  ok('IFS ima memorandum za ispis', !!D.querySelector('#modal-root .print-head'));
+  ok('IFS pokriva razdoblje iz odabira', D.querySelector('#modal-root').textContent.indexOf('90 dana') > -1);
+  app.closeModal();
+  app.analitikaIspis();
+  ok('analitika ima verziju za ispis', !!D.querySelector('#modal-root .print-head'));
+  app.closeModal();
+
+  grupa('Kalendar rasporeda');
+  app.go('raspored');
+  ok('kalendar je iscrtan', D.querySelectorAll('.cal-d').length >= 28);
+  ok('dani s preventivom su označeni', D.querySelectorAll('.cal-t').length > 0);
+  var naslovPrije = D.querySelector('.cal-naslov').textContent;
+  app.rasporedMjesec(1);
+  ok('navigacija po mjesecima radi', D.querySelector('.cal-naslov').textContent !== naslovPrije);
+  app.rasporedMjesec(-1);
+
+  grupa('Dijelovi i kontakti');
+  app.go('dijelovi');
+  ok('kritični dijelovi su na vrhu', D.querySelector('#parts-list h2').textContent.indexOf('minimuma') > -1);
+  app.traziDio('remen');
+  ok('pretraga dijelova filtrira', D.querySelectorAll('#parts-list .row').length < W.DATA.dijelovi.length);
+  app.traziDio('');
+  app.go('kontakti');
+  ok('kontakti su grupirani po vrsti', D.querySelectorAll('#kontakti-list h2').length >= 2);
+  app.traziKontakt('frigo');
+  jednako('pretraga kontakata', D.querySelectorAll('#kontakti-list .row').length, 1);
+  app.traziKontakt('');
+
+  grupa('Otpornost');
+  W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
+                       sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});
+  var palo = false;
+  try{ ['pregled','kvarovi','strojevi','dijelovi','analitika','raspored','poruke','kontakti']
+        .forEach(function(s){ W.showScreen(s); }); }
+  catch(e){ palo = true; }
+  ok('zapis s nepostojećim strojem ne ruši nijedan ekran', !palo);
+  try{ app.audit(); app.closeModal(); }catch(e){ ok('IFS izvještaj preživi siroče', false, String(e)); }
+  ok('IFS izvještaj preživi siroče', true);
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== 'kvX'; });
+  W.showScreen('pregled');
+}
+</script>
+</body>
+</html>
