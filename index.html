@@ -1031,6 +1031,14 @@ async function posaljiObavijest(naslov, tekst, ruta, samoZa){
 }
 
 /* ---------- dnevnik grešaka (monitoring) ---------- */
+/* zapisi koje sam ja upravo napravio — da mi realtime ne javlja vlastiti unos */
+var MOJI_UNOSI = {};
+function zapamtiMojUnos(id){
+  if(!id) return;
+  MOJI_UNOSI[id] = true;
+  setTimeout(function(){ delete MOJI_UNOSI[id]; }, 120000);
+}
+
 var GRESKE_POSLANO = 0;
 function zapisiGresku(poruka, detalji){
   if(!REMOTE || GRESKE_POSLANO >= 20) return;   /* bez petlji i poplave */
@@ -1263,7 +1271,7 @@ function renderStroj(){
     '<h2>Bilješke o stroju</h2><div class="card"><div style="padding:11px 13px">'+
       (m.bilj ? '<div style="font-size:13.5px;white-space:pre-wrap">'+esc(m.bilj)+'</div>'
               : '<div class="row-sub">Nema bilješki (manual, serijski broj, napomene o servisu…)</div>')+
-      '<button class="btn sec sm role-write" style="margin-top:9px" onclick="app.urediBiljeske(\''+m.id+'\')">Uredi bilješke</button>'+
+      '<button class="btn sec sm role-voditelj" style="margin-top:9px" onclick="app.urediBiljeske(\''+m.id+'\')">Uredi bilješke</button>'+
     '</div></div>'+
     '<h2>Povijest kvarova ('+ks.length+')</h2><div class="card">'+kvarHtml+'</div>';
 }
@@ -2209,14 +2217,21 @@ var app = {
     DATA.kvarovi.push(kvar);
     app.closeModal(); showScreen('kvarovi');
     var bm = machineById(kvar.m) || {name:''};
-    sysPoruka('⚠ Prijavljen kvar: '+bm.name+' — '+kvar.opis+' ('+(SESSION.ime||'')+')', kvar.id);
-    posaljiObavijest('⚠ Novi kvar', bm.name+': '+kvar.opis, '#kvarovi');
     if(REMOTE){
       kvar.foto = await uploadFoto(pendingFoto) || null;
-      await apiInsert('kvarovi', { m:kvar.m, date:kvar.date, opis:kvar.opis, sati:0,
+      var spremljen = await apiInsert('kvarovi', { m:kvar.m, date:kvar.date, opis:kvar.opis, sati:0,
         status:'otvoren', upoz:false, foto:kvar.foto, prioritet:'normalno', smjena:kvar.smjena,
         kategorija:kvar.kategorija, tip:'kvar' }, kvar);
-    } else { save(); }
+      /* zapis i obavijest tek NAKON sto je kvar stvarno u bazi — inace javljamo nesto sto ne postoji */
+      if(spremljen){
+        zapamtiMojUnos(kvar.id);
+        sysPoruka('⚠ Prijavljen kvar: '+bm.name+' — '+kvar.opis+' ('+(SESSION.ime||'')+')', kvar.id);
+        posaljiObavijest('Novi kvar', bm.name+': '+kvar.opis, '#kvarovi');
+      }
+    } else {
+      save();
+      sysPoruka('⚠ Prijavljen kvar: '+bm.name+' — '+kvar.opis+' ('+(SESSION.ime||'')+')', kvar.id);
+    }
   },
   porukeFilter: function(f){ PORUKE_FILTER = f; renderPoruke(); },
   izPoruke: function(kvarId){
@@ -2235,8 +2250,8 @@ var app = {
     if(!DATA.poruke) DATA.poruke = [];
     DATA.poruke.push(p);
     renderPoruke();
-    await apiInsert('poruke', { tko:p.tko, tekst:p.tekst }, p);
-    posaljiObavijest('💬 '+p.tko, txt.slice(0,120), '#poruke');
+    var spremljenaPoruka = await apiInsert('poruke', { tko:p.tko, tekst:p.tekst }, p);
+    if(spremljenaPoruka || !REMOTE) posaljiObavijest('Poruka — '+p.tko, txt.slice(0,120), '#poruke');
   },
   dodajKomentar: async function(e, kId, pogled){
     e.preventDefault();
@@ -2247,14 +2262,15 @@ var app = {
     if(!DATA.komentari) DATA.komentari = [];
     DATA.komentari.push(kom);
     if(pogled==='detalj') app.detaljKvara(kId); else app.komentariKvara(kId);
-    await apiInsert('komentari', { kvar_id:kId, tekst:kom.tekst, tko:kom.tko }, kom);
+    var spremljenKom = await apiInsert('komentari', { kvar_id:kId, tekst:kom.tekst, tko:kom.tko }, kom);
+    if(REMOTE && !spremljenKom) return;   /* nije u bazi (offline/odbijeno) — ne javljaj kao da jest */
     var kk = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
     /* kratki trag u zajedničkom kanalu — da ništa ne ostane zakopano u kvaru */
     var km = kk ? machineById(kk.m) : null;
     sysPoruka('💬 '+kom.tko+(km ? ' na '+km.name : '')+': „'+
       kom.tekst.slice(0,90)+(kom.tekst.length>90?'…':'')+'”', kId);
     if(kk && kk.dodijeljen && kk.dodijeljen !== kom.tko)
-      posaljiObavijest('💬 Komentar na tvom kvaru', kom.tko+': '+kom.tekst.slice(0,110), '#kvarovi', kk.dodijeljen);
+      posaljiObavijest('Komentar na tvom kvaru', kom.tko+': '+kom.tekst.slice(0,110), '#kvarovi', kk.dodijeljen);
   },
   anaPeriod: function(v){ ANA_DANA = parseInt(v,10)||0; renderAnalitika(); },
   rasporedMjesec: function(smjer){
@@ -2642,20 +2658,28 @@ var app = {
     DATA.kvarovi.push(kvar);
     app.closeModal(); showScreen('kvarovi');
     var nm = machineById(kvar.m);
-    sysPoruka((tip==='zadatak' ? '📋 Novi zadatak: ' : '⚠ Prijavljen kvar: ')+
+    var zapis = (tip==='zadatak' ? '📋 Novi zadatak: ' : '⚠ Prijavljen kvar: ')+
       (nm ? nm.name+' — ' : '')+kvar.opis+
-      (kvar.dodijeljen ? ' → '+kvar.dodijeljen : '')+' ('+(SESSION.ime||'')+')', kvar.id);
-    if(kvar.prioritet === 'hitno')
-      posaljiObavijest('🔴 HITAN KVAR', (nm?nm.name+': ':'')+kvar.opis, '#kvarovi');
-    else if(kvar.dodijeljen)
-      posaljiObavijest('📋 Novo za tebe', (nm?nm.name+': ':'')+kvar.opis, '#kvarovi', kvar.dodijeljen);
+      (kvar.dodijeljen ? ' → '+kvar.dodijeljen : '')+' ('+(SESSION.ime||'')+')';
     if(REMOTE){
       kvar.foto = await uploadFoto(pendingFoto) || null;
-      await apiInsert('kvarovi', { m:kvar.m, date:kvar.date, opis:kvar.opis, sati:kvar.sati,
+      var spremljen = await apiInsert('kvarovi', { m:kvar.m, date:kvar.date, opis:kvar.opis, sati:kvar.sati,
         status:kvar.status, upoz:kvar.upoz, tko:kvar.tko, zam:kvar.zam, foto:kvar.foto,
         dodijeljen:kvar.dodijeljen, prioritet:kvar.prioritet, smjena:kvar.smjena,
         tip:kvar.tip, rok:kvar.rok, kategorija:kvar.kategorija }, kvar);
-    } else { save(); }
+      /* javljamo tek kad zapis stvarno postoji u bazi */
+      if(spremljen){
+        zapamtiMojUnos(kvar.id);
+        sysPoruka(zapis, kvar.id);
+        if(kvar.prioritet === 'hitno')
+          posaljiObavijest('HITAN KVAR', (nm?nm.name+': ':'')+kvar.opis, '#kvarovi');
+        else if(kvar.dodijeljen)
+          posaljiObavijest('Novo za tebe', (nm?nm.name+': ':'')+kvar.opis, '#kvarovi', kvar.dodijeljen);
+      }
+    } else {
+      save();
+      sysPoruka(zapis, kvar.id);
+    }
   },
 
   obaviPreventivu: function(pId){
@@ -3181,7 +3205,8 @@ setInterval(async function(){
 /* realtime: nove poruke/kvarovi/komentari odmah stižu svima (multi-user) */
 async function rtNovo(tip, pl){
   var row = (pl && pl['new']) ? pl['new'] : {};
-  if(row.tko && row.tko === SESSION.ime) return;   /* moj vlastiti unos */
+  if(row.tko && row.tko === SESSION.ime) return;   /* moj vlastiti unos (poruke, komentari) */
+  if(row.id && MOJI_UNOSI[row.id]) return;         /* moj vlastiti kvar — ne javljaj mi ga natrag */
   if(tip==='poruke')    toast('💬 Nova poruka — ' + (row.tko||''));
   if(tip==='kvarovi')   toast('⚠ Novi kvar prijavljen');
   if(tip==='komentari') toast('💬 Novi komentar na kvaru');
