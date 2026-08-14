@@ -1772,11 +1772,27 @@ function renderQR(){
       '<div class="qr-upute">Skeniraj za prijavu kvara<br><b>'+esc(m.program)+'</b></div>';
     cilj.appendChild(kart);
     try{
-      new QRCode(kart.querySelector('.qr-slika'), {
+      var okvir = kart.querySelector('.qr-slika');
+      new QRCode(okvir, {
         text: appBaseUrl() + '#stroj=' + m.id,
         width: 132, height: 132,
         correctLevel: QRCode.CorrectLevel.M
       });
+      /* na Androidu biblioteka ostavlja canvas — pretvaramo ga u sliku
+         jer se slika pouzdano ispisuje na svakom uređaju i pisaču */
+      setTimeout(function(){
+        var cv = okvir.querySelector('canvas');
+        if(!cv) return;
+        try{
+          var podatak = cv.toDataURL('image/png');
+          var im = okvir.querySelector('img') || new Image();
+          im.src = podatak; im.width = 132; im.height = 132;
+          im.alt = 'QR kod — ' + m.name;
+          im.style.display = 'block';
+          if(!im.parentNode) okvir.appendChild(im);
+          cv.style.display = 'none';
+        }catch(e){}
+      }, 0);
     }catch(e){ kart.querySelector('.qr-slika').textContent = 'QR nedostupan'; }
   });
 }
