@@ -1410,25 +1410,23 @@ function renderPregled(){
       '<div class="bar-val">'+EUR(t.c)+'</div></div>';
   }).join('');
 
-  /* za obaviti — kasne i sljedećih 7 dana */
-  var t7 = isoShift(7);
-  var dueAll = DATA.preventiva.filter(function(p){ return p.next <= t7; })
-    .sort(function(a,b){ return a.next < b.next ? -1 : 1; });
-  var due = dueAll.slice(0, 5);
-  var dueHtml = due.length ? due.map(function(p){
-    var pm2 = machineById(p.m) || {name:'—'};
-    var isLate = p.next < todayISO();
-    return '<div class="row click" onclick="app.openStroj(\''+p.m+'\')">'+
-      '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(p.opis)+'</div>'+
-      '<div class="row-sub">'+esc(pm2.name)+' &middot; '+fmtDate(p.next)+
-        ((p.izv && p.izv!=='interno') ? ' &middot; '+esc(p.izv) : '')+'</div></div>'+
-      '<div class="row-right">'+(isLate?'<span class="chip upoz">Kasni</span>':'')+
-      '<button class="okbtn role-write" title="Označi obavljeno" onclick="event.stopPropagation();app.obaviPreventivu(\''+p.id+'\')">✓</button></div></div>';
-  }).join('') : '<div class="empty">Sve preventive su u roku.</div>';
-  if(dueAll.length > 5){
-    dueHtml += '<div class="row click" onclick="app.go(\'raspored\')">'+
-      '<div class="row-sub">… još '+(dueAll.length-5)+' stavki u planu — otvori Raspored</div></div>';
-  }
+  /* Pregled pokazuje STANJE; organizacija (što, kada, tko) živi na Rasporedu.
+     Umjesto duplirane liste preventiva: jedan redak s onim što danas/ovaj tjedan
+     čeka, koji vodi ravno na Raspored. */
+  var t7 = isoShift(7), danasIso = todayISO();
+  var tjedanPrev = DATA.preventiva.filter(function(p){ return p.next <= t7; }).length;
+  var tjedanZad = otvoreniZadaci().filter(function(z){ return z.rok && z.rok <= t7; }).length;
+  var kasniPrevN = DATA.preventiva.filter(function(p){ return p.next < danasIso; }).length;
+  var tjedanUkupno = tjedanPrev + tjedanZad;
+  var planRedak = '<div class="card"><div class="row click" onclick="app.go(\'raspored\')">'+
+    '<div class="grow"><div class="row-title" style="font-size:13.5px">Raspored i zadaci</div>'+
+    '<div class="row-sub">'+
+      (tjedanUkupno
+        ? 'Ovaj tjedan: '+tjedanPrev+(tjedanPrev===1?' preventiva':' preventive')+
+          (tjedanZad ? ' i '+tjedanZad+(tjedanZad===1?' zadatak':' zadatka/zadataka') : '')+
+          (kasniPrevN ? ' &middot; <b style="color:var(--red)">'+kasniPrevN+' kasni</b>' : '')
+        : 'Ovaj tjedan nema planiranih stavki')+
+    '</div></div><span class="chev">›</span></div></div>';
 
   /* trend troška po mjesecima (zadnja 3) — zadnji stupac je nepotpun i tako je i označen */
   var mjeseci3 = [2,1,0].map(function(off){
@@ -1499,9 +1497,11 @@ function renderPregled(){
     '<div class="stat-grid">'+
       statCard(open.length, 'Otvoreni kvarovi',        open.length ? 'red'    : 'green', "app.goKvaroviOtvoreni()")+
       statCard(low.length,  'Dijelovi za naručiti',    low.length  ? 'red'    : 'green', "app.go('nabava')")+
-      statCard(late.length, 'Preventive kasne',        late.length ? 'yellow' : 'green', "app.skociNaObaveze()")+
+      /* organizacija se radi na Rasporedu — i brojka vodi onamo */
+      statCard(late.length, 'Preventive kasne',        late.length ? 'yellow' : 'green', "app.go('raspored')")+
     '</div>'+
     stojiHtml+
+    planRedak+
     (vidiFinancije() ? '<button class="btn sec sm block" style="margin-top:10px" onclick="app.go(\'analitika\')">Analitika i izvoz</button>' : '')+
     (function(){
       /* majstoru odmah pokaži njegove zadatke na vrhu */
@@ -1510,9 +1510,6 @@ function renderPregled(){
         ? '<h2>Moji zadaci ('+moji.length+')</h2><div class="card">'+moji.map(function(k){ return kvarItem(k,true); }).join('')+'</div>'
         : '';
     })()+
-    '<h2 id="za-obaviti">Za obaviti — kasne i sljedećih 7 dana</h2>'+
-    '<div class="card">'+dueHtml+'</div>'+
-    '<button class="btn sec sm block" style="margin-top:8px" onclick="app.go(\'raspored\')">Raspored i zadaci</button>'+
     (vidiFinancije()
       ? '<h2>Najskuplji strojevi — zadnja 3 mj.</h2>'+
         '<div class="card">'+topHtml+'</div>'+
@@ -3050,10 +3047,6 @@ var app = {
   goKvaroviOtvoreni: function(){
     FILTER = { stroj:'svi', status:'aktivni', majstor:'svi', od:'', do:'', q:'' };
     showScreen('kvarovi');
-  },
-  skociNaObaveze: function(){
-    var el = document.getElementById('za-obaviti');
-    if(el) el.scrollIntoView({behavior:'smooth'});
   },
   openStroj: function(id){ CURRENT_M = id; showScreen('stroj'); },
   setFilter: function(key,val){ FILTER[key]=val; renderKvarovi(); },

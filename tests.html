@@ -55,7 +55,17 @@ function ispisi(){
       '<span>'+r.naziv+(r.detalj?'<div class="d">'+r.detalj+'</div>':'')+'</span></div>';
   }).join('');
 }
-function cekaj(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+function cekaj(ms){
+  return new Promise(function(r){
+    /* U pozadinskoj/sakrivenoj kartici preglednik prigušuje setTimeout i na minutu,
+       pa se niz od 200 testova "smrzne". MessageChannel se ne prigušuje. */
+    if(document.visibilityState === 'visible'){ setTimeout(r, ms); return; }
+    var kraj = performance.now() + ms;
+    var ch = new MessageChannel();
+    ch.port1.onmessage = function(){ if(performance.now() >= kraj) r(); else ch.port2.postMessage(0); };
+    ch.port2.postMessage(0);
+  });
+}
 function posalji(form){ form.dispatchEvent(new Event('submit', {cancelable:true})); }
 
 /* čekaj da se aplikacija u iframeu digne (radi i ako se učitala prije ove skripte) */
@@ -295,6 +305,21 @@ async function testovi(W, D){
      D.querySelector('#screen-raspored').innerHTML.indexOf('noviZadatak') > -1);
   ok('preventiva se može potvrditi i iz agende',
      D.querySelector('#screen-raspored .okbtn') !== null);
+  /* Pregled = stanje, Raspored = organizacija: Pregled više NE duplicira agendu */
+  W.showScreen('pregled'); await cekaj(150);
+  ok('Pregled ne duplicira agendu preventiva',
+     D.querySelector('#screen-pregled').textContent.indexOf('Za obaviti') === -1);
+  ok('Pregled ima jedan redak koji vodi na Raspored', (function(){
+     var r = Array.prototype.filter.call(D.querySelectorAll('#screen-pregled .row.click'),
+       function(e){ return String(e.getAttribute('onclick')||'').indexOf("go('raspored')") > -1; })[0];
+     return !!r && r.textContent.indexOf('Ovaj tjedan') > -1;
+  })());
+  ok('kartica "Preventive kasne" vodi na Raspored', (function(){
+     var s = Array.prototype.filter.call(D.querySelectorAll('#screen-pregled .stat'),
+       function(e){ return e.textContent.indexOf('Preventive kasne') > -1; })[0];
+     return !!s && String(s.getAttribute('onclick')||'').indexOf("go('raspored')") > -1;
+  })());
+  app.go('raspored'); await cekaj(120);
 
   grupa('Dijelovi i kontakti');
   app.go('dijelovi');
