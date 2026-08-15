@@ -544,8 +544,10 @@ var TVRTKA = {
                         'Grijači','Folije i ambalaža','Rashladna tehnika','Alati i matrice','Ostalo'],
   audit_norma: 'IFS Food v8, t. 4.16 / 4.17 / 5.4'
 };
-/* pločice na prijavi — popis dolazi iz baze (prijava_popis) */
-var KORISNICI = [
+/* Pločice na prijavi. Sa spojenom bazom popis dolazi iz prijava_popis; ovo je
+   ugrađeni popis za demo način — demo mora stajati sam za sebe, inače prikazuje
+   ljude iz tuđe tvornice (ili im nedostaje netko tko u toj bazi još ne postoji). */
+var KORISNICI_DEMO = [
   { naziv:'Majstor 1',   email:'marko@odrzavanje.local' },
   { naziv:'Majstor 2',   email:'ivica@odrzavanje.local' },
   { naziv:'Majstor 3',   email:'damir@odrzavanje.local' },
@@ -553,6 +555,7 @@ var KORISNICI = [
   { naziv:'Proizvodnja', email:'proizvodnja@odrzavanje.local' },
   { naziv:'Direktor',    email:'direktor@odrzavanje.local' }
 ];
+var KORISNICI = KORISNICI_DEMO.slice();
 var MAJSTORI = ['Majstor 1','Majstor 2','Majstor 3'];
 
 /* --- boje izvedene iz jedne osnovne boje tvrtke --- */
@@ -2596,6 +2599,9 @@ var app = {
   },
   demoUlaz: function(){
     REMOTE = false; sb = null;
+    /* natrag na ugrađeni popis — inace demo pokazuje ljude iz spojene baze */
+    KORISNICI = KORISNICI_DEMO.slice();
+    renderLoginTiles();
     SESSION = { ime:'Voditelj', role:'voditelj' };
     document.body.dataset.role = 'voditelj';
     $('#demo-banner').style.display = '';

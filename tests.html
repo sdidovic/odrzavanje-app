@@ -530,8 +530,18 @@ async function testovi(W, D){
   W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k !== hitniKvar; });
 
   grupa('Peta uloga — proizvodnja (readonly)');
-  ok('Proizvodnja je na popisu za prijavu',
-     W.KORISNICI.some(function(u){ return u.naziv==='Proizvodnja'; }));
+  ok('Proizvodnja je u ugrađenom popisu za prijavu',
+     W.KORISNICI_DEMO.some(function(u){ return u.naziv==='Proizvodnja'; }));
+  /* sa spojenom bazom popis dolazi iz prijava_popis i prepiše ugrađeni — demo ga mora vratiti,
+     inače pločica ovisi o tome je li dohvat iz baze stigao prije ulaska u demo */
+  W.KORISNICI = [{ naziv:'Netko iz baze', email:'x@y.local' }];
+  W.app.demoUlaz(); await cekaj(150);
+  ok('demo vraća ugrađeni popis, ne ostavlja popis iz baze',
+     W.KORISNICI.some(function(u){ return u.naziv==='Proizvodnja'; }) &&
+     !W.KORISNICI.some(function(u){ return u.naziv==='Netko iz baze'; }));
+  ok('pločica Proizvodnja je iscrtana na prijavi',
+     Array.prototype.some.call(D.querySelectorAll('#user-tiles .user-tile'),
+       function(el){ return el.textContent === 'Proizvodnja'; }));
   W.SESSION = { ime:'Proizvodnja', role:'readonly' };
   D.body.dataset.role = 'readonly';
   W.showScreen('pregled'); await cekaj(120);
