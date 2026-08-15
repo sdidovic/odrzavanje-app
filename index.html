@@ -933,9 +933,13 @@ function localLoad(){
 }
 var KV_LIMIT = 1000;   /* početno učitavanje — "Učitaj cijelu povijest" diže na sve */
 var KV_SVE = false;
+/* Raste na svaku promjenu načina rada (prijava, odjava, ulazak u demo). Dohvat iz baze
+   koji je krenuo prije promjene mora odbaciti svoj rezultat, ne pregaziti DATA. */
+var SESIJA_GEN = 0;
 async function load(tiho){
   if(!REMOTE){ localLoad(); return; }
   if(!tiho) pokaziLoader();
+  var mojaSesija = SESIJA_GEN;   /* ako se u međuvremenu uđe u demo, ovaj rezultat je zastario */
   try{
   var qKv = sb.from('kvarovi').select('*').order('date', {ascending:false});
   if(!KV_SVE) qKv = qKv.limit(KV_LIMIT);
@@ -951,6 +955,10 @@ async function load(tiho){
     sb.from('nabava').select('*').order('narucen', {ascending:false}).limit(200)
   ]);
   for(var i=0;i<r.length;i++){ if(r[i].error && i < 7) throw r[i].error; }
+  /* Dok je dohvat trajao, netko je mogao ući u demo način (ili se odjaviti). Rezultat
+     tada NE smije pregaziti DATA — inače demo prikaže žive podatke, a već otvoreni
+     zapisi ostanu vezani na objekte kojih više nema u DATA. */
+  if(!REMOTE || SESIJA_GEN !== mojaSesija) return;
   /* popis majstora dolazi iz baze — kad se osoblje promijeni, alat to sam preuzme */
   if(r[7] && r[7].data && r[7].data.length){
     var akt = r[7].data.filter(function(u){ return u.aktivan !== false && u.role === 'majstor'; })
@@ -2599,6 +2607,7 @@ var app = {
   },
   demoUlaz: function(){
     REMOTE = false; sb = null;
+    SESIJA_GEN++;   /* dohvat iz baze koji je u tijeku više se ne smije primijeniti */
     /* natrag na ugrađeni popis — inace demo pokazuje ljude iz spojene baze */
     KORISNICI = KORISNICI_DEMO.slice();
     renderLoginTiles();

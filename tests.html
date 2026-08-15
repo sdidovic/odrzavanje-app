@@ -562,6 +562,36 @@ async function testovi(W, D){
   D.body.dataset.role = 'voditelj';
   W.showScreen('pregled');
 
+  grupa('Demo ne smije pregaziti dohvat iz baze');
+  /* Ulazak u demo dok dohvat iz baze traje: kad se dohvat razriješi, NE smije zamijeniti
+     DATA. Inače demo prikaže žive podatke, a već otvoreni zapisi ostanu vezani na
+     objekte kojih više nema u DATA (pa npr. "Uredi" tiho ne spremi ništa). */
+  var lazniUpit = function(){
+    var ch = {};
+    ['select','order','limit','eq'].forEach(function(m){ ch[m] = function(){ return ch; }; });
+    ch.then = function(onF, onR){
+      return new Promise(function(r){ setTimeout(function(){ r({ data: [], error: null }); }, 250); })
+        .then(onF, onR);
+    };
+    return ch;
+  };
+  var seedPrije = W.DATA;
+  var kvaroviPrije = W.DATA.kvarovi.length;
+  W.REMOTE = true;
+  W.sb = { from: function(){ return lazniUpit(); } };
+  W.load(true);                 /* dohvat kreće… */
+  W.app.demoUlaz();             /* …a korisnik u međuvremenu ulazi u demo */
+  await cekaj(600);             /* pusti da se dohvat razriješi */
+  ok('demo preživi dohvat iz baze koji je bio u tijeku',
+     !!W.DATA && W.DATA.kvarovi.length > 0);
+  ok('zastarjeli dohvat nije obrisao strojeve', !!W.DATA && W.DATA.machines.length > 0);
+  jednako('način rada je ostao demo', W.REMOTE, false);
+  W.REMOTE = false; W.sb = null;
+  W.DATA = seedPrije; W.save();
+  jednako('stanje je vraćeno za nastavak testova', W.DATA.kvarovi.length, kvaroviPrije);
+  W.SESSION = { ime:'Voditelj', role:'voditelj' };
+  D.body.dataset.role = 'voditelj';
+
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
                        sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});
