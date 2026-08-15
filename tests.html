@@ -100,8 +100,9 @@ async function testovi(W, D){
   grupa('Osnovni podaci i izračuni');
   ok('aplikacija se pokrenula u demo načinu', W.REMOTE === false);
   jednako('11 strojeva u šifrarniku', W.DATA.machines.length, 11);
-  ok('27 kvarova u seedu', W.DATA.kvarovi.length === 27, 'ima ' + W.DATA.kvarovi.length);
-  ok('svi kvarovi imaju stroj i opis', W.DATA.kvarovi.every(function(k){ return k.m && k.opis; }));
+  ok('27 kvarova + 1 zadatak u seedu', W.DATA.kvarovi.length === 28, 'ima ' + W.DATA.kvarovi.length);
+  ok('svi kvarovi imaju stroj i opis', W.DATA.kvarovi.every(function(k){
+     return (k.tip||'kvar')!=='kvar' || (k.m && k.opis); }));
   ok('svi kvarovi referenciraju postojeći stroj',
      W.DATA.kvarovi.every(function(k){ return !k.m || !!W.machineById(k.m); }));
   ok('preventiva referencira postojeći stroj',
@@ -177,29 +178,51 @@ async function testovi(W, D){
   grupa('Filteri i pretraga');
   app.go('kvarovi');
   app.setFilter('status', 'otvoren');
-  ok('filter otvorenih vraća samo otvorene',
+  ok('filter otvorenih vraća samo otvorene (kvarove — zadaci su na Rasporedu)',
      D.querySelectorAll('#screen-kvarovi .kvar-item').length ===
-     W.DATA.kvarovi.filter(function(k){ return k.status === 'otvoren'; }).length);
+     W.DATA.kvarovi.filter(function(k){ return k.status === 'otvoren' && (k.tip||'kvar')==='kvar'; }).length);
   app.setFilter('majstor', 'Majstor 1');
   ok('filter po majstoru radi',
      Array.prototype.every.call(D.querySelectorAll('#screen-kvarovi .kvar-item'), function(el){
        return el.textContent.indexOf('Majstor 1') > -1; }));
   app.resetFiltere();
-  app.setFilter('vrsta', 'zadatak');
-  jednako('nema zadataka u seedu', D.querySelectorAll('#screen-kvarovi .kvar-item').length, 0);
-  app.resetFiltere();
 
-  grupa('Zadaci');
+  grupa('Zadaci — organizacija na Rasporedu, ne među kvarovima');
+  /* seed ima zadatak, a Kvarovi ga NE smiju prikazati — to su prijave problema */
+  ok('zadatak iz seeda se ne prikazuje na Kvarovi',
+     D.querySelector('#screen-kvarovi').textContent.indexOf('Dogovoriti termin godišnjeg servisa') === -1);
+  ok('brojka na kartici Kvarovi ne broji zadatke', (function(){
+     var b = D.querySelector('#badge-kvarovi');
+     var kvarova = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; }).length;
+     return parseInt(b.textContent,10) === kvarova;
+  })());
+  /* detaljna prijava vise ne nudi vrstu — uvijek je kvar, sa strojem */
   app.noviKvar();
   f = D.querySelector('#modal-root form');
-  f.elements.tip.value = 'zadatak';
+  ok('detaljna prijava nema izbor vrste (uvijek kvar)', !f.elements.tip);
+  app.closeModal();
+  /* zadatak se stvara na Rasporedu */
+  app.go('raspored'); await cekaj(150);
+  var brZad = W.otvoreniZadaci().length;
+  app.noviZadatak();
+  f = D.querySelector('#modal-root form');
   f.elements.opis.value = 'TEST zadatak bez stroja';
   f.elements.rok.value = W.todayISO();
-  posalji(f); await cekaj(150);
-  var zad = W.DATA.kvarovi.filter(function(k){ return k.tip === 'zadatak'; })[0];
-  ok('zadatak je spremljen bez stroja', !!zad && !zad.m);
+  posalji(f); await cekaj(200);
+  var zad = W.DATA.kvarovi.filter(function(k){ return k.opis === 'TEST zadatak bez stroja'; })[0];
+  ok('zadatak je spremljen bez stroja', !!zad && !zad.m && zad.tip==='zadatak');
   jednako('zadatak ima rok', zad.rok, W.todayISO());
+  jednako('novi zadatak je na Rasporedu', W.otvoreniZadaci().length, brZad + 1);
   jednako('zadatak ne ulazi u trošak zastoja', W.samoKvarovi().filter(function(k){ return k.tip === 'zadatak'; }).length, 0);
+  ok('zadatak se vidi u agendi Rasporeda',
+     D.querySelector('#screen-raspored').textContent.indexOf('TEST zadatak bez stroja') > -1);
+  /* kvacica obavlja zadatak izravno iz popisa */
+  await app.obaviZadatak(zad.id); await cekaj(150);
+  jednako('kvačica obavlja zadatak', zad.status, 'rijesen');
+  ok('obavljeni zadatak nestaje s Rasporeda',
+     D.querySelector('#screen-raspored').textContent.indexOf('TEST zadatak bez stroja') === -1);
+  ok('zapis o obavljenom zadatku je u kanalu',
+     W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Zadatak obavljen') > -1; }));
 
   grupa('Preventiva');
   var prev = W.DATA.preventiva.filter(function(p){ return p.next < W.todayISO(); })[0];
@@ -258,14 +281,20 @@ async function testovi(W, D){
   ok('analitika ima verziju za ispis', !!D.querySelector('#modal-root .print-head'));
   app.closeModal();
 
-  grupa('Kalendar rasporeda');
-  app.go('raspored');
-  ok('kalendar je iscrtan', D.querySelectorAll('.cal-d').length >= 28);
-  ok('dani s preventivom su označeni', D.querySelectorAll('.cal-t').length > 0);
-  var naslovPrije = D.querySelector('.cal-naslov').textContent;
-  app.rasporedMjesec(1);
-  ok('navigacija po mjesecima radi', D.querySelector('.cal-naslov').textContent !== naslovPrije);
-  app.rasporedMjesec(-1);
+  grupa('Raspored — organizacija po danima');
+  app.go('raspored'); await cekaj(150);
+  ok('mjesečna mreža je izbačena (kritika §11.4)', D.querySelectorAll('.cal-d').length === 0);
+  ok('kasne preventive su na vrhu, crveno',
+     D.querySelector('#screen-raspored').textContent.indexOf('Kasni (') > -1);
+  ok('dani nose ime dana u tjednu', (function(){
+     var t = D.querySelector('#screen-raspored').textContent;
+     return ['ponedjeljak','utorak','srijeda','četvrtak','petak','subota','nedjelja']
+       .some(function(d){ return t.indexOf(d) > -1; });
+  })());
+  ok('postoji gumb za novi zadatak',
+     D.querySelector('#screen-raspored').innerHTML.indexOf('noviZadatak') > -1);
+  ok('preventiva se može potvrditi i iz agende',
+     D.querySelector('#screen-raspored .okbtn') !== null);
 
   grupa('Dijelovi i kontakti');
   app.go('dijelovi');
@@ -569,9 +598,9 @@ async function testovi(W, D){
   jednako('klik na karticu postavlja filtar "aktivni"', W.FILTER.status, 'aktivni');
   jednako('filtar vraća isti broj kao kartica',
      D.querySelectorAll('#screen-kvarovi .kvar-item').length,
-     W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k); }).length);
-  ok('kartica i filtar se slažu i po broju kvarova (bez zadataka)',
-     W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; }).length === brojNaKartici);
+     W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; }).length);
+  jednako('kartica i popis broje isto (zadaci ne ulaze)',
+     D.querySelectorAll('#screen-kvarovi .kvar-item').length, brojNaKartici);
   app.resetFiltere();
 
   grupa('Brze radnje i HITNO');
@@ -751,18 +780,33 @@ async function testovi(W, D){
   jednako('Dijelovi broje isto', naDijelovima, naNabavi);
 
   /* klik na karticu čisti SVE filtre, ne samo status */
-  app.setFilter('vrsta','zadatak');
+  app.setFilter('stroj','e1');
   app.setFilter('majstor','Majstor 1');
   app.goKvaroviOtvoreni(); await cekaj(150);
-  jednako('klik na karticu čisti filtar vrste', W.FILTER.vrsta, 'svi');
+  jednako('klik na karticu čisti filtar stroja', W.FILTER.stroj, 'svi');
   jednako('klik na karticu čisti filtar majstora', W.FILTER.majstor, 'svi');
   jednako('popis odgovara brojci s kartice',
      D.querySelectorAll('#screen-kvarovi .kvar-item').length,
-     W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k); }).length);
+     W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; }).length);
   app.resetFiltere();
 
-  /* brze radnje: dodjela se nudi samo ondje gdje nedostaje */
-  var nedod = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k); })[0];
+  /* filtri su iza gumba — miran ekran (i stavka iz NASTAVAK §11.5) */
+  W.showScreen('kvarovi'); await cekaj(120);
+  ok('padajući filtri su skriveni dok se ne zatraže',
+     W.KV_FILTRI_OTVORENI === false && D.querySelector('#screen-kvarovi .filters') === null);
+  ok('pretraga je uvijek vidljiva', D.querySelector('#screen-kvarovi input[type="search"]') !== null);
+  app.prekidacFiltre(); await cekaj(120);
+  ok('gumb Filtri otvara padajuće filtre',
+     D.querySelectorAll('#screen-kvarovi .filters select').length === 3);
+  app.setFilter('majstor','Majstor 1'); await cekaj(120);
+  ok('gumb Filtri pokazuje broj aktivnih',
+     D.querySelector('#screen-kvarovi').innerHTML.indexOf('Filtri (1)') > -1);
+  app.resetFiltere();
+  app.prekidacFiltre();
+
+  /* brze radnje: dodjela se nudi samo ondje gdje nedostaje (pravi kvar, ne zadatak) */
+  var nedod = W.DATA.kvarovi.filter(function(k){
+    return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar' && k.m; })[0];
   nedod.dodijeljen = null;
   W.showScreen('kvarovi'); await cekaj(150);
   ok('nedodijeljen kvar nudi dodjelu na kartici', (function(){
