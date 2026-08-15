@@ -442,8 +442,47 @@ async function testovi(W, D){
   posalji(pf); await cekaj(200);
   ok('gašenje kvačice briše i rok sanacije', zaPriv.privremeni === false && !zaPriv.rok_sanacije);
 
+  /* Zatvaranje kvara NE sanira privremeni popravak — linija radi, sanacija je i dalje
+     otvorena. Prije je odjeljak 3 tada tvrdio "nema aktivnih privremenih popravaka". */
+  app.urediKvar(zaPriv.id);
+  pf = D.querySelector('#modal-root form');
+  pf.elements.privremeni.checked = true;
+  pf.elements.rok_sanacije.value = W.isoShift(5);
+  posalji(pf); await cekaj(200);
+  zaPriv.status = 'rijesen';
+  app.audit(90); await cekaj(150);
+  var ifs3 = D.querySelector('#modal-root').textContent;
+  ok('zatvoren kvar s privremenim popravkom ostaje u odjeljku 3.',
+     ifs3.indexOf('3. Privremeni popravci (0)') === -1 && ifs3.indexOf(zaPriv.opis) > -1);
+  ok('izvještaj razlikuje "linija radi" od "kvar još otvoren"',
+     ifs3.indexOf('linija radi, trajna sanacija otvorena') > -1);
+  app.closeModal();
+  /* tek kad netko makne kvačicu, odjeljak 3 je opet prazan */
+  app.urediKvar(zaPriv.id);
+  pf = D.querySelector('#modal-root form');
+  ok('kvačica privremenog popravka postoji i na zatvorenom kvaru', !!pf.elements.privremeni);
+  pf.elements.privremeni.checked = false;
+  posalji(pf); await cekaj(200);
+  app.audit(90); await cekaj(150);
+  /* seed već ima jedan privremeni popravak — provjeravamo da je nestao BAŠ ovaj */
+  var t3 = D.querySelector('#modal-root').textContent;
+  var odsjek3 = t3.slice(t3.indexOf('3. Privremeni popravci'), t3.indexOf('4. Mjerna'));
+  ok('nakon trajne sanacije taj popravak nestaje iz odjeljka 3.',
+     odsjek3.indexOf(zaPriv.opis) === -1, 'odjeljak 3: '+odsjek3.slice(0,120));
+  app.closeModal();
+
   grupa('Trajanje otvorenog kvara');
+  /* grupa iznad zatvara kvarove — ako više nijedan nije otvoren, prijavi novi */
   var otvKv = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && k.m; })[0];
+  if(!otvKv){
+    app.brzaPrijava();
+    var nf3 = D.querySelector('#modal-root form');
+    nf3.elements.m.value = 'e1';
+    nf3.elements.opis.value = 'TEST otvoren za trajanje';
+    posalji(nf3); await cekaj(250);
+    otvKv = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST otvoren za trajanje'; })[0];
+  }
+  ok('postoji otvoren kvar za mjerenje trajanja', !!otvKv);
   otvKv.sati = 0;
   otvKv.poceo_at = new Date(Date.now() - 5*3600000).toISOString();   /* stoji 5 sati */
   ok('otvoren kvar prijavljuje koliko već traje', W.trajanjeKvara(otvKv).indexOf('traje već') === 0);
@@ -453,7 +492,35 @@ async function testovi(W, D){
   ok('kartica otvorenog kvara ne piše "Zastoj 0 h"', kartica.indexOf('Zastoj 0 h') === -1);
   ok('kartica otvorenog kvara piše "traje već"', kartica.indexOf('traje već') > -1);
   otvKv.poceo_at = null;
-  ok('bez poceo_at trajanje se računa iz datuma prijave', W.trajanjeKvara(otvKv).indexOf('traje već') === 0);
+  ok('bez poceo_at trajanje se računa iz trenutka prijave', W.trajanjeKvara(otvKv).indexOf('traje već') === 0);
+
+  /* Kvar prijavljen upravo sada NE smije tvrditi da traje satima. Prije je nedostatak
+     created_at padao na "datum + 06:00", pa je prijava u podne odmah pisala 6 h. */
+  app.brzaPrijava();
+  var bf0 = D.querySelector('#modal-root form');
+  bf0.elements.m.value = 'e1';
+  bf0.elements.opis.value = 'TEST prijavljen upravo sada';
+  posalji(bf0); await cekaj(250);
+  var svjez = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST prijavljen upravo sada'; })[0];
+  ok('novi kvar nosi trenutak prijave', !!svjez && !!svjez.created_at);
+  ok('novoprijavljeni kvar ne tvrdi da traje satima',
+     W.trajanjeKvara(svjez).indexOf(' h') === -1, 'dobiveno: '+W.trajanjeKvara(svjez));
+  /* a kad se trenutak prijave uopće ne zna, broje se dani — sat se ne izmišlja */
+  var bezVremena = { date: W.isoShift(-2), status:'otvoren', m:'e1', sati:0 };
+  jednako('bez trenutka prijave broje se dani', W.trajanjeKvara(bezVremena), 'traje već 2 dana');
+  jednako('prijava od danas bez vremena ne izmišlja sate',
+     W.trajanjeKvara({ date: W.todayISO(), status:'otvoren', m:'e1', sati:0 }), 'prijavljen danas');
+  ok('bez poznatog početka nema troška "do sada"', (function(){
+    W.DATA.kvarovi.push({id:'kvBezV', m:'e1', date:W.todayISO(), opis:'TEST bez vremena',
+      sati:0, status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo'});
+    W.showScreen('pregled');
+    var html = D.querySelector('#screen-pregled').innerHTML;
+    var od = html.indexOf('TEST bez vremena');
+    var ok2 = od === -1 || html.slice(od, od+400).indexOf('do sada') === -1;
+    W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id!=='kvBezV'; });
+    return ok2;
+  })());
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k !== svjez; });
 
   grupa('Poštena usporedba mjeseci');
   var danMj = new Date().getDate();

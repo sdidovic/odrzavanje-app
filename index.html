@@ -682,8 +682,8 @@ var SEED_PARTNERI = [
 
 /* ---------- seed: kvarovi (d = prije koliko dana) ---------- */
 var SEED_KVAROVI = [
-  {m:'p2', d:0,  opis:'Folija se zaglavljuje u čeljustima za varenje — linija stoji', sati:1.5, status:'otvoren', dod:'Majstor 1', pri:'hitno', ceka:true, smj:'1. smjena', priv:true, roks:12},
-  {m:'k1', d:1,  opis:'Postupni pad tlaka — sumnja na propuštanje rashladne tvari na usisnom vodu', sati:2, status:'otvoren', upoz:true, dod:'Majstor 3', pri:'visok', smj:'2. smjena'},
+  {m:'p2', d:0,  opis:'Folija se zaglavljuje u čeljustima za varenje — linija stoji', sati:1.5, status:'otvoren', dod:'Majstor 1', pri:'hitno', ceka:true, smj:'1. smjena', priv:true, roks:12, sat:'06:40'},
+  {m:'k1', d:1,  opis:'Postupni pad tlaka — sumnja na propuštanje rashladne tvari na usisnom vodu', sati:2, status:'otvoren', upoz:true, dod:'Majstor 3', pri:'visok', smj:'2. smjena', sat:'14:20'},
   {m:'e1', d:3,  opis:'Puknuti pogonski remen puža', sati:3, tko:'Majstor 1', zam:'Remen HTD 1440-8M'},
   {m:'s1', d:5,  opis:'Senzor temperature zone 2 daje nestabilna očitanja', sati:2.5, tko:'Majstor 2', zam:'Senzor PT100'},
   {m:'t1', d:7,  opis:'Kvar grijača odleđivanja isparivača', sati:1.5, tko:'Majstor 3', zam:'Grijač odleđivanja 2 kW'},
@@ -783,23 +783,36 @@ function fmtDate(iso){
 }
 function EUR(n){ return Math.round(n).toLocaleString('hr-HR')+' €'; }
 function H(n){ return n.toLocaleString('hr-HR',{maximumFractionDigits:1})+' h'; }
-/* od kada kvar traje: poceo_at (preuzet) → created_at (prijavljen) → date (dan prijave) */
+/* Točan početak kvara: poceo_at (preuzet) → created_at (prijavljen).
+   Ako imamo SAMO datum, sat ne znamo — i ne izmišljamo ga. Prije je ovdje stajao
+   datum + 06:00, pa je kvar prijavljen u podne odmah tvrdio da traje šest sati. */
 function pocetakKvara(k){
   var t = k.poceo_at || k.created_at;
   if(t){ var d = new Date(t); if(!isNaN(d.getTime())) return d; }
-  if(k.date){ var d2 = new Date(k.date+'T06:00:00'); if(!isNaN(d2.getTime())) return d2; }
   return null;
 }
+function danaOd(iso){
+  if(!iso) return null;
+  var a = new Date(String(iso).slice(0,10)+'T00:00:00');
+  var b = new Date(todayISO()+'T00:00:00');
+  if(isNaN(a.getTime())) return null;
+  return Math.round((b - a) / 86400000);
+}
+function danaTekst(n){ return n + (n===1 ? ' dan' : ' dana'); }
 /* koliko kvar traje SADA — "Zastoj 0h" dok linija stoji je suprotno od istine */
 function trajanjeKvara(k){
   var p = pocetakKvara(k);
-  if(!p) return '';
+  if(!p){
+    /* znamo samo dan prijave — brojimo dane, ne sate */
+    var d = danaOd(k.date);
+    if(d === null) return '';
+    return d <= 0 ? 'prijavljen danas' : 'traje već '+danaTekst(d);
+  }
   var sati = (Date.now() - p.getTime()) / 3600000;
   if(sati < 0) sati = 0;
   if(sati < 1)  return 'traje već '+Math.max(1, Math.round(sati*60))+' min';
   if(sati < 24) return 'traje već '+H(Math.round(sati*10)/10);
-  var dana = Math.floor(sati/24);
-  return 'traje već '+dana+(dana===1 ? ' dan' : (dana<5 ? ' dana' : ' dana'));
+  return 'traje već '+danaTekst(Math.floor(sati/24));
 }
 function esc(s){
   return String(s==null?'':s).replace(/[&<>"']/g,function(c){
@@ -877,7 +890,9 @@ function buildSeed(){
                tip:'kvar', rok:null, storno_razlog:null, kategorija:autoKat(k.opis),
                /* IFS: otpuštanje se bilježi kad je zahvat bio u zoni proizvoda */
                otpusteno: (k.status||'rijesen')==='rijesen' && k.otp !== false,
-               privremeni: !!k.priv, rok_sanacije: k.roks ? isoShift(k.roks) : null };
+               privremeni: !!k.priv, rok_sanacije: k.roks ? isoShift(k.roks) : null,
+               /* stvarni trenutak prijave — "traje već" se računa iz njega, ne iz datuma */
+               created_at: isoShift(-k.d)+'T'+(k.sat||'07:30')+':00' };
     }),
     dijelovi: SEED_DIJELOVI.map(function(p,i){
       /* "naručeno" nije polje na dijelu — izvodi se iz otvorene narudžbe u Nabavi (nb1 niže) */
@@ -1416,13 +1431,17 @@ function renderPregled(){
   var stoje = open.filter(function(k){ return !k.upoz && k.m; })
     .sort(function(a,b){
       var pa = pocetakKvara(a), pb = pocetakKvara(b);
-      return (pa?pa.getTime():0) - (pb?pb.getTime():0);   /* najdulji zastoj na vrh */
+      /* najdulji zastoj na vrh; bez poznatog početka sortiramo po danu prijave */
+      var ta = pa ? pa.getTime() : new Date(a.date+'T00:00:00').getTime();
+      var tb = pb ? pb.getTime() : new Date(b.date+'T00:00:00').getTime();
+      return ta - tb;
     });
   var stojiHtml = stoje.length
     ? '<h2>Trenutno stoji ('+stoje.length+')</h2><div class="card">'+stoje.map(function(k){
         var sm = machineById(k.m) || {name:'—', rate:350};
         var p = pocetakKvara(k);
-        var sati = p ? Math.max(0, (Date.now() - p.getTime())/3600000) : 0;
+        /* bez poznatog početka ne postoji trošak "do sada" — prazno je poštenije od nule */
+        var sati = p ? Math.max(0, (Date.now() - p.getTime())/3600000) : null;
         return '<div class="row click" onclick="app.detaljKvara(\''+k.id+'\')">'+
           '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(sm.name)+
             (k.prioritet==='hitno' ? ' <span class="chip kvar">HITNO</span>' : '')+
@@ -1430,7 +1449,7 @@ function renderPregled(){
           '<div class="row-sub">'+esc(k.opis)+'</div>'+
           '<div class="row-sub">'+(trajanjeKvara(k) || 'u tijeku')+
             (k.dodijeljen ? ' &middot; <b>'+esc(k.dodijeljen)+'</b>' : ' &middot; nedodijeljen')+'</div></div>'+
-          (vidiFinancije()
+          (vidiFinancije() && sati !== null
             ? '<div class="row-right"><div class="stoji-cijena">'+EUR(sati * (sm.rate||350))+
               '<span>do sada</span></div></div>'
             : '')+
@@ -2749,7 +2768,9 @@ var app = {
                           return (h>=6&&h<14)?sm[0]:(sm[1]||sm[0]); })(),
       ceka_dio:false, sudjelovali:null, tip:'kvar', rok:null,
       kategorija:autoKat(f.get('opis')),
-      otpusteno:false, privremeni:false, rok_sanacije:null
+      otpusteno:false, privremeni:false, rok_sanacije:null,
+      /* stvarni trenutak prijave — bez njega "traje već" izmišlja sate */
+      created_at:new Date().toISOString()
     };
     var pendingFoto = PENDING_FOTO; PENDING_FOTO = '';
     DATA.kvarovi.push(kvar);
@@ -3267,7 +3288,8 @@ var app = {
       ceka_dio: false, sudjelovali: null,
       tip: tip, rok: tip==='zadatak' ? (f.get('rok') || null) : null,
       kategorija: tip==='zadatak' ? 'Ostalo' : (f.get('kategorija') || autoKat(f.get('opis'))),
-      otpusteno: false, privremeni: false, rok_sanacije: null
+      otpusteno: false, privremeni: false, rok_sanacije: null,
+      created_at: new Date().toISOString()
     };
     var pendingFoto = PENDING_FOTO; PENDING_FOTO = '';
     DATA.kvarovi.push(kvar);
@@ -3673,8 +3695,12 @@ var app = {
     }).join('') : '<div class="a-sub">Nema zahvata u zadnjih '+dani+' dana.</div>';
 
     /* 3. Privremeni popravci — iz stvarnih zapisa, ne iz fiksnog teksta */
+    /* Zatvoren kvar NE znači trajno saniran: linija radi, ali popravak je i dalje
+       privremen dok netko ne makne kvačicu. Ranije su takvi ispadali iz izvještaja
+       i odjeljak 3 se vraćao na "nema privremenih popravaka" — točno u trenutku
+       kad ih ima. */
     var privremeni = DATA.kvarovi.filter(function(k){
-      return k.privremeni && k.status !== 'rijesen' && k.status !== 'otkazan';
+      return k.privremeni && k.status !== 'otkazan';
     }).sort(function(a,b){
       return String(a.rok_sanacije||'9999').localeCompare(String(b.rok_sanacije||'9999'));
     });
@@ -3684,6 +3710,7 @@ var app = {
           var kasni = k.rok_sanacije && k.rok_sanacije < todayISO();
           return '<div class="a-item"><b>'+esc(m.name)+'</b> — '+esc(k.opis)+
             '<div class="a-sub">privremeni popravak od '+fmtDate(k.date)+
+              ' &middot; '+(k.status==='rijesen' ? 'linija radi, trajna sanacija otvorena' : 'kvar još otvoren')+
               ' &middot; '+(k.dodijeljen||k.tko ? 'zadužen: '+esc(k.dodijeljen||k.tko) : 'nije zadužen nitko')+
               ' &middot; rok trajne sanacije: '+(k.rok_sanacije ? fmtDate(k.rok_sanacije) : 'nije određen')+
               (kasni ? ' <span class="late">— KASNI</span>' : '')+'</div></div>';
