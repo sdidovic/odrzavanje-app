@@ -969,7 +969,16 @@ async function load(tiho){
     sb.from('users').select('ime, role, aktivan'),
     sb.from('nabava').select('*').order('narucen', {ascending:false}).limit(200)
   ]);
-  for(var i=0;i<r.length;i++){ if(r[i].error && i < 7) throw r[i].error; }
+  /* Ranije je ovdje stajalo "i < 7", pa su greške za users i nabavu tiho nestale:
+     "nema otvorenih narudžbi" zbog pada upita izgleda isto kao stvarno prazan popis,
+     a posljedica je da voditelj naruči sve po drugi put. */
+  var IMENA = ['strojevi','kvarovi','dijelovi','preventiva','partneri','komentari','poruke','korisnici','nabava'];
+  for(var i=0;i<r.length;i++){
+    if(!r[i] || !r[i].error) continue;
+    if(i < 7) throw r[i].error;                       /* bez ovoga app nema što prikazati */
+    zapisiGresku('Učitavanje nije uspjelo: '+IMENA[i], (r[i].error && r[i].error.message) || String(r[i].error));
+    toast('Dio podataka ('+IMENA[i]+') nije učitan — osvježi ekran');
+  }
   /* Dok je dohvat trajao, netko je mogao ući u demo način (ili se odjaviti). Rezultat
      tada NE smije pregaziti DATA — inače demo prikaže žive podatke, a već otvoreni
      zapisi ostanu vezani na objekte kojih više nema u DATA. */
@@ -1352,8 +1361,20 @@ function renderPregled(){
   var mk = KV.filter(function(k){ return k.date.slice(0,7)===mm; });
   var cost = 0, hrs = 0;
   mk.forEach(function(k){ cost += kvarCost(k); hrs += k.sati; });
+  /* Zatvoreni kvarovi nose sate, otvoreni ih još nemaju — pa mjesečna brojka vrijedi
+     0 € za kvar koji upravo stoji, dok sekcija ispod za isti kvar kaže 1.962 €.
+     Procjenu držimo odvojeno od dokazive brojke, ali je ne prešućujemo. */
+  var uTijekuCost = 0;
+  mk.forEach(function(k){
+    /* isto pravilo kao "Trenutno stoji": upozorenje nije zaustavljena linija */
+    if(!jeOtvoren(k) || k.upoz) return;
+    var p0 = pocetakKvara(k);
+    if(!p0) return;
+    var sm0 = machineById(k.m);
+    uTijekuCost += Math.max(0, (Date.now() - p0.getTime())/3600000) * (sm0 ? sm0.rate : 350);
+  });
   var open = KV.filter(function(k){ return jeOtvoren(k); });
-  var low  = DATA.dijelovi.filter(function(p){ return p.stanje < p.min; });
+  var low  = zaNaruciti();   /* ista definicija kao na Nabavi: bez otvorene narudžbe */
   var late = DATA.preventiva.filter(function(p){ return p.next < todayISO(); });
   var last3 = aktivni().slice().sort(byDateDesc).slice(0,3);
 
@@ -1370,7 +1391,10 @@ function renderPregled(){
   var trend = '';
   if(prevCost > 0){
     var pct = Math.round((cost - prevCost) / prevCost * 100);
-    trend = '<span class="trend '+(pct>=0?'up':'down')+'" title="usporedba s istim brojem dana prošlog mjeseca">'+
+    /* pad se ne smije bojiti zeleno dok kvarovi koji traju još nisu ušli u brojku */
+    var padJeSiguran = pct < 0 && uTijekuCost === 0;
+    trend = '<span class="trend '+(pct>=0 ? 'up' : (padJeSiguran ? 'down' : ''))+
+      '" title="usporedba s istim brojem dana prošlog mjeseca">'+
       (pct>=0?'▲ +':'▼ ')+Math.abs(pct)+'% vs prvih '+danMj+' dana '+esc(MJESECI_G[pm.getMonth()])+'</span>';
   }
 
@@ -1464,7 +1488,8 @@ function renderPregled(){
     ? '<div class="big-card" onclick="app.go(\'kvarovi\')">'+
         '<div class="big-label">Trošak zastoja ovaj mjesec</div>'+
         '<div class="big-num">'+EUR(cost)+trend+'</div>'+
-        '<div class="big-sub">'+mjesecSub+' &middot; '+mk.length+' zastoja &middot; ukupno '+H(hrs)+'</div>'+
+        '<div class="big-sub">'+mjesecSub+' &middot; '+mk.length+' zastoja &middot; ukupno '+H(hrs)+
+          (uTijekuCost > 0 ? '<br>+ '+EUR(uTijekuCost)+' iz kvarova koji još traju' : '')+'</div>'+
       '</div>'
     : '<div class="big-card" onclick="app.go(\'kvarovi\')">'+
         '<div class="big-label">Zastoji ovaj mjesec</div>'+
@@ -1475,7 +1500,7 @@ function renderPregled(){
     bigCard+
     '<div class="stat-grid">'+
       statCard(open.length, 'Otvoreni kvarovi',        open.length ? 'red'    : 'green', "app.goKvaroviOtvoreni()")+
-      statCard(low.length,  'Dijelovi ispod minimuma', low.length  ? 'red'    : 'green', "app.go('dijelovi')")+
+      statCard(low.length,  'Dijelovi za naručiti',    low.length  ? 'red'    : 'green', "app.go('nabava')")+
       statCard(late.length, 'Preventive kasne',        late.length ? 'yellow' : 'green', "app.skociNaObaveze()")+
     '</div>'+
     stojiHtml+
@@ -1630,8 +1655,10 @@ function kvarItem(k, showMachine){
   if(zadatak){
     meta = k.rok ? ('Rok: '+(k.rok < todayISO() && jeOtvoren(k) ? '<b style="color:var(--red)">'+fmtDate(k.rok)+'</b>' : fmtDate(k.rok))) : 'Bez roka';
   } else if(jeOtvoren(k)){
-    /* dok linija stoji, "Zastoj 0h" je suprotno od istine — pokazujemo koliko već traje */
-    meta = (trajanjeKvara(k) || 'u tijeku')+(k.sati > 0 ? ' &middot; upisano '+H(k.sati) : '');
+    /* dok linija stoji, "Zastoj 0h" je suprotno od istine — pokazujemo koliko već traje.
+       Procijenjene sate NE stavljamo uz to: dva trajanja jedno do drugog samo zbunjuju,
+       a broj je ionako u detalju kvara. */
+    meta = trajanjeKvara(k) || 'u tijeku';
     if(k.kategorija && k.kategorija!=='Ostalo') meta += ' &middot; '+esc(k.kategorija);
   } else {
     meta = 'Zastoj '+H(k.sati)+(vidiFinancije() ? ' &middot; <b>'+EUR(kvarCost(k))+'</b>' : '');
@@ -1657,17 +1684,22 @@ function kvarItem(k, showMachine){
   var ind = [];
   if(brKom) ind.push('💬 '+brKom);
   if(k.foto) ind.push('📷');
-  /* dvije najčešće radnje voditelja bez otvaranja punog obrasca Uredi */
+  /* Brze radnje samo ondje gdje stvarno treba nešto poduzeti:
+     dodjela se nudi SAMO za nedodijeljen kvar (tko ga radi već piše u meta retku,
+     a prebacivanje je rijetko i ide kroz Uredi), a "Čeka dio" samo dok kvar traje. */
   var brzeAkcije = '';
   if(jeOtvoren(k)){
-    var majOpts = '<option value="">Dodijeli…</option>'+MAJSTORI.map(function(mj){
-      return '<option'+(k.dodijeljen===mj?' selected':'')+'>'+esc(mj)+'</option>'; }).join('');
+    var djelovi = [];
+    if(!k.dodijeljen){
+      djelovi.push('<select onchange="app.brzoDodijeli(\''+k.id+'\',this.value)" aria-label="Dodijeli majstora">'+
+        '<option value="">Dodijeli…</option>'+
+        MAJSTORI.map(function(mj){ return '<option>'+esc(mj)+'</option>'; }).join('')+'</select>');
+    }
+    djelovi.push('<button class="btn-mini'+(k.ceka_dio?' aktivan':'')+
+      '" onclick="event.stopPropagation();app.brzoCekaDio(\''+k.id+'\')">'+
+      (k.ceka_dio ? '✓ Čeka dio' : 'Čeka dio')+'</button>');
     brzeAkcije = '<div class="kvar-brzo role-write" onclick="event.stopPropagation()">'+
-      '<select onchange="app.brzoDodijeli(\''+k.id+'\',this.value)" '+
-        'aria-label="Dodijeli majstora">'+majOpts+'</select>'+
-      '<button class="btn-mini'+(k.ceka_dio?' aktivan':'')+
-        '" onclick="event.stopPropagation();app.brzoCekaDio(\''+k.id+'\')">'+
-        (k.ceka_dio ? '✓ Čeka dio' : 'Čeka dio')+'</button></div>';
+      djelovi.join('')+'</div>';
   }
   return '<div class="kvar-item click"'+(k.status==='otkazan'?' style="opacity:.55"':'')+
     ' onclick="app.detaljKvara(\''+k.id+'\')">'+
@@ -1742,7 +1774,7 @@ function renderKvarovi(){
       '<input type="date" value="'+FILTER.od+'" onchange="app.setFilter(\'od\',this.value)" title="Od datuma">'+
       '<input type="date" value="'+FILTER.do+'" onchange="app.setFilter(\'do\',this.value)" title="Do datuma">'+
     '</div>'+
-    ((FILTER.q||FILTER.od||FILTER.do||FILTER.stroj!=='svi'||FILTER.status!=='svi'||FILTER.majstor!=='svi')
+    ((FILTER.q||FILTER.od||FILTER.do||FILTER.stroj!=='svi'||FILTER.status!=='svi'||FILTER.majstor!=='svi'||FILTER.vrsta!=='svi')
       ? '<button class="btn-mini" style="margin-bottom:10px" onclick="app.resetFiltere()">✕ Poništi filtere ('+list.length+' rezultata)</button>' : '')+
     '<div class="card">'+
       (list.length ? list.map(function(k){ return kvarItem(k,true); }).join('')
@@ -1815,6 +1847,13 @@ function dioPoId(id){ return DATA.dijelovi.filter(function(x){ return x.id===id;
 function narudzbaZaDio(id){
   return otvoreneNarudzbe().filter(function(n){ return n.dio_id === id; })[0] || null;
 }
+/* Jedna definicija "treba naručiti" za cijelu aplikaciju. Prije su postojale dvije —
+   Dijelovi su brojali sve ispod minimuma, Nabava samo one bez otvorene narudžbe —
+   pa je isti pojam u četiri dodira davao tri različita broja. */
+function zaNaruciti(){
+  return DATA.dijelovi.filter(function(p){ return p.stanje < p.min && !narudzbaZaDio(p.id); })
+    .sort(function(a,b){ return (a.stanje/(a.min||1)) - (b.stanje/(b.min||1)); });
+}
 function nabavaRedak(n){
   var d = dioPoId(n.dio_id) || { naziv:'—' };
   var kasni = n.ocekivano && n.ocekivano < todayISO();
@@ -1830,15 +1869,13 @@ function nabavaRedak(n){
 }
 function renderNabava(){
   var otv = otvoreneNarudzbe();
-  var zaNaruciti = DATA.dijelovi.filter(function(p){
-    return p.stanje < p.min && !otv.some(function(n){ return n.dio_id === p.id; });
-  }).sort(function(a,b){ return (a.stanje/(a.min||1)) - (b.stanje/(b.min||1)); });
+  var zaNar = zaNaruciti();
   var vrijednostNarudzbi = otv.reduce(function(s,n){ return s + (n.cijena||0)*n.kolicina; }, 0);
 
   $('#screen-nabava').innerHTML =
     '<button class="back" onclick="app.go(\'dijelovi\')">‹ Dijelovi</button>'+
-    '<h2>Za naručiti ('+zaNaruciti.length+')</h2>'+
-    '<div class="card">'+ (zaNaruciti.length ? zaNaruciti.map(function(p){
+    '<h2>Za naručiti ('+zaNar.length+')</h2>'+
+    '<div class="card">'+ (zaNar.length ? zaNar.map(function(p){
       return '<div class="row"><div class="grow">'+
         '<div class="row-title" style="font-size:13.5px">'+esc(p.naziv)+'</div>'+
         '<div class="row-sub">stanje <b style="color:var(--red)">'+p.stanje+'</b> / min '+p.min+
@@ -1867,8 +1904,9 @@ function renderNabava(){
     })();
 }
 function renderDijelovi(){
-  var vrijednost = 0, ispodMin = 0;
-  DATA.dijelovi.forEach(function(p){ vrijednost += p.stanje * p.cijena; if(p.stanje < p.min) ispodMin++; });
+  var vrijednost = 0;
+  DATA.dijelovi.forEach(function(p){ vrijednost += p.stanje * p.cijena; });
+  var ispodMin = zaNaruciti().length;   /* isti broj kao na Pregledu i Nabavi */
   $('#screen-dijelovi').innerHTML =
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'+
       '<button class="btn primary role-write" onclick="app.go(\'nabava\')">Nabava'+
@@ -2036,8 +2074,13 @@ function renderAnalitika(){
       /* sva četiri broja na isti font — različite veličine su sugerirale različitu važnost */
       '<div class="stat"><span class="stat-num kpi">'+uk.n+'</span><span class="stat-label">kvarova</span>'+deltaChip(uk.n, prethodno?prethodno.n:null, true)+'</div>'+
       '<div class="stat"><span class="stat-num kpi">'+H(uk.sati)+'</span><span class="stat-label">zastoja</span>'+deltaChip(uk.sati, prethodno?prethodno.sati:null, true)+'</div>'+
-      '<div class="stat"><span class="stat-num kpi">'+EUR(uk.cost)+'</span><span class="stat-label">trošak</span>'+deltaChip(uk.cost, prethodno?prethodno.cost:null, true)+'</div>'+
-      '<div class="stat"><span class="stat-num kpi">'+(mttr?H(mttr):'—')+'</span><span class="stat-label">popravak</span>'+deltaChip(mttr, prethodno?prethodno.mttr:null, true)+'</div>'+
+      /* to nije ukupan trošak održavanja — dijelovi i vanjski servis nisu u njemu */
+      '<div class="stat"><span class="stat-num kpi">'+EUR(uk.cost)+'</span><span class="stat-label">trošak zastoja</span>'+deltaChip(uk.cost, prethodno?prethodno.cost:null, true)+'</div>'+
+      /* MTTR ne dijeli s istim brojem kao ostala tri broja — dijeli samo s riješenima.
+         Broj uzoraka mora pisati, inače mjesec s jednim brzim popravkom izgleda kao rekord. */
+      '<div class="stat"><span class="stat-num kpi">'+(mttr?H(mttr):'—')+'</span>'+
+        '<span class="stat-label">prosj. popravak'+(rijeseni.length ? ' ('+rijeseni.length+')' : '')+'</span>'+
+        deltaChip(mttr, prethodno?prethodno.mttr:null, true)+'</div>'+
     '</div>'+
     (prethodno
       ? '<div class="row-sub" style="text-align:center;margin-top:7px">usporedba s prethodnih '+ANA_DANA+' dana'+
@@ -2881,7 +2924,11 @@ var app = {
     var od = dani ? isoShift(-dani) : '0000-00-00';
     var glava = 'datum;stroj;vrsta;kategorija;opis;status;prioritet;smjena;sati_zastoja;trosak_eur;'+
                 'dodijeljen;rijesio;sudjelovali;zamijenjeno;ceka_dio;linija_otpustena;privremeni_popravak;rok_sanacije';
-    var redovi = DATA.kvarovi.filter(function(k){ return k.date >= od; }).sort(byDateDesc).map(function(k){
+    /* Analitika i IFS izbacuju storno i zadatke — izvoz mora brojati isto,
+       inače voditelj i direktor iz istog klika dobiju dva različita broja. */
+    var redovi = DATA.kvarovi.filter(function(k){
+      return k.date >= od && k.status !== 'otkazan' && (k.tip||'kvar') === 'kvar';
+    }).sort(byDateDesc).map(function(k){
       var m = machineById(k.m) || {name:''};
       var c = function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; };
       return [k.date, m.name, k.tip||'kvar', k.kategorija||'', k.opis, k.status, k.prioritet||'', k.smjena||'', k.sati,
@@ -2902,8 +2949,13 @@ var app = {
     a.download = 'odrzavanje-izvoz-' + todayISO() + '.json';
     document.body.appendChild(a); a.click(); a.remove();
   },
-  /* kartica broji jeOtvoren() = otvoren + u radu — filtar mora dati točno to */
-  goKvaroviOtvoreni: function(){ FILTER.status='aktivni'; FILTER.stroj='svi'; showScreen('kvarovi'); },
+  /* Kartica broji jeOtvoren() = otvoren + u radu, pa filtar mora dati točno to —
+     i mora očistiti SVE ostale filtre, inače popis tiho izostavi dio onoga što je
+     kartica prebrojala, a gumb "Poništi filtere" se ni ne pojavi. */
+  goKvaroviOtvoreni: function(){
+    FILTER = { stroj:'svi', status:'aktivni', majstor:'svi', od:'', do:'', q:'', vrsta:'svi' };
+    showScreen('kvarovi');
+  },
   skociNaObaveze: function(){
     var el = document.getElementById('za-obaviti');
     if(el) el.scrollIntoView({behavior:'smooth'});
@@ -3270,8 +3322,10 @@ var app = {
     var status = tip==='zadatak' ? 'otvoren' : f.get('status');
     if(tip==='kvar' && !f.get('m')){ alert('Odaberi stroj (ili promijeni vrstu u Zadatak).'); return; }
     var satiUnos = parseFloat(f.get('sati'));
-    if(tip==='kvar' && (isNaN(satiUnos) || satiUnos < 0 || satiUnos > 72)){
-      alert('Trajanje zastoja mora biti između 0 i 72 sata.'); return; }
+    if(tip==='kvar' && (isNaN(satiUnos) || satiUnos < 0 || satiUnos > 720)){
+      alert('Trajanje zastoja mora biti između 0 i 720 sati (30 dana).'); return; }
+    if(tip==='kvar' && satiUnos > 72 &&
+       !confirm('Upisano je '+H(satiUnos)+' — to je '+Math.round(satiUnos/24*10)/10+' dana. Je li točno?')) return;
     if(tip==='kvar' && f.get('prioritet')==='hitno' && !PENDING_FOTO &&
        !confirm('HITAN kvar bez fotografije — nastaviti bez nje?')) return;
     var kvar = {
@@ -3380,7 +3434,12 @@ var app = {
       '<div class="modal-head"><h3>Riješi kvar</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<div class="row-sub" style="margin-bottom:2px">'+esc(m.name)+' &middot; '+esc(k.opis)+'</div>'+
       '<form onsubmit="app.saveRijesen(event,\''+kId+'\')">'+
-        '<label>Ukupno trajanje zastoja (h)</label><input type="number" name="sati" step="0.5" min="0" value="'+k.sati+'" required>'+
+        /* Brza prijava sprema sati:0. Kad bi ovdje pisala nula, ona bi i ostala —
+           a to je jedini kanal kojim stvarni zastoj ikad uđe u evidenciju. */
+        '<label>Ukupno trajanje zastoja (h)</label>'+
+        '<input type="number" name="sati" step="0.5" min="0" max="720" required'+
+          (k.sati > 0 ? ' value="'+k.sati+'"' : ' placeholder="koliko je linija stvarno stajala"')+'>'+
+        (k.sati > 0 ? '' : '<div class="row-sub" style="margin-top:-4px">Upiši stvarno trajanje — iz ovoga se računa trošak zastoja.</div>')+
         '<label>Riješio</label><select name="tko">'+majstorOpts(SESSION.ime)+'</select>'+
         '<label>Sudjelovali (ako je radilo više ljudi)</label><input name="sudjelovali" placeholder="npr. Marko 0,5 h + Ivica 1 h">'+
         '<label>Utrošeni dio sa skladišta</label><select name="dio">'+dioOpts+'</select>'+
@@ -3399,7 +3458,8 @@ var app = {
     if(!k) return;
     var f = new FormData(e.target);
     var sh = parseFloat(f.get('sati'));
-    if(isNaN(sh) || sh < 0 || sh > 72){ alert('Trajanje zastoja mora biti između 0 i 72 sata.'); return; }
+    if(isNaN(sh) || sh < 0 || sh > 720){ alert('Trajanje zastoja mora biti između 0 i 720 sati (30 dana).'); return; }
+    if(sh > 72 && !confirm('Upisano je '+H(sh)+' — to je '+Math.round(sh/24*10)/10+' dana. Je li točno?')) return;
     k.sati = sh;
     k.status = 'rijesen'; k.upoz = false; k.ceka_dio = false;
     /* IFS: u izvještaj ide samo ono što je netko stvarno potvrdio */
@@ -3497,7 +3557,14 @@ var app = {
     k.m = f.get('m') || null;
     k.opis = String(f.get('opis')||'').trim() || k.opis;
     k.date = f.get('date') || k.date;
-    k.sati = parseFloat(f.get('sati')); if(isNaN(k.sati)) k.sati = 0;
+    /* Uredi dosad nije provjeravao sate — nerealan unos hvatala je tek baza, i to
+       porukom "Spremanje NIJE uspjelo". Ista pravila kao pri prijavi i zatvaranju. */
+    var satiU = parseFloat(f.get('sati'));
+    if(isNaN(satiU)) satiU = 0;
+    if(satiU < 0 || satiU > 720){ alert('Trajanje zastoja mora biti između 0 i 720 sati (30 dana).'); return; }
+    if(satiU > 72 && satiU !== k.sati &&
+       !confirm('Upisano je '+H(satiU)+' — to je '+Math.round(satiU/24*10)/10+' dana. Je li točno?')) return;
+    k.sati = satiU;
     k.kategorija = f.get('kategorija') || 'Ostalo';
     k.dodijeljen = f.get('dodijeljen') || null;
     k.prioritet  = f.get('prioritet') || 'normalno';

@@ -659,6 +659,104 @@ async function testovi(W, D){
   W.SESSION = { ime:'Voditelj', role:'voditelj' };
   D.body.dataset.role = 'voditelj';
 
+  grupa('Istina o satima i eurima');
+  /* zastoj preko vikenda (100+ h) mora se moći upisati — prije je granica bila 72 h */
+  var dugi = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && k.m; })[0];
+  if(!dugi){
+    app.brzaPrijava();
+    var df = D.querySelector('#modal-root form');
+    df.elements.m.value='e1'; df.elements.opis.value='TEST dugi zastoj';
+    posalji(df); await cekaj(250);
+    dugi = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST dugi zastoj'; })[0];
+  }
+  var stariConfirm2 = W.confirm; W.confirm = function(){ return true; };
+  var stariAlert2 = W.alert; var alertTekst = ''; W.alert = function(t){ alertTekst = String(t||''); };
+  app.rijesiKvar(dugi.id);
+  var lf = D.querySelector('#modal-root form');
+  ok('obrazac zatvaranja ne nudi nulu kad sati nisu procijenjeni',
+     dugi.sati > 0 || lf.elements.sati.value === '');
+  lf.elements.tko.value = 'Majstor 1';
+  lf.elements.sati.value = '104';          /* linija stajala preko vikenda */
+  posalji(lf); await cekaj(250);
+  jednako('zastoj od 104 h je prihvaćen', dugi.sati, 104);
+  /* iznad 720 h i dalje pada — granica postoji da uhvati tipfeler */
+  app.urediKvar(dugi.id);
+  var uf2 = D.querySelector('#modal-root form');
+  uf2.elements.sati.value = '5000';
+  alertTekst = '';
+  posalji(uf2); await cekaj(200);
+  ok('nerealan unos je i dalje odbijen', dugi.sati === 104 || alertTekst.indexOf('720') > -1);
+  app.closeModal();
+  W.confirm = stariConfirm2; W.alert = stariAlert2;
+
+  /* mjesečna brojka ne smije šutjeti o kvarovima koji upravo traju */
+  W.DATA.kvarovi.push({id:'kvUT', m:'e1', date:W.todayISO(), opis:'TEST još traje', sati:0,
+    status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo',
+    created_at:new Date(Date.now()-6*3600000).toISOString()});
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role='voditelj';
+  W.showScreen('pregled'); await cekaj(200);
+  var pregledT = D.querySelector('#screen-pregled').textContent;
+  ok('velika kartica priznaje trošak kvarova koji još traju',
+     pregledT.indexOf('iz kvarova koji još traju') > -1);
+  ok('pad se ne boji zeleno dok kvarovi traju',
+     !D.querySelector('#screen-pregled .trend.down'));
+  /* upozorenje nije zaustavljena linija — ne smije ulaziti u procjenu, kao ni u
+     sekciju "Trenutno stoji" */
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id!=='kvUT'; });
+  var procjena = function(){
+    W.showScreen('pregled');
+    var m = D.querySelector('#screen-pregled .big-sub').textContent.match(/\+\s*([\d.,]+)\s*€/);
+    return m ? m[1] : '';
+  };
+  var prijeUpoz = procjena();
+  W.DATA.kvarovi.push({id:'kvUP', m:'e1', date:W.todayISO(), opis:'TEST samo upozorenje', sati:0,
+    status:'otvoren', upoz:true, tip:'kvar', kategorija:'Ostalo',
+    created_at:new Date(Date.now()-9*3600000).toISOString()});
+  await cekaj(150);
+  jednako('upozorenje ne mijenja procjenu troška u tijeku', procjena(), prijeUpoz);
+  ok('upozorenje nije u sekciji "Trenutno stoji"',
+     D.querySelector('#screen-pregled').textContent.indexOf('TEST samo upozorenje') === -1);
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id!=='kvUP'; });
+
+  /* jedna definicija "za naručiti" na sva tri mjesta */
+  W.showScreen('pregled'); await cekaj(150);
+  var naKartici = parseInt(D.querySelectorAll('#screen-pregled .stat-num')[1].textContent, 10);
+  W.showScreen('nabava'); await cekaj(150);
+  var naNabavi = W.zaNaruciti().length;
+  W.showScreen('dijelovi'); await cekaj(150);
+  var naDijelovima = parseInt((D.querySelector('#screen-dijelovi').textContent
+    .match(/ispod minimuma:\s*(\d+)/)||[0,'-1'])[1], 10);
+  jednako('Pregled i Nabava broje isto', naKartici, naNabavi);
+  jednako('Dijelovi broje isto', naDijelovima, naNabavi);
+
+  /* klik na karticu čisti SVE filtre, ne samo status */
+  app.setFilter('vrsta','zadatak');
+  app.setFilter('majstor','Majstor 1');
+  app.goKvaroviOtvoreni(); await cekaj(150);
+  jednako('klik na karticu čisti filtar vrste', W.FILTER.vrsta, 'svi');
+  jednako('klik na karticu čisti filtar majstora', W.FILTER.majstor, 'svi');
+  jednako('popis odgovara brojci s kartice',
+     D.querySelectorAll('#screen-kvarovi .kvar-item').length,
+     W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k); }).length);
+  app.resetFiltere();
+
+  /* brze radnje: dodjela se nudi samo ondje gdje nedostaje */
+  var nedod = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k); })[0];
+  nedod.dodijeljen = null;
+  W.showScreen('kvarovi'); await cekaj(150);
+  ok('nedodijeljen kvar nudi dodjelu na kartici', (function(){
+    var el = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
+      function(e){ return e.textContent.indexOf(nedod.opis) > -1; })[0];
+    return !!(el && el.querySelector('.kvar-brzo select'));
+  })());
+  nedod.dodijeljen = 'Majstor 1';
+  W.showScreen('kvarovi'); await cekaj(150);
+  ok('dodijeljen kvar ne nudi suvišan padajući popis', (function(){
+    var el = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
+      function(e){ return e.textContent.indexOf(nedod.opis) > -1; })[0];
+    return !!el && !el.querySelector('.kvar-brzo select') && !!el.querySelector('.kvar-brzo .btn-mini');
+  })());
+
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
                        sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});
