@@ -575,15 +575,36 @@ async function testovi(W, D){
   app.resetFiltere();
 
   grupa('Brze radnje i HITNO');
-  var zaBrzo = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k); })[0];
+  /* kartica je za čitanje: jedina radnja na njoj je dodjela NEDODIJELJENOG kvara.
+     Mora biti pravi kvar sa strojem — zadatak nema "Čeka dio" po dizajnu. */
+  var zaBrzo = W.DATA.kvarovi.filter(function(k){
+    return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar' && k.m; })[0];
+  if(!zaBrzo){
+    app.brzaPrijava();
+    var zf = D.querySelector('#modal-root form');
+    zf.elements.m.value='e1'; zf.elements.opis.value='TEST za brze radnje';
+    posalji(zf); await cekaj(250);
+    zaBrzo = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST za brze radnje'; })[0];
+  }
+  zaBrzo.dodijeljen = null;
   W.showScreen('kvarovi'); await cekaj(120);
-  ok('kartica nudi dodjelu i "Čeka dio"',
+  ok('nedodijeljen kvar nudi dodjelu na kartici',
      D.querySelector('#screen-kvarovi').innerHTML.indexOf('kvar-brzo') > -1);
-  var cekaPrije = !!zaBrzo.ceka_dio;
-  await app.brzoCekaDio(zaBrzo.id); await cekaj(150);
-  jednako('"Čeka dio" se prebacuje s kartice', !!zaBrzo.ceka_dio, !cekaPrije);
+  ok('kartica NE nosi gumb "Čeka dio" — taj je u detalju',
+     D.querySelector('#screen-kvarovi .kvar-brzo .btn-mini') === null);
   await app.brzoDodijeli(zaBrzo.id, 'Majstor 2'); await cekaj(150);
   jednako('dodjela s kartice je spremljena', zaBrzo.dodijeljen, 'Majstor 2');
+  /* "Čeka dio" se prebacuje iz detalja kvara */
+  var cekaPrije = !!zaBrzo.ceka_dio;
+  app.detaljKvara(zaBrzo.id); await cekaj(120);
+  ok('detalj kvara nudi prekidač "Čeka dio"',
+     D.querySelector('#modal-root').innerHTML.indexOf('cekaDioIzDetalja') > -1);
+  await app.cekaDioIzDetalja(zaBrzo.id); await cekaj(150);
+  jednako('"Čeka dio" se prebacuje iz detalja', !!zaBrzo.ceka_dio, !cekaPrije);
+  ok('detalj nakon prebacivanja pokazuje novo stanje',
+     D.querySelector('#modal-root').textContent.indexOf(zaBrzo.ceka_dio ? 'makni oznaku' : 'naručeno, popravak stoji') > -1);
+  await app.cekaDioIzDetalja(zaBrzo.id); await cekaj(120);  /* vrati kako je bilo */
+  app.closeModal();
   /* brza prijava: prekidač HITNO stvarno postavlja prioritet */
   app.brzaPrijava();
   var bf = D.querySelector('#modal-root form');
@@ -751,10 +772,57 @@ async function testovi(W, D){
   })());
   nedod.dodijeljen = 'Majstor 1';
   W.showScreen('kvarovi'); await cekaj(150);
-  ok('dodijeljen kvar ne nudi suvišan padajući popis', (function(){
+  ok('dodijeljen kvar nema NIJEDNU kontrolu na kartici', (function(){
     var el = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
       function(e){ return e.textContent.indexOf(nedod.opis) > -1; })[0];
-    return !!el && !el.querySelector('.kvar-brzo select') && !!el.querySelector('.kvar-brzo .btn-mini');
+    return !!el && !el.querySelector('.kvar-brzo');
+  })());
+
+  grupa('Miran ekran — radnje na dodir, ne stalno');
+  /* Kontakti: nema gumba "Uredi" na svakom retku; voditelju redak otvara uređivanje */
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  app.go('kontakti'); await cekaj(150);
+  ok('kontakti nemaju gumb "Uredi" na recima',
+     D.querySelector('#kontakti-list .btn-mini') === null);
+  ok('voditelju je redak kontakta klikabilan i vodi na uređivanje',
+     (function(){ var r = D.querySelector('#kontakti-list .row.click');
+       return !!r && String(r.getAttribute('onclick')||'').indexOf('urediPartnera') > -1; })());
+  ok('telefon ostaje izravan link i ne otvara uređivanje',
+     (function(){ var a = D.querySelector('#kontakti-list a.clink[href^="tel:"]');
+       return !!a && String(a.getAttribute('onclick')||'').indexOf('stopPropagation') > -1; })());
+  W.SESSION = { ime:'Majstor 1', role:'majstor' }; D.body.dataset.role = 'majstor';
+  app.go('kontakti'); await cekaj(150);
+  ok('majstoru redak kontakta nije klikabilan (nema što uređivati)',
+     D.querySelector('#kontakti-list .row.click') === null);
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+
+  /* Dijelovi: sklopljen redak nosi samo naziv, oznaku i stanje; dodir otvara ostalo */
+  app.go('dijelovi'); await cekaj(150);
+  ok('sklopljen redak dijela nema gumbe',
+     D.querySelector('#parts-list .row .btn-mini') === null &&
+     D.querySelector('#parts-list .dio-detalj') === null);
+  var prviDio = W.DATA.dijelovi[0];
+  app.otvoriDio(prviDio.id); await cekaj(120);
+  ok('dodir rastvara detalje s radnjama',
+     !!D.querySelector('#parts-list .dio-detalj') &&
+     D.querySelector('#parts-list .dio-detalj').innerHTML.indexOf('qbtn') > -1);
+  ok('rastvoren je točno jedan dio', D.querySelectorAll('#parts-list .dio-detalj').length === 1);
+  var stanjeR = prviDio.stanje;
+  await app.qty(prviDio.id, 1); await cekaj(120);
+  jednako('korekcija stanja radi iz rastvorenog retka', prviDio.stanje, stanjeR + 1);
+  ok('redak ostaje rastvoren nakon korekcije', !!D.querySelector('#parts-list .dio-detalj'));
+  await app.qty(prviDio.id, -1); await cekaj(80);
+  app.otvoriDio(prviDio.id); await cekaj(80);   /* sklopi natrag */
+  ok('drugi dodir sklapa detalje', D.querySelector('#parts-list .dio-detalj') === null);
+
+  /* Poruke: mrtva opcija push obavijesti se ne prikazuje kad se ništa ne može napraviti */
+  app.go('poruke'); await cekaj(250);
+  ok('nema kartice "dostupno kad…" koja samo objašnjava zašto ne radi',
+     D.querySelector('#screen-poruke').textContent.indexOf('Dostupno kad je app dodana') === -1);
+  ok('objašnjenje obavijesti postoji u Pomoći', (function(){
+    app.pomoc();
+    var ima = D.querySelector('#modal-root').textContent.indexOf('početni zaslon') > -1;
+    app.closeModal(); return ima;
   })());
 
   grupa('Otpornost');
