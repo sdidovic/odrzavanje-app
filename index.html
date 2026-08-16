@@ -360,6 +360,11 @@ body:not([data-role="voditelj"]) .role-voditelj{display:none !important}
 /* ---------- filters / buttons ---------- */
 .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
 .filters select:first-child{grid-column:1 / -1}
+/* iOS: date input ima intrinzičnu širinu koja ignorira width:100% u gridu
+   pa izlazi van ruba ekrana — min-width:0 na stavci grida + kapa na inputu */
+.filters > div{min-width:0}
+.filters input[type="date"]{max-width:100%;min-width:0;min-height:46px;
+  -webkit-appearance:none;appearance:none}
 select,input,textarea{width:100%;border:1.5px solid var(--border-jaci);border-radius:var(--radius-s);
   background:#fff;padding:11px 12px;font-size:16px;font-family:inherit;color:var(--text);
   transition:border-color .14s ease, box-shadow .14s ease}  /* 16px: sprječava iOS auto-zoom */
@@ -566,7 +571,9 @@ var TVRTKA = {
   logo: null,
   boja: '#3a3285',
   boja_akcent: '#ffd749',
-  programi: ['Suhi program','Svježi program','Zamrznuti program'],
+  /* sektori održavanja, ne proizvodni programi (PLAN-KAIZEN S7) — kompresor je
+     energetika koja služi svima, a ne dio zamrznutog programa */
+  programi: ['Priprema i ekstruzija','Linije svježeg','Zamrzavanje','Energetika','Pakiranje'],
   smjene: ['1. smjena','2. smjena'],
   smjene_od: null,   /* početak svake smjene (sat); null = izvedi iz broja smjena */
   kategorije_kvara: ['Mehanički','Električni','Pneumatika i rashlada','Ostalo'],
@@ -586,6 +593,9 @@ var KORISNICI_DEMO = [
   { naziv:'Direktor',    email:'direktor@odrzavanje.local' }
 ];
 var KORISNICI = KORISNICI_DEMO.slice();
+/* netaknuta kopija demo identiteta — demo mora stajati sam za sebe i kad je
+   spojena baza već prepisala TVRTKA (isto pravilo kao KORISNICI_DEMO) */
+var TVRTKA_DEMO = JSON.parse(JSON.stringify(TVRTKA));
 var MAJSTORI = ['Majstor 1','Majstor 2','Majstor 3'];
 /* Zadatak se može dodijeliti i voditelju (nabava, dogovori) — ne samo majstoru.
    "Riješio" kod kvara ostaje MAJSTORI, jer kvar rješava onaj tko je na terenu. */
@@ -677,21 +687,21 @@ var DEMO_FOTO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAA8KCw0L
 
 /* ---------- seed: strojevi ---------- */
 var SEED_MACHINES = [
-  {id:'e1', name:'Ekstruder E1',            program:'Suhi program',      rate:350,
+  {id:'e1', name:'Ekstruder E1',            program:'Priprema i ekstruzija', rate:350,
    bilj:'Manual i el. shema u registratoru u radioni. Nakon zamjene remena provjeriti zategnutost nakon 48 h rada.'},
-  {id:'e2', name:'Ekstruder E2',            program:'Suhi program',      rate:350},
-  {id:'s1', name:'Sušara S1',               program:'Suhi program',      rate:350},
-  {id:'p1', name:'Pakirka P1',              program:'Suhi program',      rate:350},
-  {id:'l1', name:'Linija listova L1',       program:'Svježi program',    rate:350},
-  {id:'v1', name:'Valjci V1',               program:'Svježi program',    rate:350},
-  {id:'pa1',name:'Pasterizator PA1',        program:'Svježi program',    rate:350},
-  {id:'p2', name:'Pakirka P2',              program:'Svježi program',    rate:350},
-  {id:'t1', name:'Tunel za zamrzavanje T1', program:'Zamrznuti program', rate:500,
+  {id:'e2', name:'Ekstruder E2',            program:'Priprema i ekstruzija', rate:350},
+  {id:'s1', name:'Sušara S1',               program:'Priprema i ekstruzija', rate:350},
+  {id:'l1', name:'Linija listova L1',       program:'Linije svježeg',        rate:350},
+  {id:'v1', name:'Valjci V1',               program:'Linije svježeg',        rate:350},
+  {id:'pa1',name:'Pasterizator PA1',        program:'Linije svježeg',        rate:350},
+  {id:'t1', name:'Tunel za zamrzavanje T1', program:'Zamrzavanje',           rate:500,
    bilj:'Servisna knjižica kod MB Frigo. Punjenja rashladne tvari bilježiti zbog F-gas evidencije.'},
-  {id:'k1', name:'Kompresor K1',            program:'Zamrznuti program', rate:500},
-  {id:'p3', name:'Pakirka P3',              program:'Zamrznuti program', rate:350}
+  {id:'k1', name:'Kompresor K1',            program:'Energetika',            rate:500},
+  {id:'p1', name:'Pakirka P1',              program:'Pakiranje',             rate:350},
+  {id:'p2', name:'Pakirka P2',              program:'Pakiranje',             rate:350},
+  {id:'p3', name:'Pakirka P3',              program:'Pakiranje',             rate:350}
 ];
-var PROGRAMS = ['Suhi program','Svježi program','Zamrznuti program'];
+var PROGRAMS = ['Priprema i ekstruzija','Linije svježeg','Zamrzavanje','Energetika','Pakiranje'];
 
 /* ---------- seed: dobavljači i servisi ---------- */
 var SEED_PARTNERI = [
@@ -1453,23 +1463,8 @@ function renderPregled(){
       '<div class="bar-val">'+EUR(t.c)+'</div></div>';
   }).join('');
 
-  /* Pregled pokazuje STANJE; organizacija (što, kada, tko) živi na Rasporedu.
-     Umjesto duplirane liste preventiva: jedan redak s onim što danas/ovaj tjedan
-     čeka, koji vodi ravno na Raspored. */
-  var t7 = isoShift(7), danasIso = todayISO();
-  var tjedanPrev = DATA.preventiva.filter(function(p){ return p.next <= t7; }).length;
-  var tjedanZad = otvoreniZadaci().filter(function(z){ return z.rok && z.rok <= t7; }).length;
-  var kasniPrevN = DATA.preventiva.filter(function(p){ return p.next < danasIso; }).length;
-  var tjedanUkupno = tjedanPrev + tjedanZad;
-  var planRedak = '<div class="card"><div class="row click" onclick="app.go(\'raspored\')">'+
-    '<div class="grow"><div class="row-title" style="font-size:13.5px">Raspored i zadaci</div>'+
-    '<div class="row-sub">'+
-      (tjedanUkupno
-        ? 'Ovaj tjedan: '+tjedanPrev+(tjedanPrev===1?' preventiva':' preventive')+
-          (tjedanZad ? ' i '+tjedanZad+(tjedanZad===1?' zadatak':' zadatka/zadataka') : '')+
-          (kasniPrevN ? ' &middot; <b style="color:var(--red)">'+kasniPrevN+' kasni</b>' : '')
-        : 'Ovaj tjedan nema planiranih stavki')+
-    '</div></div><span class="chev">›</span></div></div>';
+  /* Redak "Raspored i zadaci" je izbačen (PLAN-KAIZEN S1) — Raspored ima svoju
+     karticu u dnu, a "Preventive kasne" u stat-mreži već vodi onamo. */
 
   /* trend troška po mjesecima (zadnja 3) — zadnji stupac je nepotpun i tako je i označen */
   var mjeseci3 = [2,1,0].map(function(off){
@@ -1544,7 +1539,6 @@ function renderPregled(){
       statCard(late.length, 'Preventive kasne',        late.length ? 'yellow' : 'green', "app.go('raspored')")+
     '</div>'+
     stojiHtml+
-    planRedak+
     (vidiFinancije() ? '<button class="btn sec sm block" style="margin-top:10px" onclick="app.go(\'analitika\')">Analitika i izvoz</button>' : '')+
     (function(){
       /* majstoru odmah pokaži njegove zadatke na vrhu */
@@ -1593,9 +1587,17 @@ function renderStrojevi(){
     '<button class="btn sec" onclick="app.go(\'qr\')">QR naljepnice</button></div>';
   PROGRAMS.forEach(function(prog){
     var ms = DATA.machines.filter(function(m){ return m.program===prog; });
+    if(!ms.length) return;   /* prazan sektor ne treba prazan naslov */
     html += '<h2>'+esc(prog)+'</h2><div class="card">'+
       ms.map(function(m){ return machineRow(m); }).join('') + '</div>';
   });
+  /* stroj čiji sektor nije na popisu (npr. vlasnik preimenovao sektore u postavkama,
+     a stroj još nosi stari naziv) NE SMIJE nestati s ekrana */
+  var bezSektora = DATA.machines.filter(function(m){ return PROGRAMS.indexOf(m.program) === -1; });
+  if(bezSektora.length){
+    html += '<h2>Ostalo</h2><div class="card">'+
+      bezSektora.map(function(m){ return machineRow(m); }).join('') + '</div>';
+  }
   $('#screen-strojevi').innerHTML = html;
 }
 function machineRow(m){
@@ -2420,7 +2422,7 @@ function renderSustav(){
     '<h2>Tvrtka i postavke</h2>'+
     '<div class="card"><div class="row"><div class="grow">'+
       '<div class="row-title" style="font-size:13.5px">'+esc(TVRTKA.puni_naziv||TVRTKA.naziv)+'</div>'+
-      '<div class="row-sub">'+(TVRTKA.programi||[]).length+' programa &middot; '+
+      '<div class="row-sub">'+(TVRTKA.programi||[]).length+' sektora &middot; '+
         (TVRTKA.smjene||[]).length+' smjene &middot; norma: '+esc(TVRTKA.audit_norma)+'</div>'+
       '<div style="margin-top:6px"><button class="btn-mini" onclick="app.urediTvrtku()">Uredi identitet i postavke</button></div>'+
     '</div><span class="marka" style="background:'+esc(TVRTKA.boja)+'"></span></div></div>'+
@@ -2762,7 +2764,7 @@ var app = {
           (t.logo ? ' src="'+t.logo+'" style="display:block;max-height:70px"' : '')+'>'+
         '<label>Osnovna boja</label><input type="color" name="boja" value="'+esc(t.boja)+'" style="height:48px;padding:4px">'+
         '<label>Boja isticanja</label><input type="color" name="boja_akcent" value="'+esc(t.boja_akcent)+'" style="height:48px;padding:4px">'+
-        '<label>Programi proizvodnje (jedan po retku)</label>'+
+        '<label>Sektori (jedan po retku — npr. Energetika, Pakiranje)</label>'+
         '<textarea name="programi" rows="3">'+esc((t.programi||[]).join('\n'))+'</textarea>'+
         '<label>Smjene (jedna po retku)</label>'+
         '<textarea name="smjene" rows="2">'+esc((t.smjene||[]).join('\n'))+'</textarea>'+
@@ -2854,12 +2856,12 @@ var app = {
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Uvoz iz CSV-a</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<form onsubmit="app.saveUvoz(event)">'+
-        '<label>Što uvoziš</label><select name="vrsta" onchange="document.getElementById(\'uvoz-pomoc\').textContent=this.value===\'machines\'?\'šifra;naziv;program;cijena sata\':\'naziv;za koji stroj;stanje;minimum;dobavljač;cijena;kategorija\'">'+
+        '<label>Što uvoziš</label><select name="vrsta" onchange="document.getElementById(\'uvoz-pomoc\').textContent=this.value===\'machines\'?\'šifra;naziv;sektor;cijena sata\':\'naziv;za koji stroj;stanje;minimum;dobavljač;cijena;kategorija\'">'+
           '<option value="machines">Strojevi</option><option value="dijelovi">Skladište</option></select>'+
         '<label>Redoslijed stupaca</label>'+
-        '<div class="row-sub" id="uvoz-pomoc" style="margin-bottom:6px">šifra;naziv;program;cijena sata</div>'+
+        '<div class="row-sub" id="uvoz-pomoc" style="margin-bottom:6px">šifra;naziv;sektor;cijena sata</div>'+
         '<label>Zalijepi podatke (jedan redak = jedna stavka, odvojeno s ; ili tab)</label>'+
-        '<textarea name="csv" rows="8" required placeholder="e3;Ekstruder E3;Suhi program;350"></textarea>'+
+        '<textarea name="csv" rows="8" required placeholder="e3;Ekstruder E3;Energetika;350"></textarea>'+
         '<button class="btn primary block" type="submit">Uvezi</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
@@ -2906,6 +2908,9 @@ var app = {
     SESIJA_GEN++;   /* dohvat iz baze koji je u tijeku više se ne smije primijeniti */
     /* natrag na ugrađeni popis — inace demo pokazuje ljude iz spojene baze */
     KORISNICI = KORISNICI_DEMO.slice();
+    /* i identitet natrag na demo zadano — inače demo nosi sektore/boje iz tuđe baze */
+    TVRTKA = JSON.parse(JSON.stringify(TVRTKA_DEMO));
+    primijeniIdentitet();
     renderLoginTiles();
     SESSION = { ime:'Voditelj', role:'voditelj' };
     document.body.dataset.role = 'voditelj';
@@ -2969,10 +2974,13 @@ var app = {
         '<div style="font-size:13.5px;margin-top:3px">'+esc(c.tekst)+'</div></div>';
     }).join('') : '<div class="empty" style="padding:12px">Još nema komentara.</div>';
     var akcije = '';
+    /* Radni tok je preuzmi → radi → riješi (PLAN-KAIZEN S3): na otvorenom kvaru je
+       "Preuzimam" glavni gumb. "Riješi" ostaje kao brzi put — majstor koji je već
+       popravio ne smije morati dva puta otvarati isti kvar. */
     if(k.status==='otvoren')
-      akcije += '<button class="btn sec block role-write" style="margin-top:14px" onclick="app.preuzmiKvar(\''+kId+'\')">Preuzimam — radim na ovome</button>';
+      akcije += '<button class="btn '+(zadatak?'sec':'primary')+' block role-write" style="margin-top:14px" onclick="app.preuzmiKvar(\''+kId+'\')">Preuzimam — radim na ovome</button>';
     if(jeOtvoren(k))
-      akcije += '<button class="btn primary block role-write" style="margin-top:'+(k.status==='otvoren'?'8':'14')+'px" onclick="app.rijesiKvar(\''+kId+'\')">'+(zadatak?'Označi obavljeno':'Riješi kvar')+'</button>';
+      akcije += '<button class="btn '+(k.status==='otvoren' && !zadatak ? 'sec' : 'primary')+' block role-write" style="margin-top:'+(k.status==='otvoren'?'8':'14')+'px" onclick="app.rijesiKvar(\''+kId+'\')">'+(zadatak?'Označi obavljeno':'Riješi kvar')+'</button>';
     if(jeOtvoren(k) && !zadatak)
       /* premješteno s kartice: prekidač koji ne mora stajati na svakoj kartici u popisu */
       akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.cekaDioIzDetalja(\''+kId+'\')">'+
@@ -3417,7 +3425,7 @@ var app = {
       '<div class="modal-head"><h3>Uredi stroj</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<form onsubmit="app.saveUrediStroj(event,\''+mId+'\')">'+
         '<label>Naziv</label><input name="name" required value="'+esc(m.name)+'">'+
-        '<label>Program</label><select name="program">'+progOpts+'</select>'+
+        '<label>Sektor</label><select name="program">'+progOpts+'</select>'+
         '<label>Trošak zastoja (€/h)</label><input type="number" name="rate" step="10" min="0" value="'+m.rate+'" required>'+
         '<button class="btn primary block" type="submit">Spremi</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
@@ -3550,15 +3558,31 @@ var app = {
       sysPoruka('🧾 Naručeno: '+(p?p.naziv:'dio')+' ×'+n.kolicina+' kod '+(n.dobavljac||'—')+
         (n.ocekivano ? ', očekivano '+fmtDate(n.ocekivano) : '')+' ('+(SESSION.ime||'')+')');
   },
-  primiNabavu: async function(id){
+  primiNabavu: function(id){
     var n = (DATA.nabava||[]).filter(function(x){ return x.id===id; })[0];
     if(!n) return;
     if(jeTempId(id)){ alert('Narudžba se upravo sprema — pokušaj za par sekundi.'); return; }
     var p = dioPoId(n.dio_id);
-    var kol = prompt('Koliko je komada stiglo?', String(n.kolicina));
-    if(kol === null) return;
-    kol = Math.max(0, parseInt(kol,10) || 0);
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
+      '<div class="modal-head"><h3>Primitak narudžbe</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<div class="row-sub" style="margin-bottom:2px">'+esc(p?p.naziv:'dio')+' &middot; naručeno ×'+n.kolicina+
+        (n.dobavljac?' kod '+esc(n.dobavljac):'')+'</div>'+
+      '<form onsubmit="app.savePrimitak(event,\''+id+'\')">'+
+        '<label>Koliko je komada stiglo?</label>'+
+        '<input type="number" name="kol" min="1" step="1" value="'+n.kolicina+'" required>'+
+        '<button class="btn primary block" type="submit">Zaprimi</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</form></div></div>';
+  },
+  savePrimitak: async function(e, id){
+    e.preventDefault();
+    var kol = Math.max(0, parseInt(new FormData(e.target).get('kol'),10) || 0);
     if(!kol) return;
+    app.closeModal();
+    var n = (DATA.nabava||[]).filter(function(x){ return x.id===id; })[0];
+    if(!n || n.primljeno) return;
+    var p = dioPoId(n.dio_id);
     n.primljeno = todayISO();
     n.primljena_kolicina = kol;
     if(p) p.stanje = p.stanje + kol;
@@ -4007,16 +4031,32 @@ var app = {
     var el = $('#polje-sanacije');
     if(el) el.style.display = ukljucen ? '' : 'none';
   },
-  stornirajKvar: async function(kId){
+  stornirajKvar: function(kId){
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
     if(!k) return;
-    if(k.status==='rijesen' && k.zam &&
-       !confirm('Ovaj kvar ima utrošeni dio ("'+k.zam+'").\n\nStorno NE vraća dio na skladište automatski — '+
-                'ako je potrebno, ispravi stanje ručno u Dijelovima.\n\nNastaviti?')) return;
-    var razlog = prompt('Razlog storniranja (obavezno — ostaje u evidenciji):');
-    if(!razlog || !razlog.trim()) return;
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
+      '<div class="modal-head"><h3>Storniraj kvar</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<div class="row-sub" style="margin-bottom:2px">'+esc(k.opis)+'</div>'+
+      (k.status==='rijesen' && k.zam
+        ? '<div class="row-sub" style="margin-bottom:2px;color:var(--red)">Kvar ima utrošeni dio („'+esc(k.zam)+
+          '"). Storno NE vraća dio na skladište — ako treba, ispravi stanje ručno u Skladištu.</div>'
+        : '')+
+      '<form onsubmit="app.saveStorno(event,\''+kId+'\')">'+
+        '<label>Razlog storniranja (ostaje u evidenciji)</label>'+
+        '<textarea name="razlog" rows="2" required placeholder="npr. duplo prijavljen, kriva prijava…"></textarea>'+
+        '<button class="btn primary block" type="submit">Storniraj</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</form></div></div>';
+  },
+  saveStorno: async function(e, kId){
+    e.preventDefault();
+    var razlog = String(new FormData(e.target).get('razlog')||'').trim();
+    if(!razlog) return;
+    var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
+    if(!k) return;
     k.status = 'otkazan';
-    k.storno_razlog = razlog.trim();
+    k.storno_razlog = razlog;
     app.closeModal();
     showScreen('kvarovi');
     await apiUpdate('kvarovi', k.id, { status:'otkazan', storno_razlog:k.storno_razlog });
@@ -4059,7 +4099,7 @@ var app = {
       '<div class="modal-head"><h3>Novi stroj</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<form onsubmit="app.saveStroj(event)">'+
         '<label>Naziv stroja</label><input name="name" required placeholder="npr. Miješalica M1">'+
-        '<label>Program</label><select name="program">'+progOpts+'</select>'+
+        '<label>Sektor</label><select name="program">'+progOpts+'</select>'+
         '<label>Trošak zastoja (€/h)</label><input type="number" name="rate" step="10" min="0" value="350" required>'+
         '<button class="btn primary block" type="submit">Spremi stroj</button>'+
       '</form></div></div>';

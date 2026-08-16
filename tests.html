@@ -176,12 +176,16 @@ async function testovi(W, D){
   f.elements.sati.value = '5';
   posalji(f); await cekaj(150);
   jednako('ispravljeni sati su spremljeni', novi.sati, 5);
-  var stariPrompt = W.prompt; W.prompt = function(){ return 'dupli unos'; };
-  var stariConfirm = W.confirm; W.confirm = function(){ return true; };  /* potvrda upozorenja o utrošenom dijelu */
-  app.stornirajKvar(novi.id); await cekaj(200);
-  W.prompt = stariPrompt; W.confirm = stariConfirm;
+  /* storno je modal (PLAN-KAIZEN K-1), ne prompt() */
+  app.stornirajKvar(novi.id); await cekaj(120);
+  f = D.querySelector('#modal-root form');
+  ok('storno je uredan modal s obveznim razlogom', !!f && !!f.elements.razlog);
+  ok('storno upozorava kad je dio bio utrošen',
+     D.querySelector('#modal-root').textContent.indexOf('utrošeni dio') > -1);
+  f.elements.razlog.value = 'dupli unos';
+  posalji(f); await cekaj(200);
   jednako('storno postavlja status', novi.status, 'otkazan');
-  ok('storno upozorava kad je dio bio utrošen', (novi.zam||'').length > 0);
+  jednako('razlog storna je spremljen', novi.storno_razlog, 'dupli unos');
   ok('stornirani kvar ne ulazi u izračune',
      W.samoKvarovi().every(function(k){ return k.id !== novi.id; }));
 
@@ -449,11 +453,9 @@ async function testovi(W, D){
   W.showScreen('pregled'); await cekaj(150);
   ok('Pregled ne duplicira agendu preventiva',
      D.querySelector('#screen-pregled').textContent.indexOf('Za obaviti') === -1);
-  ok('Pregled ima jedan redak koji vodi na Raspored', (function(){
-     var r = Array.prototype.filter.call(D.querySelectorAll('#screen-pregled .row.click'),
-       function(e){ return String(e.getAttribute('onclick')||'').indexOf("go('raspored')") > -1; })[0];
-     return !!r && r.textContent.indexOf('Ovaj tjedan') > -1;
-  })());
+  /* redak "Raspored i zadaci" je izbačen (PLAN-KAIZEN S1) — dupli put do iste kartice */
+  ok('Pregled nema redak "Raspored i zadaci"',
+     D.querySelector('#screen-pregled').textContent.indexOf('Raspored i zadaci') === -1);
   ok('kartica "Preventive kasne" vodi na Raspored', (function(){
      var s = Array.prototype.filter.call(D.querySelectorAll('#screen-pregled .stat'),
        function(e){ return e.textContent.indexOf('Preventive kasne') > -1; })[0];
@@ -560,9 +562,12 @@ async function testovi(W, D){
   ok('zapis o narudžbi je u kanalu',
      W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Naručeno') > -1; }));
   var stanjePrijePrimitka = W.dioPoId(kritican.id).stanje;
-  var sp = W.prompt; W.prompt = function(){ return '3'; };
-  await app.primiNabavu(nova.id); await cekaj(250);
-  W.prompt = sp;
+  /* primitak je modal (PLAN-KAIZEN K-1), ne prompt() */
+  app.primiNabavu(nova.id); await cekaj(120);
+  f = D.querySelector('#modal-root form');
+  ok('primitak je uredan modal, ne prompt()', !!f && !!f.elements.kol);
+  f.elements.kol.value = '3';
+  posalji(f); await cekaj(250);
   jednako('primitak povećava stanje', W.dioPoId(kritican.id).stanje, stanjePrijePrimitka + 3);
   jednako('narudžba je zatvorena', nova.primljeno, W.todayISO());
   ok('oznaka "naručeno" nestaje s dijela nakon primitka', !W.narudzbaZaDio(kritican.id));
@@ -1106,6 +1111,64 @@ async function testovi(W, D){
     return !!inp && !!lbl && lbl.classList.contains('btn') && getComputedStyle(inp).position === 'absolute';
   })());
   app.closeModal();
+
+  grupa('Kaizen G1 — sektori, preuzmi-pa-riješi, Pregled bez šuma');
+  app.go('strojevi'); await cekaj(150);
+  ok('strojevi su grupirani po sektorima (Energetika postoji)',
+     D.querySelector('#screen-strojevi').textContent.indexOf('Energetika') > -1);
+  ok('kompresor je u Energetici, ne u proizvodnom programu', (function(){
+     var h2 = Array.prototype.filter.call(D.querySelectorAll('#screen-strojevi h2'),
+       function(h){ return h.textContent==='Energetika'; })[0];
+     return !!h2 && h2.nextElementSibling.textContent.indexOf('Kompresor') > -1;
+  })());
+  ok('stroj s nepoznatim sektorom ide pod "Ostalo", ne nestaje', (function(){
+     var m = W.DATA.machines[0], staro = m.program;
+     m.program = 'SEKTOR KOJI NE POSTOJI';
+     W.showScreen('strojevi');
+     var ima = D.querySelector('#screen-strojevi').textContent.indexOf('Ostalo') > -1 &&
+               D.querySelector('#screen-strojevi').textContent.indexOf(m.name) > -1;
+     m.program = staro; W.showScreen('strojevi');
+     return ima;
+  })());
+  /* S3: na otvorenom kvaru je "Preuzimam" glavni gumb, "Riješi" sekundarni */
+  var otvZaTok = W.DATA.kvarovi.filter(function(k){
+    return k.status==='otvoren' && (k.tip||'kvar')==='kvar'; })[0];
+  app.detaljKvara(otvZaTok.id); await cekaj(120);
+  ok('na otvorenom kvaru je "Preuzimam" primarni gumb', (function(){
+     var b = Array.prototype.filter.call(D.querySelectorAll('#modal-root .btn'),
+       function(x){ return x.textContent.indexOf('Preuzimam') > -1; })[0];
+     return !!b && b.className.indexOf('primary') > -1;
+  })());
+  ok('"Riješi kvar" je sekundarni dok kvar nije preuzet', (function(){
+     var b = Array.prototype.filter.call(D.querySelectorAll('#modal-root .btn'),
+       function(x){ return x.textContent.indexOf('Riješi kvar') > -1; })[0];
+     return !!b && b.className.indexOf('primary') === -1;
+  })());
+  app.closeModal();
+  var uRaduZaTok = W.DATA.kvarovi.filter(function(k){
+    return k.status==='u_radu' && (k.tip||'kvar')==='kvar'; })[0];
+  if(uRaduZaTok){
+    app.detaljKvara(uRaduZaTok.id); await cekaj(120);
+    ok('na kvaru u radu je "Riješi kvar" primarni', (function(){
+       var b = Array.prototype.filter.call(D.querySelectorAll('#modal-root .btn'),
+         function(x){ return x.textContent.indexOf('Riješi kvar') > -1; })[0];
+       return !!b && b.className.indexOf('primary') > -1;
+    })());
+    app.closeModal();
+  }
+
+  /* demo mora stajati sam za sebe i za identitet: spojena baza zna prepisati
+     TVRTKA (sektore, boje) prije ulaska u demo — demoUlaz ga mora vratiti */
+  ok('demo vraća ugrađene sektore, ne one iz baze', (function(){
+    var dPrije = W.DATA;
+    W.TVRTKA.programi = ['Tuđi sektor iz baze'];
+    W.app.demoUlaz();
+    var vraceno = W.PROGRAMS.indexOf('Energetika') > -1 &&
+                  W.TVRTKA.programi.indexOf('Tuđi sektor iz baze') === -1;
+    W.DATA = dPrije; W.save();
+    W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+    return vraceno;
+  })());
 
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
