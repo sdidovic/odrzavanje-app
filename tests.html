@@ -515,6 +515,27 @@ async function testovi(W, D){
   grupa('Dijelovi i kontakti');
   app.go('dijelovi');
   ok('kritični dijelovi su na vrhu', D.querySelector('#parts-list h2').textContent.indexOf('minimuma') > -1);
+  ok('pretraga skladišta ima novi naziv (F4 §2a)',
+     D.querySelector('#screen-dijelovi input[type="search"]').placeholder.indexOf('skladište') > -1);
+  ok('kartica na Pregledu kaže "Za naručiti", ne "Dijelovi za naručiti"', (function(){
+     W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+     app.go('pregled');
+     var labele = Array.prototype.map.call(D.querySelectorAll('#screen-pregled .stat-label'), function(e){ return e.textContent; });
+     app.go('dijelovi');
+     return labele.indexOf('Za naručiti') > -1 && labele.indexOf('Dijelovi za naručiti') === -1;
+  })());
+  /* F4 §2b: lokacija na skladištu (dijelovi.lokacija je postojao u bazi, nikad u UI) */
+  var dioZaLok = W.DATA.dijelovi[0];
+  app.urediDio(dioZaLok.id); await cekaj(100);
+  var flok = D.querySelector('#modal-root form');
+  ok('obrazac uređivanja dijela ima polje lokacije', !!flok.elements.lokacija);
+  flok.elements.lokacija.value = 'Polica B2';
+  posalji(flok); await cekaj(150);
+  jednako('lokacija je spremljena', dioZaLok.lokacija, 'Polica B2');
+  app.go('dijelovi'); await cekaj(80);
+  app.otvoriDio(dioZaLok.id); await cekaj(80);
+  ok('lokacija se vidi u rastvorenom retku', D.querySelector('#parts-list').innerHTML.indexOf('Polica B2') > -1);
+  app.otvoriDio(dioZaLok.id);
   app.traziDio('remen');
   ok('pretraga dijelova filtrira', D.querySelectorAll('#parts-list .row').length < W.DATA.dijelovi.length);
   app.traziDio('');
@@ -768,6 +789,74 @@ async function testovi(W, D){
   app.openStroj('e1'); await cekaj(150);
   ok('kartica iskustva prikazuje ponovljene kvarove i rješenja',
      D.querySelector('#screen-stroj').textContent.indexOf('Iskustvo') > -1);
+
+  grupa('Dokumenti uz stroj — F4');
+  app.openStroj('e1'); await cekaj(150);
+  ok('sekcija Dokumenti postoji na detalju stroja', D.querySelector('#screen-stroj').innerHTML.indexOf('>Dokumenti<') > -1);
+  ok('prazno stanje kaže da nema dokumenata (seed nema lažnih dokumenata)',
+     D.querySelector('#screen-stroj').textContent.indexOf('Nema dokumenata') > -1);
+  app.dodajDokument('e1'); await cekaj(120);
+  var fdok = D.querySelector('#modal-root form');
+  ok('obrazac ima naziv, vrstu i dva gumba za datoteku (slikaj / odaberi)',
+     !!fdok.elements.naziv && !!fdok.elements.tip &&
+     !!D.querySelector('#modal-root label[for="dok-input-foto"]') &&
+     !!D.querySelector('#modal-root label[for="dok-input-datoteka"]'));
+  fdok.elements.naziv.value = 'TEST manual kompresora';
+  fdok.elements.tip.value = 'manual';
+  var stariAlertD = W.alert; W.alert = function(){};
+  posalji(fdok); await cekaj(150);
+  W.alert = stariAlertD;
+  ok('spremanje bez odabrane datoteke ne stvara zapis',
+     !W.DATA.dokumenti.some(function(d){ return d.naziv==='TEST manual kompresora'; }));
+  /* dokumentOdabran koristi pravi FileReader/Image na pravom File objektu — u testu
+     preskačemo tu čahuru i izravno postavljamo PENDING_DOK kao da je datoteka odabrana */
+  app.dodajDokument('e1'); await cekaj(100);
+  fdok = D.querySelector('#modal-root form');
+  fdok.elements.naziv.value = 'TEST manual kompresora';
+  fdok.elements.tip.value = 'manual';
+  W.PENDING_DOK = { dataUrl:'data:image/jpeg;base64,AAAA', mime:'image/jpeg', naziv:'test.jpg', velicina:1234 };
+  posalji(fdok); await cekaj(150);
+  var noviDok = W.DATA.dokumenti.filter(function(d){ return d.naziv==='TEST manual kompresora'; })[0];
+  ok('dokument je spremljen uz stroj', !!noviDok && noviDok.m==='e1' && noviDok.tip==='manual');
+  ok('zapis o dokumentu je u kanalu',
+     W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Dodan dokument') > -1; }));
+  ok('dokument se vidi na sklopljenoj sekciji', D.querySelector('#screen-stroj').innerHTML.indexOf('TEST manual kompresora') > -1);
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  app.obrisiDokument(noviDok.id); await cekaj(100);
+  ok('brisanje traži potvrdu (modal, ne prompt)',
+     D.querySelector('#modal-root').innerHTML.indexOf('Obriši dokument') > -1);
+  await app.potvrdiBrisanjeDokumenta(noviDok.id); await cekaj(150);
+  ok('dokument je uklonjen nakon potvrde', !W.DATA.dokumenti.some(function(d){ return d.id===noviDok.id; }));
+  /* offline: dodavanje se onemogući, ne samo sakrije gumb bez objašnjenja */
+  var stariNaMrezi = W.naMrezi;
+  W.naMrezi = function(){ return false; };
+  app.go('strojevi'); await cekaj(80); app.openStroj('e1'); await cekaj(120);
+  ok('gumb "+ Dodaj dokument" nestaje offline uz jasnu poruku',
+     D.querySelector('#screen-stroj').innerHTML.indexOf('app.dodajDokument') === -1 &&
+     D.querySelector('#screen-stroj').textContent.indexOf('kad ima mreže') > -1);
+  var stariAlertD2 = W.alert; var alertPozvan = false; W.alert = function(){ alertPozvan = true; };
+  app.dodajDokument('e1');
+  W.alert = stariAlertD2;
+  ok('poziv dodajDokument offline odbija s porukom, ne otvara obrazac',
+     alertPozvan && D.querySelector('#modal-root form') === null);
+  W.naMrezi = stariNaMrezi;
+  app.go('strojevi'); await cekaj(80); app.openStroj('e1'); await cekaj(120);
+
+  grupa('Zakači zapisnik uz preventivu — F4/§1c');
+  var prevIzv = W.DATA.preventiva.filter(function(p){ return p.izv && p.izv!=='interno'; })[0];
+  ok('seed ima preventivu s vanjskim izvođačem', !!prevIzv);
+  if(prevIzv){
+    app.obaviPreventivu(prevIzv.id); await cekaj(120);
+    ok('obrazac nudi izborno polje za zapisnik kad radi izvođač',
+       !!D.querySelector('#modal-root label[for="dok-input-zap"]'));
+    app.closeModal();
+  }
+  var prevInterno = W.DATA.preventiva.filter(function(p){ return !p.izv || p.izv==='interno'; })[0];
+  if(prevInterno){
+    app.obaviPreventivu(prevInterno.id); await cekaj(120);
+    ok('nema polja za zapisnik kad se radi interno', !D.querySelector('#modal-root label[for="dok-input-zap"]'));
+    app.closeModal();
+  }
 
   grupa('IFS — stvarna polja, ne fiksni tekst');
   /* otpuštanje linije: ispisuje se samo ako ga je netko stvarno potvrdio */

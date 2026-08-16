@@ -993,7 +993,8 @@ function buildSeed(){
       { id:'po1', tko:'Voditelj',  tekst:'Dobrodošli u alat — od danas se sve prijave, dodjele i dogovori vode ovdje, ne usmeno.', created_at: isoShift(-1)+'T08:00:00Z' },
       { id:'po2', tko:'Majstor 1', tekst:'Pakirka P2 čeka oprugu dozatora, do tada folija ručno. Detalji u komentaru kvara.', created_at: isoShift(0)+'T06:40:00Z' },
       { id:'po3', tko:'Majstor 3', tekst:'Kompresor K1 pod nadzorom — očitavajte tlak svaki sat i javite padne li ispod 6 bara.', created_at: isoShift(0)+'T07:15:00Z' }
-    ]
+    ],
+    dokumenti: []   /* nova mogućnost — prazno stanje je pošteno dok se ne isproba */
   };
 }
 function buildSeedSFotkom(){
@@ -1033,12 +1034,13 @@ async function load(tiho){
     sb.from('komentari').select('*').order('created_at'),
     sb.from('poruke').select('*').order('created_at').limit(300),
     sb.from('users').select('ime, role, aktivan'),
-    sb.from('nabava').select('*').order('narucen', {ascending:false}).limit(200)
+    sb.from('nabava').select('*').order('narucen', {ascending:false}).limit(200),
+    sb.from('dokumenti').select('*').order('created_at', {ascending:false})
   ]);
   /* Ranije je ovdje stajalo "i < 7", pa su greške za users i nabavu tiho nestale:
      "nema otvorenih narudžbi" zbog pada upita izgleda isto kao stvarno prazan popis,
      a posljedica je da voditelj naruči sve po drugi put. */
-  var IMENA = ['strojevi','kvarovi','dijelovi','preventiva','partneri','komentari','poruke','korisnici','nabava'];
+  var IMENA = ['strojevi','kvarovi','dijelovi','preventiva','partneri','komentari','poruke','korisnici','nabava','dokumenti'];
   for(var i=0;i<r.length;i++){
     if(!r[i] || !r[i].error) continue;
     if(i < 7) throw r[i].error;                       /* bez ovoga app nema što prikazati */
@@ -1063,7 +1065,8 @@ async function load(tiho){
     partneri: r[4].data,
     komentari: r[5].data,
     poruke: r[6].data,
-    nabava: (r[8] && r[8].data) ? r[8].data : []
+    nabava: (r[8] && r[8].data) ? r[8].data : [],
+    dokumenti: (r[9] && r[9].data) ? r[9].data : []
   };
   primijeniRed();     /* nesinkronizirani lokalni unosi ostaju vidljivi */
   cacheSpremi();      /* da app radi i kad mreža padne */
@@ -1078,7 +1081,7 @@ function save(){
    PENDING_OPS štiti unos u tijeku od pregaženja pollingom; kod greške
    se lokalni unos vraća (rollback) i stanje ponovno povlači iz baze. */
 var PENDING_OPS = 0;
-var TABLE2KEY = { tvrtka:'tvrtka', machines:'machines', kvarovi:'kvarovi', dijelovi:'dijelovi', preventiva:'preventiva', partneri:'partneri', komentari:'komentari', poruke:'poruke', nabava:'nabava' };
+var TABLE2KEY = { tvrtka:'tvrtka', machines:'machines', kvarovi:'kvarovi', dijelovi:'dijelovi', preventiva:'preventiva', partneri:'partneri', komentari:'komentari', poruke:'poruke', nabava:'nabava', dokumenti:'dokumenti' };
 function rerender(){
   REPS = repCounts();
   if(RENDERERS[CURRENT_SCREEN]) RENDERERS[CURRENT_SCREEN]();
@@ -1419,6 +1422,38 @@ async function uploadFoto(dataUrl){
     return sb.storage.from('fotke-kvarova').getPublicUrl(path).data.publicUrl;
   }catch(e){ return dataUrl; }
 }
+/* Dokumenti uz stroj (F4, PLAN-MODULI §1) — za razliku od fotki kvara NEMA base64
+   fallback: papir od servisera može pričekati mrežu 10 minuta (§1d), a jedan PDF u
+   localStorage redu čekanja bi mu srušio kvotu i oborio SVE buduće offline unose. */
+async function uploadDokument(mId, dataUrl, mime){
+  if(!REMOTE) return null;
+  try{
+    var blob = await (await fetch(dataUrl)).blob();
+    var ext = mime==='application/pdf' ? '.pdf' : '.jpg';
+    var nasumicno = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+                    : (Date.now()+'-'+Math.random().toString(36).slice(2,10));
+    var path = mId + '/' + nasumicno + ext;
+    var up = await sb.storage.from('dokumenti').upload(path, blob, {contentType:mime});
+    if(up.error) return null;
+    return path;
+  }catch(e){ return null; }
+}
+function dokUrl(dok){
+  if(!REMOTE) return dok.path;   /* demo način: path je već dataURL */
+  return sb.storage.from('dokumenti').getPublicUrl(dok.path).data.publicUrl;
+}
+function dokIkona(tip){
+  return tip==='manual' ? '📄' : tip==='shema' ? '📐' : tip==='zapisnik' ? '🧾' : tip==='certifikat' ? '📋' : '📎';
+}
+var DOK_TIPOVI = [['manual','Manual'],['shema','Shema'],['zapisnik','Zapisnik servisa'],['certifikat','Certifikat'],['ostalo','Ostalo']];
+function dokTipLabel(tip){
+  var t = DOK_TIPOVI.filter(function(x){ return x[0]===tip; })[0];
+  return t ? t[1] : 'Ostalo';
+}
+function velicinaTxt(bajtova){
+  if(!bajtova) return '';
+  return bajtova >= 1024*1024 ? (Math.round(bajtova/1024/1024*10)/10)+' MB' : Math.round(bajtova/1024)+' KB';
+}
 
 /* =====================  render: Pregled  ===================== */
 function renderPregled(){
@@ -1552,7 +1587,7 @@ function renderPregled(){
     stojiHtml+
     '<div class="stat-grid">'+
       statCard(open.length, 'Otvoreni kvarovi',        open.length ? 'red'    : 'green', "app.goKvaroviOtvoreni()")+
-      statCard(low.length,  'Dijelovi za naručiti',    low.length  ? 'red'    : 'green', "app.go('nabava')")+
+      statCard(low.length,  'Za naručiti',             low.length  ? 'red'    : 'green', "app.go('nabava')")+
       /* organizacija se radi na Rasporedu — i brojka vodi onamo */
       statCard(late.length, 'Preventive kasne',        late.length ? 'yellow' : 'green', "app.go('raspored')")+
     '</div>'+
@@ -1669,6 +1704,24 @@ function renderStroj(){
       '<button class="btn sec sm role-voditelj" style="margin-top:9px" onclick="app.urediBiljeske(\''+m.id+'\')">Uredi bilješke</button>'+
     '</div></div>'+
     (function(){
+      /* F4: dokument je papir koji je serviser ostavio uz stroj — slikan ili PDF,
+         umjesto da završi "u registratoru kod nekoga". Online-only (§1d). */
+      var dok = (DATA.dokumenti||[]).filter(function(x){ return x.m===m.id; })
+        .sort(function(a,b){ return String(b.created_at).localeCompare(String(a.created_at)); });
+      var dokHtml = dok.length ? dok.map(function(d){
+        return '<div class="row click" onclick="app.otvoriDokument(\''+d.id+'\')">'+
+          '<div class="grow"><div class="row-title" style="font-size:13.5px">'+dokIkona(d.tip)+' '+esc(d.naziv)+'</div>'+
+          '<div class="row-sub">'+dokTipLabel(d.tip)+(d.tko?' &middot; '+esc(d.tko):'')+
+            ' &middot; '+fmtDate(d.created_at.slice(0,10))+(velicinaTxt(d.velicina)?' &middot; '+velicinaTxt(d.velicina):'')+'</div></div>'+
+          '<button class="btn-mini opasno role-voditelj" onclick="event.stopPropagation();app.obrisiDokument(\''+d.id+'\')">Obriši</button>'+
+        '</div>';
+      }).join('') : '<div class="empty">Nema dokumenata (manual, shema, zapisnik servisa…)</div>';
+      return '<h2>Dokumenti</h2><div class="card">'+dokHtml+'</div>'+
+        (naMrezi()
+          ? '<button class="btn sec sm block role-write" style="margin-top:8px" onclick="app.dodajDokument(\''+m.id+'\')">+ Dodaj dokument</button>'
+          : '<div class="row-sub role-write" style="margin-top:8px">Dokumenti se dodaju kad ima mreže.</div>');
+    })()+
+    (function(){
       /* Kartica znanja: što se najčešće kvari na ovom stroju i čime je riješeno.
          Ovo je jedini način da iskustvo majstora ostane u firmi kad on nije tu. */
       var rijeseni = ks.filter(function(k){ return k.status==='rijesen' && (k.tip||'kvar')==='kvar'; });
@@ -1764,6 +1817,7 @@ function kvarItem(k, showMachine){
 var FILTER = { stroj:'svi', status:'svi', majstor:'svi', od:'', do:'', q:'' };
 var KV_FILTRI_OTVORENI = false;
 var PENDING_FOTO = '';
+var PENDING_DOK = null;   /* {dataUrl, mime, naziv, velicina} — dokument uz stroj čeka spremanje */
 var PENDING_LOGO = '';
 function brojAktivnihFiltera(){
   var n = 0;
@@ -1874,6 +1928,7 @@ function partRow(p){
   var glava = '<div class="row click" onclick="app.otvoriDio(\''+p.id+'\')">'+
     '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(p.naziv)+chip+'</div>'+
     (otvoren ? '<div class="row-sub">'+esc(p.stroj)+' &middot; '+esc(p.dob)+
+       (p.lokacija ? ' &middot; '+esc(p.lokacija) : '')+
        (vidiFinancije() ? ' &middot; '+EUR(p.cijena) : '')+
        (nar ? ' &middot; u dolasku &times;'+preostaloNar+(nar.ocekivano ? ' do '+fmtDate(nar.ocekivano) : '') : '')+'</div>' : '')+
     '</div>'+
@@ -2031,7 +2086,7 @@ function renderDijelovi(){
         (function(){ var n=otvoreneNarudzbe().length; return n ? ' ('+n+')' : ''; })()+'</button>'+
       '<button class="btn sec role-voditelj" onclick="app.noviDio()">+ Novi dio</button>'+
     '</div>'+
-    '<input type="search" placeholder="Pretraži dijelove (naziv, stroj, dobavljač…)" value="'+esc(PART_Q)+'"'+
+    '<input type="search" placeholder="Pretraži skladište (naziv, stroj, dobavljač…)" value="'+esc(PART_Q)+'"'+
       ' oninput="app.traziDio(this.value)" style="margin-bottom:4px">'+
     '<div class="row-sub" style="margin-top:8px">Vrijednost skladišta: <b style="color:var(--text)">'+EUR(vrijednost)+'</b>'+
       ' &middot; ispod minimuma: <b style="color:'+(ispodMin?'var(--red)':'var(--green)')+'">'+ispodMin+'</b></div>'+
@@ -3539,6 +3594,7 @@ var app = {
         '<label>Naziv</label><input name="naziv" required value="'+esc(p.naziv)+'">'+
         '<label>Za koje strojeve</label>'+strojeviCheckbox(p.strojevi)+
         '<label style="margin-top:10px">Opis mjesta ugradnje (ako treba)</label><input name="stroj" value="'+esc(p.stroj)+'">'+
+        '<label>Lokacija na skladištu (neobavezno)</label><input name="lokacija" value="'+esc(p.lokacija||'')+'" placeholder="npr. polica B2, ormar alata">'+
         '<label>Stanje</label><input type="number" name="stanje" min="0" step="1" value="'+p.stanje+'" required>'+
         '<label>Minimum</label><input type="number" name="min" min="0" step="1" value="'+p.min+'" required>'+
         '<label>Dobavljač</label><select name="dob">'+dobOpts+'</select>'+
@@ -3556,6 +3612,7 @@ var app = {
     p.strojevi = citajStrojeve(e.target);
     p.naziv = String(f.get('naziv')||'').trim() || p.naziv;
     p.stroj = String(f.get('stroj')||'').trim() || strojeviNazivi(p.strojevi);
+    p.lokacija = String(f.get('lokacija')||'').trim() || null;
     p.stanje = Math.max(0, parseInt(f.get('stanje'),10)||0);
     p.min = Math.max(0, parseInt(f.get('min'),10)||0);
     p.dob = f.get('dob');
@@ -3564,7 +3621,7 @@ var app = {
     var pt = DATA.partneri.filter(function(x){ return x.naziv===p.dob; })[0];
     p.partner_id = pt ? pt.id : null;
     app.closeModal(); showScreen('dijelovi');
-    await apiUpdate('dijelovi', id, { naziv:p.naziv, stroj:p.stroj, stanje:p.stanje,
+    await apiUpdate('dijelovi', id, { naziv:p.naziv, stroj:p.stroj, lokacija:p.lokacija, stanje:p.stanje,
       min:p.min, dob:p.dob, kategorija:p.kategorija, cijena:p.cijena,
       strojevi:p.strojevi, partner_id:p.partner_id });
   },
@@ -3824,6 +3881,7 @@ var app = {
         '<label>Naziv dijela</label><input name="naziv" required placeholder="npr. Remen, ležaj, brtva…">'+
         '<label>Za koje strojeve</label>'+strojeviCheckbox([])+
         '<label style="margin-top:10px">Opis mjesta ugradnje (neobavezno)</label><input name="stroj" placeholder="npr. pogon puža">'+
+        '<label>Lokacija na skladištu (neobavezno)</label><input name="lokacija" placeholder="npr. polica B2, ormar alata">'+
         '<label>Stanje na skladištu</label><input type="number" name="stanje" min="0" step="1" value="1" required>'+
         '<label>Minimum</label><input type="number" name="min" min="0" step="1" value="1" required>'+
         '<label>Dobavljač</label><select name="dob">'+dobOpts+'</select>'+
@@ -3841,6 +3899,7 @@ var app = {
     var dio = {
       id:'d'+Date.now(), naziv:String(f.get('naziv')||'').trim(),
       stroj:String(f.get('stroj')||'').trim() || strojeviNazivi(odabraniStrojevi),
+      lokacija:String(f.get('lokacija')||'').trim() || null,
       stanje:Math.max(0, parseInt(f.get('stanje'),10)||0), min:Math.max(0, parseInt(f.get('min'),10)||0),
       dob:f.get('dob'), cijena:Math.max(0, parseFloat(f.get('cijena'))||0),
       kategorija:f.get('kat')||'Ostalo',
@@ -3848,7 +3907,7 @@ var app = {
     };
     DATA.dijelovi.push(dio);
     app.closeModal(); showScreen('dijelovi');
-    await apiInsert('dijelovi', { naziv:dio.naziv, stroj:dio.stroj, stanje:dio.stanje,
+    await apiInsert('dijelovi', { naziv:dio.naziv, stroj:dio.stroj, lokacija:dio.lokacija, stanje:dio.stanje,
       min:dio.min, dob:dio.dob, cijena:dio.cijena, kategorija:dio.kategorija,
       strojevi:dio.strojevi, partner_id:dio.partner_id }, dio);
   },
@@ -3988,11 +4047,20 @@ var app = {
     if(jeTempId(pId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
     var p = DATA.preventiva.filter(function(x){ return x.id===pId; })[0];
     if(!p) return;
+    PENDING_DOK = null;
     var m = machineById(p.m) || {name:''};
     var pref = (p.izv && p.izv!=='interno') ? p.izv : (p.tkoZadnji || SESSION.ime || MAJSTORI[0]);
     var tkoOpts = MAJSTORI.concat([SESSION.ime]).concat(DATA.partneri.map(function(x){ return x.naziv; }))
       .filter(function(t,i,a){ return t && a.indexOf(t)===i; })
       .map(function(t){ return '<option'+(pref===t?' selected':'')+'>'+esc(t)+'</option>'; }).join('');
+    /* F4/§1c: kad servis radi izvođač, zapisnik se slika u istom koraku u kojem se
+       potvrđuje da je obavljeno — nula dodatnih ekrana. Online-only, kao i svi dokumenti. */
+    var zapisnikHtml = (p.izv && p.izv!=='interno' && naMrezi())
+      ? '<label>Zapisnik servisa (izborno)</label>'+
+        '<input type="file" id="dok-input-zap" class="file-input" accept="application/pdf,image/*" onchange="app.dokumentOdabran(event)">'+
+        '<label for="dok-input-zap" class="btn sec block file-label">📎 Slikaj ili odaberi zapisnik</label>'+
+        '<div id="dok-ime" class="row-sub" style="margin-top:6px"></div>'
+      : '';
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Obavljeno — '+esc(p.opis)+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
@@ -4000,6 +4068,7 @@ var app = {
       '<form onsubmit="app.saveObavljeno(event,\''+pId+'\')">'+
         '<label>Obavio</label><select name="tko">'+tkoOpts+'</select>'+
         '<label>Datum</label><input type="date" name="datum" value="'+todayISO()+'" max="'+todayISO()+'" required>'+
+        zapisnikHtml+
         '<button class="btn primary block" type="submit">Potvrdi</button>'+
       '</form></div></div>';
   },
@@ -4012,6 +4081,7 @@ var app = {
     p.zadnje = datum;
     p.tkoZadnji = f.get('tko');
     p.next = addDaysISO(datum, intervalDays(p.interval));
+    var pd = PENDING_DOK; PENDING_DOK = null;
     app.closeModal();
     /* prije je uvijek padalo na Pregled — sad ostaje na ekranu s kojeg je i pokrenuto
        (Raspored, K4 lista radnji), stroj-detalj ostaje posebni slučaj kao i dosad */
@@ -4019,6 +4089,24 @@ var app = {
     var pmm = machineById(p.m);
     sysPoruka('🔧 Preventiva obavljena: '+(pmm ? pmm.name+' — ' : '')+p.opis+' ('+esc(p.tkoZadnji||'')+')');
     await apiUpdate('preventiva', p.id, { zadnje:p.zadnje, tko_zadnji:p.tkoZadnji, next:p.next });
+    if(pd && p.m){
+      var path = pd.dataUrl;
+      if(REMOTE){
+        var poslano = await uploadDokument(p.m, pd.dataUrl, pd.mime);
+        if(!poslano) return;   /* zapisnik nije poslao — preventiva je svejedno potvrđena, ne rušimo taj tok */
+        path = poslano;
+      }
+      var dok = { id:'dok'+Date.now(), m:p.m, naziv:p.opis+' — '+fmtDate(datum), tip:'zapisnik', path:path,
+        mime:pd.mime, velicina:pd.velicina||0, tko:SESSION.ime||'', created_at:new Date().toISOString(),
+        preventiva_id:p.id };
+      if(!DATA.dokumenti) DATA.dokumenti = [];
+      DATA.dokumenti.push(dok);
+      if(REMOTE){
+        var res = await sb.from('dokumenti').insert({ m:dok.m, naziv:dok.naziv, tip:dok.tip, path:dok.path,
+          mime:dok.mime, velicina:dok.velicina, tko:dok.tko, preventiva_id:dok.preventiva_id }).select().single();
+        if(!res.error) dok.id = res.data.id;
+      } else { save(); }
+    }
   },
   preuzmiKvar: async function(kId){
     if(jeTempId(kId)){ alert('Zapis se upravo sprema — pokušaj za par sekundi.'); return; }
@@ -4303,6 +4391,122 @@ var app = {
       '<div class="modal-head"><h3>Fotografija kvara</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<img class="foto-full" src="'+k.foto+'" alt="foto kvara">'+
       '</div></div>';
+  },
+
+  /* ---- dokumenti uz stroj (F4) ---- */
+  dokumentOdabran: function(e){
+    var file = e.target.files && e.target.files[0];
+    if(!file) return;
+    if(file.size > 10*1024*1024){ alert('Datoteka je veća od 10 MB — smanji je ili odaberi drugu.'); e.target.value=''; return; }
+    var oznaci = function(dataUrl, mime){
+      PENDING_DOK = { dataUrl:dataUrl, mime:mime, naziv:file.name, velicina:file.size };
+      var ime = document.getElementById('dok-ime');
+      if(ime) ime.textContent = '✓ '+file.name;
+    };
+    if(file.type.indexOf('image') === 0){
+      /* slika se smanji na canvasu prije slanja — 1600px/kvaliteta .8 (900px iz brze
+         prijave kvara je premalo da shema ili sitni tisak zapisnika ostanu čitljivi) */
+      var reader = new FileReader();
+      reader.onload = function(ev){
+        var img = new Image();
+        img.onload = function(){
+          var max = 1600, k = Math.min(1, max/Math.max(img.width, img.height));
+          var c = document.createElement('canvas');
+          c.width = Math.round(img.width*k); c.height = Math.round(img.height*k);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          oznaci(c.toDataURL('image/jpeg', 0.8), 'image/jpeg');
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    } else {
+      var reader2 = new FileReader();
+      reader2.onload = function(ev){ oznaci(ev.target.result, file.type || 'application/pdf'); };
+      reader2.readAsDataURL(file);
+    }
+  },
+  dodajDokument: function(mId){
+    if(!naMrezi()){ alert('Dokumenti se dodaju kad ima mreže.'); return; }
+    PENDING_DOK = null;
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
+      '<div class="modal-head"><h3>Dodaj dokument</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<form onsubmit="app.saveDokument(event,\''+mId+'\')">'+
+        '<label>Naziv</label><input name="naziv" required placeholder="npr. Zapisnik godišnjeg servisa">'+
+        '<label>Vrsta</label><select name="tip">'+
+          DOK_TIPOVI.map(function(t){ return '<option value="'+t[0]+'"'+(t[0]==='ostalo'?' selected':'')+'>'+t[1]+'</option>'; }).join('')+
+        '</select>'+
+        '<label>Datoteka</label>'+
+        '<input type="file" id="dok-input-foto" class="file-input" accept="image/*" capture="environment" onchange="app.dokumentOdabran(event)">'+
+        '<label for="dok-input-foto" class="btn sec block file-label">📷 Slikaj papir</label>'+
+        '<input type="file" id="dok-input-datoteka" class="file-input" accept="application/pdf,image/*" onchange="app.dokumentOdabran(event)">'+
+        '<label for="dok-input-datoteka" class="btn sec block file-label" style="margin-top:8px">📄 Odaberi datoteku</label>'+
+        '<div id="dok-ime" class="row-sub" style="margin-top:6px"></div>'+
+        '<button class="btn primary block" type="submit" style="margin-top:8px">Spremi dokument</button>'+
+      '</form></div></div>';
+  },
+  saveDokument: async function(e, mId){
+    e.preventDefault();
+    if(!PENDING_DOK){ alert('Odaberi datoteku prije spremanja.'); return; }
+    var f = new FormData(e.target);
+    var naziv = String(f.get('naziv')||'').trim();
+    if(!naziv) return;
+    var pd = PENDING_DOK; PENDING_DOK = null;
+    var tip = f.get('tip') || 'ostalo';
+    app.closeModal();
+    var path = pd.dataUrl;
+    if(REMOTE){
+      var poslano = await uploadDokument(mId, pd.dataUrl, pd.mime);
+      if(!poslano){ alert('Slanje datoteke NIJE uspjelo — pokušaj ponovno.'); return; }
+      path = poslano;
+    }
+    var dok = { id:'dok'+Date.now(), m:mId, naziv:naziv, tip:tip, path:path, mime:pd.mime,
+      velicina:pd.velicina||0, tko:SESSION.ime||'', created_at:new Date().toISOString() };
+    if(!DATA.dokumenti) DATA.dokumenti = [];
+    DATA.dokumenti.push(dok);
+    showScreen('stroj');
+    var dm = machineById(mId);
+    if(REMOTE){
+      var res = await sb.from('dokumenti').insert({ m:mId, naziv:dok.naziv, tip:dok.tip, path:dok.path,
+        mime:dok.mime, velicina:dok.velicina, tko:dok.tko }).select().single();
+      if(res.error){
+        alert('Zapis NIJE spremljen u bazu.\n('+res.error.message+')');
+        DATA.dokumenti = DATA.dokumenti.filter(function(x){ return x.id!==dok.id; });
+        rerender();
+        return;
+      }
+      dok.id = res.data.id;
+      rerender();
+    } else { save(); }
+    sysPoruka('📎 Dodan dokument: '+dok.naziv+(dm?' — '+dm.name:'')+' ('+(SESSION.ime||'')+')');
+  },
+  otvoriDokument: function(id){
+    var d = (DATA.dokumenti||[]).filter(function(x){ return x.id===id; })[0];
+    if(!d) return;
+    window.open(dokUrl(d), '_blank');
+  },
+  obrisiDokument: function(id){
+    var d = (DATA.dokumenti||[]).filter(function(x){ return x.id===id; })[0];
+    if(!d) return;
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
+      '<div class="modal-head"><h3>Obriši dokument?</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<div class="row-sub" style="margin-bottom:10px">'+esc(d.naziv)+'</div>'+
+      '<button class="btn opasno block" onclick="app.potvrdiBrisanjeDokumenta(\''+id+'\')">Obriši</button>'+
+      '<button class="btn sec block" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</div></div>';
+  },
+  potvrdiBrisanjeDokumenta: async function(id){
+    app.closeModal();
+    var d = (DATA.dokumenti||[]).filter(function(x){ return x.id===id; })[0];
+    if(!d) return;
+    DATA.dokumenti = DATA.dokumenti.filter(function(x){ return x.id!==id; });
+    showScreen('stroj');
+    if(REMOTE){
+      await sb.from('dokumenti').delete().eq('id', id);
+      if(!jeTempId(id) && d.path) await sb.storage.from('dokumenti').remove([d.path]);
+    } else { save(); }
+    sysPoruka('🗑 Obrisan dokument: '+d.naziv+' ('+(SESSION.ime||'')+')');
   },
 
   noviStroj: function(){
