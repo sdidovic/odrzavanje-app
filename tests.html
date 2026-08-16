@@ -350,6 +350,12 @@ async function testovi(W, D){
      D.querySelector('#screen-raspored').innerHTML.indexOf('noviZadatak') > -1);
   ok('preventiva se može potvrditi i iz agende',
      D.querySelector('#screen-raspored .okbtn') !== null);
+  /* korisnikov feedback iz pogona: kalendar je orijentir, mora biti prvi na ekranu */
+  ok('kalendar dolazi prije "Kasni" liste i gumba "+ Novi zadatak"', (function(){
+     var html = D.querySelector('#screen-raspored').innerHTML;
+     var iMreza = html.indexOf('rasp-grid'), iKasni = html.indexOf('Kasni ('), iGumb = html.indexOf('noviZadatak');
+     return iMreza > -1 && iMreza < iKasni && iMreza < iGumb;
+  })());
 
   grupa('Kalendarska mreža — K1/K2/S6 (brojke, ne točkice; po mjesecima)');
   jednako('mreža ima cijeli broj tjedana (djeljivo sa 7)',
@@ -512,6 +518,21 @@ async function testovi(W, D){
   app.traziDio('remen');
   ok('pretraga dijelova filtrira', D.querySelectorAll('#parts-list .row').length < W.DATA.dijelovi.length);
   app.traziDio('');
+  /* korisnikov feedback: "naručeno" ne znači "stiglo" — chip mora ostati pošten */
+  var dioZaChip = W.DATA.dijelovi.filter(function(p){ return p.stanje < p.min && !W.narudzbaZaDio(p.id); })[0];
+  if(dioZaChip){
+    var nBudObj = { id:'nbTEST1', dio_id:dioZaChip.id, kolicina:2, dobavljac:'Tokić', narucen:W.todayISO(),
+      ocekivano:W.isoShift(3), primljeno:null, primljena_kolicina:null, cijena:5, tko:'Voditelj' };
+    W.DATA.nabava.push(nBudObj);
+    app.go('dijelovi'); await cekaj(120);
+    ok('narudžba koja nije kasni piše "U dolasku", ne "Naručeno"',
+       D.querySelector('#parts-list').innerHTML.indexOf('U dolasku') > -1);
+    nBudObj.ocekivano = W.isoShift(-2);   /* zakašnjela isporuka */
+    app.go('dijelovi'); await cekaj(120);
+    ok('zakašnjela narudžba piše "Kasni isporuka", ne mirno "Naručeno"',
+       D.querySelector('#parts-list').innerHTML.indexOf('Kasni isporuka') > -1);
+    W.DATA.nabava = W.DATA.nabava.filter(function(n){ return n.id !== 'nbTEST1'; });
+  }
   app.go('kontakti');
   ok('kontakti su grupirani po vrsti', D.querySelectorAll('#kontakti-list h2').length >= 2);
   app.traziKontakt('frigo');
@@ -615,6 +636,21 @@ async function testovi(W, D){
   app.go('poruke'); await cekaj(150);
   ok('svjež ulazak na Poruke nema gumb "↓" (skoči na dno)', D.querySelector('#screen-poruke .chat-dolje') === null);
   W.DATA.poruke = W.DATA.poruke.filter(function(p){ return p.id.indexOf('poFILL')!==0 && p.id!=='poTESTdojava'; });
+  await W.renderPoruke(); await cekaj(100);   /* DOM je do sada nosio ukloniene TEST poruke — osvježi prije mjerenja */
+
+  /* pretraga kanala — jedina osnovna funkcija koju je istraživanje označilo kao nedostajuću */
+  var brSvihP = D.querySelectorAll('#poruke-lista .msg').length;
+  var inpP = D.querySelector('#screen-poruke input[type="search"]');
+  ok('pretraga poruka postoji', !!inpP);
+  app.traziPoruku('dobrodošli');
+  ok('pretraga filtrira popis poruka', D.querySelectorAll('#poruke-lista .msg').length < brSvihP);
+  ok('polje za pretragu ostaje isti DOM element nakon filtriranja (fokus se ne gubi)',
+     D.querySelector('#screen-poruke input[type="search"]') === inpP);
+  app.traziPoruku('ovaj_pojam_sigurno_ne_postoji_xyz');
+  ok('nema rezultata javlja poruku s upisanim pojmom',
+     D.querySelector('#poruke-lista').textContent.indexOf('ovaj_pojam_sigurno_ne_postoji_xyz') > -1);
+  app.traziPoruku('');
+  ok('prazna pretraga vraća pun popis', D.querySelectorAll('#poruke-lista .msg').length === brSvihP);
 
   grupa('Nabava');
   app.go('dijelovi'); await cekaj(150);

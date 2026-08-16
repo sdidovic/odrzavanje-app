@@ -67,7 +67,8 @@ main{max-width:760px;margin:0 auto;padding:16px 16px calc(86px + env(safe-area-i
 /* --text-2, ne --muted: 11.5px se ne broji kao "veliki tekst", a radi se u hali na suncu */
 h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--text-2);
   font-weight:700;margin:var(--r5) 0 var(--r2);display:flex;align-items:center;gap:var(--r2)}
-h2:first-child{margin-top:var(--r1)}
+h2:first-child{margin-top:var(--r3)}
+.screen>.card:first-child{margin-top:var(--r3)}   /* zrak ispod zaglavlja i kad ekran ne počinje s h2 (npr. kalendar) */
 h2:after{content:'';flex:1;height:1px;background:var(--border)}
 
 /* ---------- kartice i redovi ---------- */
@@ -100,7 +101,7 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 /* ---------- dashboard ---------- */
 .big-card{position:relative;overflow:hidden;color:#fff;border-radius:var(--radius);
   background:linear-gradient(145deg,var(--accent) 0%,var(--accent-dark) 100%);
-  padding:var(--r4) var(--r4) 15px;cursor:pointer;box-shadow:var(--sjena-2);
+  padding:var(--r4) var(--r4) 15px;margin-top:var(--r4);cursor:pointer;box-shadow:var(--sjena-2);
   transition:transform .14s ease}
 .big-card:active{transform:scale(.995)}
 .big-card:after{content:'';position:absolute;right:-40px;top:-40px;width:150px;height:150px;
@@ -221,7 +222,7 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .msg.sustav .msg-meta{display:none}
 /* S9: chat-layout — tanka traka umjesto kartice, unos zalijepljen za dno */
 .chat-traka{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
-  padding:6px 2px 10px;margin-bottom:6px;border-bottom:1px solid var(--border);
+  padding:var(--r3) 2px 10px;margin-bottom:6px;border-bottom:1px solid var(--border);
   font-size:12px;color:var(--muted)}
 .chat-traka a{color:var(--accent);font-weight:600;cursor:pointer}
 .chat-seg{font-weight:700;color:var(--text)}
@@ -1855,8 +1856,16 @@ function partRow(p){
   var low = p.stanje < p.min;
   /* "naručeno" se izvodi iz stvarne narudžbe u Nabavi — ne drži se drugi put na dijelu */
   var nar = narudzbaZaDio(p.id);
+  /* Naručeno != stiglo (korisnikov feedback) — "Naručeno" je zvučalo kao gotova stvar
+     dok je dio i dalje na 0 na skladištu. "U dolasku" je pošteniji opis stanja, a
+     zakašnjela isporuka ostaje crvena umjesto smirene žute — i dalje nešto gori. */
   var chip = '';
-  if(nar) chip = ' <span class="chip upoz">Naručeno</span>';
+  if(nar){
+    var kasniIsporuka = nar.ocekivano && nar.ocekivano < todayISO();
+    chip = kasniIsporuka
+      ? ' <span class="chip kvar">Kasni isporuka</span>'
+      : ' <span class="chip upoz">U dolasku</span>';
+  }
   else if(low) chip = ' <span class="chip kvar">'+(p.stanje===0?'Naruči odmah':'Naruči')+'</span>';
   var otvoren = PART_OPEN === p.id;
   /* Sklopljen redak: naziv, oznaka i stanje — to je sve što se čita pri prolasku.
@@ -2430,13 +2439,15 @@ function renderRaspored(){
   }
 
   $('#screen-raspored').innerHTML =
-    /* Raspored je vlastita kartica u dnu — više nije pod-ekran Pregleda, pa nema "‹ Pregled" */
-    '<button class="btn primary block role-write" style="margin-bottom:4px" onclick="app.noviZadatak()">+ Novi zadatak</button>'+
+    /* Kalendar prvo — to je orijentir na koji se sve ostalo nadovezuje (korisnikov
+       feedback iz pogona), tek onda "Kasni" i agenda. Raspored je vlastita kartica
+       u dnu — više nije pod-ekran Pregleda, pa nema "‹ Pregled". */
+    mrezaHtml+
     premjestiHtml+
     (brojKasnih
       ? '<h2 style="color:var(--red)">Kasni ('+brojKasnih+')</h2><div class="card" style="border-color:var(--red-border)">'+kasniHtml+'</div>'
       : '')+
-    mrezaHtml+
+    '<button class="btn primary block role-write" style="margin:10px 0 4px" onclick="app.noviZadatak()">+ Novi zadatak</button>'+
     donjiDioHtml;
 }
 
@@ -2571,19 +2582,21 @@ function oznaciProcitano(){
   var zadnja = (DATA.poruke||[]).reduce(function(m,p){ return String(p.created_at) > m ? String(p.created_at) : m; }, '');
   try{ if(zadnja) localStorage.setItem('porukeSeen', zadnja); }catch(e){}
 }
-async function renderPoruke(){
-  /* S9: mjeri PRIJE zamjene DOM-a — bilo dna, ili je ovo tek otvoren ekran (ne uživo-dojava) */
-  var bioNaDnu = (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 60);
-  var svjezOtvoreno = PRIJASNJI_EKRAN !== 'poruke';
+var PORUKE_Q = '';   /* pretraga kanala — jedina stvarno nedostajuća osnovna funkcija (istraženo) */
+function porukeListaHtml(){
   var seenPrije = '';
   try{ seenPrije = localStorage.getItem('porukeSeen') || ''; }catch(e){}
   /* Filtar Sve/Ljudi/Sustav je izbačen (NASTAVAK §11.4) — 4 čovjeka je jedan kanal,
-     pregledan bez filtriranja; sistemske poruke se ionako vizualno razlikuju (.msg.sustav). */
+     pregledan bez filtriranja; sistemske poruke se ionako vizualno razlikuju (.msg.sustav).
+     Pretraga teksta/imena ostaje — to je jedino što istraživanje označilo kao stvarno
+     nedostajuću osnovnu funkciju (naći stariju odluku/kontekst bez ručnog skrolanja). */
+  var q = PORUKE_Q.trim().toLowerCase();
   var lista = (DATA.poruke||[]).slice().sort(function(a,b){
     return String(a.created_at).localeCompare(String(b.created_at));
   });
+  if(q) lista = lista.filter(function(p){ return (p.tekst+' '+p.tko).toLowerCase().indexOf(q) > -1; });
   var zadnjiDan = '', crtaPostavljena = false;
-  var html = lista.length ? lista.map(function(p){
+  return lista.length ? lista.map(function(p){
     var out = '';
     var dan = String(p.created_at).slice(0,10);
     if(dan && dan !== zadnjiDan){
@@ -2602,7 +2615,14 @@ async function renderPoruke(){
       (sustav ? '' : '<div class="msg-meta">'+esc(p.tko)+' &middot; '+vrijeme+'</div>')+
       '<div class="msg-txt">'+esc(p.tekst)+(sustav?' <span style="opacity:.6">'+vrijeme+'</span>':'')+veza+'</div></div>';
     return out;
-  }).join('') : '<div class="empty">Nema poruka za odabrani prikaz.</div>';
+  }).join('') : '<div class="empty">'+(q ? 'Nema poruka za „'+esc(PORUKE_Q.trim())+'”.' : 'Nema poruka.')+'</div>';
+}
+async function renderPoruke(){
+  /* S9: mjeri PRIJE zamjene DOM-a — bilo dna, ili je ovo tek otvoren ekran (ne uživo-dojava) */
+  var bioNaDnu = (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 60);
+  var svjezOtvoreno = PRIJASNJI_EKRAN !== 'poruke';
+  var q = PORUKE_Q.trim();
+  var html = porukeListaHtml();
 
   var stanjePusha = await pushStanje();
   /* S9: push-status i segment Poruke│Kontakti sele u jednu tanku traku na vrhu
@@ -2617,12 +2637,15 @@ async function renderPoruke(){
   '</div>';
 
   /* prikazi "↓ nove poruke" samo kad ekran vec gleda netko tko NIJE na dnu (uzivo-dojava) —
-     na tek otvorenom ekranu ili nakon vlastite poruke odmah skacemo na dno, gumb je suvisan */
-  var prikaziDolje = !svjezOtvoreno && !bioNaDnu;
+     na tek otvorenom ekranu ili nakon vlastite poruke odmah skacemo na dno, gumb je suvisan.
+     Dok se pretražuje, ni skrol ni gumb nemaju smisla — korisnik traži nešto konkretno. */
+  var prikaziDolje = !q && !svjezOtvoreno && !bioNaDnu;
 
   $('#screen-poruke').innerHTML =
     trakaHtml+
-    '<div class="card" style="padding:5px 0">'+html+'</div>'+
+    '<input type="search" placeholder="Pretraži poruke (tekst, ime…)" value="'+esc(PORUKE_Q)+'"'+
+      ' oninput="app.traziPoruku(this.value)" style="margin-bottom:6px">'+
+    '<div class="card" id="poruke-lista" style="padding:5px 0">'+html+'</div>'+
     '<form class="msg-form" onsubmit="app.posaljiPoruku(event)">'+
       '<textarea name="tekst" rows="2" required placeholder="Poruka svima — primopredaja, obavijest, upozorenje…"></textarea>'+
       '<button class="btn primary block" type="submit" style="margin-top:8px">Pošalji</button>'+
@@ -2630,7 +2653,7 @@ async function renderPoruke(){
     (prikaziDolje ? '<button type="button" class="chat-dolje" onclick="app.porukeNaDno()">↓ Nove poruke</button>' : '');
   oznaciProcitano();
   updateBadge();
-  if(!prikaziDolje){
+  if(!q && !prikaziDolje){
     var crta = document.querySelector('.msg-nove');
     if(crta && svjezOtvoreno) crta.scrollIntoView({block:'center'});
     else window.scrollTo(0, document.body.scrollHeight);
@@ -3189,6 +3212,12 @@ var app = {
   porukeNaDno: function(){
     window.scrollTo(0, document.body.scrollHeight);
     var b = document.querySelector('.chat-dolje'); if(b) b.remove();
+  },
+  traziPoruku: function(v){
+    /* osvježi samo popis — fokus u polju za pretragu ostaje (isti obrazac kao Dijelovi/Kontakti) */
+    PORUKE_Q = v;
+    var el = $('#poruke-lista');
+    if(el) el.innerHTML = porukeListaHtml();
   },
   dodajKomentar: async function(e, kId, pogled){
     e.preventDefault();
