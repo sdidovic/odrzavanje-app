@@ -179,6 +179,26 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .qr-slika img,.qr-slika canvas{display:block}
 .qr-upute{font-size:10.5px;color:var(--muted);margin-top:7px;line-height:1.35}
 
+/* ---------- kalendarska mreža na Rasporedu (K1-K2) — brojke, ne točkice ---------- */
+.rasp-nav{display:flex;align-items:center;justify-content:space-between;margin:6px 0 8px;gap:8px}
+.rasp-naslov{font-size:14.5px;font-weight:700;flex:1;text-align:center}
+.rasp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.rasp-h{text-align:center;font-size:10px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;padding:2px 0 5px}
+.rasp-d{min-height:54px;border-radius:9px;border:1.5px solid var(--border);background:var(--card);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  cursor:pointer;font-size:14px;font-weight:700;color:var(--text);padding:2px}
+.rasp-d:active{transform:scale(.96)}
+.rasp-d.prosli{color:var(--muted);border-color:transparent}
+.rasp-d.danas{border-color:var(--accent);border-width:2px}
+.rasp-d.odabran{background:var(--accent-soft);border-color:var(--accent)}
+.rasp-broj{font-size:11.5px;font-weight:700;background:var(--accent-soft);color:var(--accent);
+  border-radius:20px;padding:1px 7px;min-width:18px;line-height:1.5;font-variant-numeric:tabular-nums}
+.rasp-broj.kasni{background:var(--red-bg);color:var(--red)}
+.rasp-premjesti{padding:11px 13px;border:1.5px solid var(--accent);background:var(--accent-soft);
+  border-radius:var(--radius-s);margin-bottom:10px}
+.rasp-premjesti .row-sub:first-child{color:var(--accent);font-weight:700}
+
 /* ---------- statusna točka stroja ---------- */
 .sdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:0}
 .sdot.ok{background:#2e9e57}.sdot.upoz{background:#e5a50a}.sdot.kvar{background:var(--red)}
@@ -2169,10 +2189,27 @@ function danUTjednu(iso){
 function otvoreniZadaci(){
   return DATA.kvarovi.filter(function(k){ return (k.tip||'kvar')==='zadatak' && jeOtvoren(k); });
 }
+/* Rok trajne sanacije privremenog popravka (dorade.sql) — planska obveza s datumom,
+   danas vidljiva samo u IFS izvještaju. Ovo NIJE kvar na kalendaru (kvar = prijava,
+   model modula) — prikazuje se OBVEZA sanacije, ne prijava problema. */
+function sanacijeOtvorene(){
+  return DATA.kvarovi.filter(function(k){ return k.privremeni && k.status!=='otkazan' && k.rok_sanacije; });
+}
+function sanacijaRedak(k){
+  var m = machineById(k.m) || {name:'—'};
+  var kasni = k.rok_sanacije < todayISO();
+  return '<div class="row click" onclick="app.detaljKvara(\''+k.id+'\')">'+
+    '<div class="grow"><div class="row-title" style="font-size:13.5px">Sanacija: '+esc(k.opis)+'</div>'+
+    '<div class="row-sub">'+esc(m.name)+' &middot; rok '+fmtDate(k.rok_sanacije)+
+      (kasni ? ' &middot; <b style="color:var(--red)">kasni</b>' : '')+'</div></div>'+
+  '</div>';
+}
+/* Dodir na redak otvara popis radnji (K4) — ne bježi izravno na stroj/detalj kao prije.
+   ✓ ostaje izravno u retku za najčešću radnju (obavljeno), sve ostalo je iza dodira na redak. */
 function prevRedak(p){
   var m = machineById(p.m) || {name:'—'};
   var kasni = p.next < todayISO();
-  return '<div class="row click" onclick="app.openStroj(\''+p.m+'\')">'+
+  return '<div class="row click" onclick="app.akcijeStavke(\'preventiva\',\''+p.id+'\')">'+
     '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(p.opis)+'</div>'+
     '<div class="row-sub">'+esc(m.name)+' &middot; '+fmtDate(p.next)+
       ((p.izv && p.izv!=='interno') ? ' &middot; <b>'+esc(p.izv)+'</b>' : '')+
@@ -2182,7 +2219,7 @@ function prevRedak(p){
 }
 function zadatakRedak(z){
   var kasni = z.rok && z.rok < todayISO();
-  return '<div class="row click" onclick="app.detaljKvara(\''+z.id+'\')">'+
+  return '<div class="row click" onclick="app.akcijeStavke(\'zadatak\',\''+z.id+'\')">'+
     '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(z.opis)+'</div>'+
     '<div class="row-sub"><span class="chip" style="background:var(--accent-soft);color:var(--accent);border:1px solid #d5d2ef">Zadatak</span>'+
       (z.dodijeljen ? ' '+esc(z.dodijeljen) : '')+
@@ -2191,51 +2228,151 @@ function zadatakRedak(z){
     '<button class="okbtn role-write" title="Označi obavljeno" onclick="event.stopPropagation();app.obaviZadatak(\''+z.id+'\')">✓</button>'+
   '</div>';
 }
+
+/* ---------- kalendarska mreža (K1-K2): pisaljka i filtar, ne slika ---------- */
+function ponedjeljakTjedna(iso){
+  var d = new Date(iso+'T00:00:00');
+  d.setDate(d.getDate() - (d.getDay()+6)%7);
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+}
+function fmtDatKratko(iso){
+  var p = iso.split('-');
+  return parseInt(p[2],10)+'.'+parseInt(p[1],10)+'.';
+}
+var RASP_POCETAK = null;      /* ISO ponedjeljak — početak prikazana 4 tjedna */
+var RASP_ODABRAN = null;      /* ISO odabranog dana, ili null */
+var RASP_PREMJESTI = null;    /* {tip:'preventiva'|'zadatak', id} dok traje premještanje */
+function stavkeZaDan(iso){
+  return {
+    prev: DATA.preventiva.filter(function(p){ return p.next===iso; }),
+    zad: otvoreniZadaci().filter(function(z){ return z.rok===iso; }),
+    san: sanacijeOtvorene().filter(function(k){ return k.rok_sanacije===iso; })
+  };
+}
+function rasporedCelija(iso, danas){
+  var st = stavkeZaDan(iso);
+  var ukupno = st.prev.length + st.zad.length + st.san.length;
+  var p = iso.split('-');
+  var prviUMjesecu = parseInt(p[2],10) === 1;
+  var oznaka = prviUMjesecu ? (parseInt(p[2],10)+'.'+parseInt(p[1],10)+'.') : String(parseInt(p[2],10));
+  var prosli = iso < danas;
+  var klase = 'rasp-d'+(iso===danas?' danas':'')+(iso===RASP_ODABRAN?' odabran':'')+(prosli?' prosli':'');
+  var brojHtml = ukupno ? '<span class="rasp-broj'+(prosli?' kasni':'')+'">'+ukupno+'</span>' : '';
+  return '<div class="'+klase+'" onclick="app.rasporedDan(\''+iso+'\')">'+
+    '<span>'+esc(oznaka)+'</span>'+brojHtml+'</div>';
+}
+function renderKalendarskaMreza(){
+  var danas = todayISO();
+  if(RASP_POCETAK===null) RASP_POCETAK = ponedjeljakTjedna(danas);
+  var celije = '';
+  DANI_TJEDNA.slice(1).concat([DANI_TJEDNA[0]]).forEach(function(dn){   /* P U S Č P S N */
+    celije += '<div class="rasp-h">'+dn.slice(0,1).toUpperCase()+'</div>';
+  });
+  for(var i=0; i<28; i++) celije += rasporedCelija(addDaysISO(RASP_POCETAK, i), danas);
+  var pomaknuto = RASP_POCETAK !== ponedjeljakTjedna(danas);
+  var odabranDrugi = RASP_ODABRAN && RASP_ODABRAN !== danas;
+  var naslov = fmtDatKratko(RASP_POCETAK)+' – '+fmtDatKratko(addDaysISO(RASP_POCETAK,27));
+  return '<div class="card" style="padding:8px">'+
+    '<div class="rasp-nav">'+
+      '<button class="qbtn" onclick="app.rasporedTjedni(-1)" aria-label="Prethodna 4 tjedna">‹</button>'+
+      '<div class="rasp-naslov">'+naslov+'</div>'+
+      (pomaknuto||odabranDrugi ? '<button class="btn-mini" onclick="app.rasporedDanas()">Danas</button>' : '<span style="width:34px"></span>')+
+      '<button class="qbtn" onclick="app.rasporedTjedni(1)" aria-label="Sljedeća 4 tjedna">›</button>'+
+    '</div>'+
+    '<div class="rasp-grid">'+celije+'</div>'+
+  '</div>';
+}
+
+/* ---------- panel odabranog dana (K3) — zamjenjuje agendu dok je dan odabran ---------- */
+function panelDana(iso){
+  var st = stavkeZaDan(iso);
+  var ukupno = st.prev.length + st.zad.length + st.san.length;
+  var danas = todayISO();
+  var naslov = (iso===danas ? 'Danas' : (iso===isoShift(1) ? 'Sutra' : fmtDate(iso)))+' — '+danUTjednu(iso);
+  var html = '<h2>'+naslov+'</h2>';
+  html += ukupno
+    ? '<div class="card">'+st.prev.map(prevRedak).join('')+st.zad.map(zadatakRedak).join('')+st.san.map(sanacijaRedak).join('')+'</div>'
+    : '<div class="card"><div class="empty"><b>Slobodan dan</b>Ništa nije planirano.</div></div>';
+  if(iso >= danas)
+    html += '<button class="btn sec sm block role-write" style="margin-top:8px" onclick="app.noviZadatak(\''+iso+'\')">+ Na ovaj dan</button>';
+  html += '<button class="btn-mini" style="margin-top:8px" onclick="app.rasporedDan(\''+iso+'\')">‹ Cijeli raspored</button>';
+  return html;
+}
+
 function renderRaspored(){
   var danasISO = todayISO();
   var zadaci = otvoreniZadaci();
+  var sanacije = sanacijeOtvorene();
 
-  /* kasni: preventive s prošlim terminom + zadaci s prošlim rokom — jedan popis,
-     jer je oboje "trebalo je biti napravljeno, a nije" */
+  /* kasni: preventive s prošlim terminom + zadaci s prošlim rokom + zakašnjele sanacije —
+     jedan popis, jer je sve troje "trebalo je biti napravljeno, a nije" */
   var kasniHtml =
     DATA.preventiva.filter(function(p){ return p.next < danasISO; })
       .sort(function(a,b){ return a.next < b.next ? -1 : 1; }).map(prevRedak).join('')+
     zadaci.filter(function(z){ return z.rok && z.rok < danasISO; })
-      .sort(function(a,b){ return a.rok < b.rok ? -1 : 1; }).map(zadatakRedak).join('');
+      .sort(function(a,b){ return a.rok < b.rok ? -1 : 1; }).map(zadatakRedak).join('')+
+    sanacije.filter(function(k){ return k.rok_sanacije < danasISO; })
+      .sort(function(a,b){ return a.rok_sanacije < b.rok_sanacije ? -1 : 1; }).map(sanacijaRedak).join('');
   var brojKasnih = (kasniHtml.match(/class="row click"/g)||[]).length;
 
-  /* sljedećih 14 dana, grupirano po danu — "koji dan što radim" */
-  var danHtml = '';
-  for(var d=0; d<14; d++){
-    var iso = isoShift(d);
-    var ps = DATA.preventiva.filter(function(p){ return p.next===iso; });
-    var zs = zadaci.filter(function(z){ return z.rok===iso; });
-    if(!ps.length && !zs.length) continue;
-    var naslov = (d===0 ? 'Danas' : (d===1 ? 'Sutra' : fmtDate(iso)))+' — '+danUTjednu(iso);
-    danHtml += '<h2>'+naslov+'</h2><div class="card">'+
-      ps.map(prevRedak).join('')+zs.map(zadatakRedak).join('')+'</div>';
+  /* traka premještanja (K4) — dok traje, dodir na bilo koji dan u mreži izvršava premještanje */
+  var premjestiHtml = '';
+  if(RASP_PREMJESTI){
+    var st2 = RASP_PREMJESTI.tip==='preventiva'
+      ? DATA.preventiva.filter(function(x){ return x.id===RASP_PREMJESTI.id; })[0]
+      : DATA.kvarovi.filter(function(x){ return x.id===RASP_PREMJESTI.id; })[0];
+    if(st2){
+      premjestiHtml = '<div class="rasp-premjesti">'+
+        '<div class="row-sub">Premještaš: '+esc(st2.opis)+'</div>'+
+        '<div class="row-sub">Dodirni novi dan u kalendaru</div>'+
+        '<button class="btn-mini" style="margin-top:6px" onclick="app.odustaniPremjestanje()">Odustani</button></div>';
+    } else RASP_PREMJESTI = null;
   }
-  if(!danHtml) danHtml = '<div class="card"><div class="empty"><b>Sljedeća dva tjedna su prazna</b>'+
-    'Ni preventive ni zadaci nemaju termin u ovom razdoblju.</div></div>';
 
-  /* dalje od 14 dana: samo najbliže, bez pretrpavanja */
-  var kasnije = DATA.preventiva.filter(function(p){ return p.next > isoShift(14); })
-    .sort(function(a,b){ return a.next < b.next ? -1 : 1; }).slice(0,6);
+  var mrezaHtml = renderKalendarskaMreza();
 
-  var bezRoka = zadaci.filter(function(z){ return !z.rok; });
+  /* Zadano (nijedan dan odabran): puna agenda, identična dosadašnjoj. Kalendar ništa ne
+     duplicira (mreža=brojke, agenda=tekst) — dodir na dan zamijeni agendu panelom (K3). */
+  var donjiDioHtml;
+  if(RASP_ODABRAN){
+    donjiDioHtml = panelDana(RASP_ODABRAN);
+  } else {
+    var danHtml = '';
+    for(var d=0; d<14; d++){
+      var iso = isoShift(d);
+      var ps = DATA.preventiva.filter(function(p){ return p.next===iso; });
+      var zs = zadaci.filter(function(z){ return z.rok===iso; });
+      var sn = sanacije.filter(function(k){ return k.rok_sanacije===iso; });
+      if(!ps.length && !zs.length && !sn.length) continue;
+      var naslov = (d===0 ? 'Danas' : (d===1 ? 'Sutra' : fmtDate(iso)))+' — '+danUTjednu(iso);
+      danHtml += '<h2>'+naslov+'</h2><div class="card">'+
+        ps.map(prevRedak).join('')+zs.map(zadatakRedak).join('')+sn.map(sanacijaRedak).join('')+'</div>';
+    }
+    if(!danHtml) danHtml = '<div class="card"><div class="empty"><b>Sljedeća dva tjedna su prazna</b>'+
+      'Ni preventive ni zadaci nemaju termin u ovom razdoblju.</div></div>';
+
+    /* dalje od 14 dana: samo najbliže, bez pretrpavanja */
+    var kasnije = DATA.preventiva.filter(function(p){ return p.next > isoShift(14); })
+      .sort(function(a,b){ return a.next < b.next ? -1 : 1; }).slice(0,6);
+    var bezRoka = zadaci.filter(function(z){ return !z.rok; });
+
+    donjiDioHtml = danHtml+
+      (kasnije.length
+        ? '<h2>Kasnije</h2><div class="card">'+kasnije.map(prevRedak).join('')+'</div>' : '')+
+      (bezRoka.length
+        ? '<h2>Zadaci bez roka ('+bezRoka.length+')</h2><div class="card">'+bezRoka.map(zadatakRedak).join('')+'</div>'
+        : '');
+  }
 
   $('#screen-raspored').innerHTML =
     /* Raspored je vlastita kartica u dnu — više nije pod-ekran Pregleda, pa nema "‹ Pregled" */
     '<button class="btn primary block role-write" style="margin-bottom:4px" onclick="app.noviZadatak()">+ Novi zadatak</button>'+
+    premjestiHtml+
     (brojKasnih
       ? '<h2 style="color:var(--red)">Kasni ('+brojKasnih+')</h2><div class="card" style="border-color:var(--red-border)">'+kasniHtml+'</div>'
       : '')+
-    danHtml+
-    (kasnije.length
-      ? '<h2>Kasnije</h2><div class="card">'+kasnije.map(prevRedak).join('')+'</div>' : '')+
-    (bezRoka.length
-      ? '<h2>Zadaci bez roka ('+bezRoka.length+')</h2><div class="card">'+bezRoka.map(zadatakRedak).join('')+'</div>'
-      : '');
+    mrezaHtml+
+    donjiDioHtml;
 }
 
 /* =====================  render: Sustav (voditelj)  ===================== */
@@ -2969,14 +3106,16 @@ var app = {
   },
   anaPeriod: function(v){ ANA_DANA = parseInt(v,10)||0; renderAnalitika(); },
   /* ---- zadaci: organizacija, ne kvarovi — žive na Rasporedu ---- */
-  noviZadatak: function(){
+  noviZadatak: function(rok){
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Novi zadatak</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<div class="row-sub" style="margin-bottom:2px">Kupiti, dogovoriti, pripremiti — ono što nije kvar, a mora se obaviti.</div>'+
       '<form onsubmit="app.saveZadatak(event)">'+
         '<label>Što treba obaviti</label><textarea name="opis" rows="2" required placeholder="npr. dogovoriti termin servisa s MB Frigo"></textarea>'+
-        '<label>Rok (prazno = bez roka)</label><input type="date" name="rok" min="'+todayISO()+'">'+
+        /* "+ Na ovaj dan" s kalendara (K3) predispuni rok — dva dodira do gotovog obrasca */
+        '<label>Rok (prazno = bez roka)</label><input type="date" name="rok" min="'+todayISO()+'"'+
+          (rok ? ' value="'+esc(rok)+'"' : '')+'>'+
         '<label>Tko</label><select name="dodijeljen"><option value="">—</option>'+majstorOpts('')+'</select>'+
         '<button class="btn primary block" type="submit">Spremi zadatak</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
@@ -3015,6 +3154,80 @@ var app = {
     rerender();
     sysPoruka('✅ Zadatak obavljen: '+z.opis+' ('+(SESSION.ime||'')+')', z.id);
     await apiUpdate('kvarovi', z.id, { status:'rijesen', tko:z.tko, closed_at:new Date().toISOString() });
+  },
+
+  /* ---- kalendarska mreža na Rasporedu (K1-K4) ---- */
+  rasporedTjedni: function(smjer){
+    RASP_POCETAK = addDaysISO(RASP_POCETAK || ponedjeljakTjedna(todayISO()), smjer*28);
+    renderRaspored();
+  },
+  rasporedDanas: function(){
+    RASP_POCETAK = ponedjeljakTjedna(todayISO());
+    RASP_ODABRAN = null;
+    renderRaspored();
+  },
+  rasporedDan: function(iso){
+    if(RASP_PREMJESTI){ app.izvrsiPremjestanje(iso); return; }
+    RASP_ODABRAN = (RASP_ODABRAN===iso) ? null : iso;
+    renderRaspored();
+  },
+  /* Dodir na redak u agendi (K4) — donji list radnji umjesto izravnog bijega na stroj/detalj */
+  akcijeStavke: function(tip, id){
+    if(tip==='preventiva'){
+      var p = DATA.preventiva.filter(function(x){ return x.id===id; })[0];
+      if(!p) return;
+      var m = machineById(p.m) || {name:''};
+      $('#modal-root').innerHTML =
+        '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
+        '<div class="modal-head"><h3>'+esc(p.opis)+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+        '<div class="row-sub" style="margin-bottom:10px">'+esc(m.name)+' &middot; sljedeće '+fmtDate(p.next)+'</div>'+
+        '<button class="btn primary block role-write" onclick="app.closeModal();app.obaviPreventivu(\''+id+'\')">✓ Obavljeno</button>'+
+        '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.pokreniPremjestanje(\'preventiva\',\''+id+'\')">Premjesti na drugi dan</button>'+
+        '<button class="btn sec block" style="margin-top:8px" onclick="app.closeModal();app.openStroj(\''+p.m+'\')">Otvori stroj</button>'+
+        '</div></div>';
+    } else {
+      var z = DATA.kvarovi.filter(function(x){ return x.id===id; })[0];
+      if(!z) return;
+      $('#modal-root').innerHTML =
+        '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
+        '<div class="modal-head"><h3>'+esc(z.opis)+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+        (z.rok ? '<div class="row-sub" style="margin-bottom:10px">rok '+fmtDate(z.rok)+'</div>' : '')+
+        '<button class="btn primary block role-write" onclick="app.closeModal();app.obaviZadatak(\''+id+'\')">✓ Obavljeno</button>'+
+        '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.pokreniPremjestanje(\'zadatak\',\''+id+'\')">'+(z.rok?'Premjesti rok':'Stavi na dan…')+'</button>'+
+        '<button class="btn sec block" style="margin-top:8px" onclick="app.closeModal();app.detaljKvara(\''+id+'\')">Detalji</button>'+
+        '</div></div>';
+    }
+  },
+  pokreniPremjestanje: function(tip, id){
+    app.closeModal();
+    RASP_PREMJESTI = { tip:tip, id:id };
+    RASP_ODABRAN = null;
+    renderRaspored();
+  },
+  odustaniPremjestanje: function(){ RASP_PREMJESTI = null; renderRaspored(); },
+  izvrsiPremjestanje: async function(noviDan){
+    var pr = RASP_PREMJESTI; RASP_PREMJESTI = null;
+    if(!pr) return;
+    if(jeTempId(pr.id)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); renderRaspored(); return; }
+    if(pr.tip==='preventiva'){
+      var p = DATA.preventiva.filter(function(x){ return x.id===pr.id; })[0];
+      if(!p){ renderRaspored(); return; }
+      var stari = p.next;
+      p.next = noviDan;
+      renderRaspored();
+      sysPoruka('📅 Premješteno: '+p.opis+' — s '+fmtDate(stari)+' na '+fmtDate(noviDan)+' ('+(SESSION.ime||'')+')');
+      await apiUpdate('preventiva', p.id, { next:p.next });
+    } else {
+      var z = DATA.kvarovi.filter(function(x){ return x.id===pr.id; })[0];
+      if(!z){ renderRaspored(); return; }
+      var stariZ = z.rok;
+      z.rok = noviDan;
+      renderRaspored();
+      sysPoruka('📅 Premješteno: '+z.opis+' — '+(stariZ?'s '+fmtDate(stariZ)+' ':'')+'na '+fmtDate(noviDan)+' ('+(SESSION.ime||'')+')');
+      await apiUpdate('kvarovi', z.id, { rok:z.rok });
+      if(z.dodijeljen && z.dodijeljen !== SESSION.ime)
+        posaljiObavijest('📅 Promijenjen rok', z.opis+' — novi rok '+fmtDate(noviDan), '#raspored', z.dodijeljen);
+    }
   },
   analitikaIspis: function(){
     /* analitika u modal (print CSS ispisuje samo modal) pa na pisač/PDF */
@@ -3534,7 +3747,9 @@ var app = {
     p.tkoZadnji = f.get('tko');
     p.next = addDaysISO(datum, intervalDays(p.interval));
     app.closeModal();
-    showScreen(CURRENT_M && !$('#screen-stroj').classList.contains('hidden') ? 'stroj' : 'pregled');
+    /* prije je uvijek padalo na Pregled — sad ostaje na ekranu s kojeg je i pokrenuto
+       (Raspored, K4 lista radnji), stroj-detalj ostaje posebni slučaj kao i dosad */
+    showScreen(CURRENT_M && !$('#screen-stroj').classList.contains('hidden') ? 'stroj' : (CURRENT_SCREEN||'pregled'));
     var pmm = machineById(p.m);
     sysPoruka('🔧 Preventiva obavljena: '+(pmm ? pmm.name+' — ' : '')+p.opis+' ('+esc(p.tkoZadnji||'')+')');
     await apiUpdate('preventiva', p.id, { zadnje:p.zadnje, tko_zadnji:p.tkoZadnji, next:p.next });

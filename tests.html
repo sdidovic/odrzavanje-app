@@ -293,7 +293,8 @@ async function testovi(W, D){
 
   grupa('Raspored — organizacija po danima');
   app.go('raspored'); await cekaj(150);
-  ok('mjesečna mreža je izbačena (kritika §11.4)', D.querySelectorAll('.cal-d').length === 0);
+  ok('stara mjesečna mreža s točkicama u boji je izbačena (kritika §11.4)',
+     D.querySelectorAll('.cal-d').length === 0 && D.querySelectorAll('.cal-t').length === 0);
   ok('kasne preventive su na vrhu, crveno',
      D.querySelector('#screen-raspored').textContent.indexOf('Kasni (') > -1);
   ok('dani nose ime dana u tjednu', (function(){
@@ -305,6 +306,105 @@ async function testovi(W, D){
      D.querySelector('#screen-raspored').innerHTML.indexOf('noviZadatak') > -1);
   ok('preventiva se može potvrditi i iz agende',
      D.querySelector('#screen-raspored .okbtn') !== null);
+
+  grupa('Kalendarska mreža — K1/K2 (brojke, ne točkice)');
+  jednako('mreža ima 28 ćelija (4 tjedna × 7 dana)', D.querySelectorAll('#screen-raspored .rasp-d').length, 28);
+  jednako('zaglavlje ima 7 dana u tjednu', D.querySelectorAll('#screen-raspored .rasp-h').length, 7);
+  ok('nijedna ćelija ne nosi obojenu točku — samo tekst/brojke',
+     D.querySelector('#screen-raspored .rasp-grid').querySelectorAll('[style*="background"]').length === 0);
+  ok('mreža počinje ponedjeljkom tekućeg tjedna', W.RASP_POCETAK === W.ponedjeljakTjedna(W.todayISO()));
+  ok('današnja ćelija je označena', D.querySelector('#screen-raspored .rasp-d.danas') !== null);
+  ok('gumb "Danas" se ne prikazuje kad ništa nije pomaknuto (mrtva opcija se ne prikazuje)',
+     Array.prototype.every.call(D.querySelectorAll('#screen-raspored .btn-mini'),
+       function(b){ return b.textContent !== 'Danas'; }));
+  var pocetakPrije = W.RASP_POCETAK;
+  app.rasporedTjedni(1); await cekaj(100);
+  ok('› pomiče mrežu za 28 dana', W.RASP_POCETAK === W.addDaysISO(pocetakPrije, 28));
+  ok('gumb "Danas" se pojavi kad je mreža pomaknuta',
+     Array.prototype.some.call(D.querySelectorAll('#screen-raspored .btn-mini'),
+       function(b){ return b.textContent === 'Danas'; }));
+  app.rasporedDanas(); await cekaj(100);
+  jednako('"Danas" vraća mrežu na tekući tjedan', W.RASP_POCETAK, pocetakPrije);
+
+  grupa('Panel dana — K3');
+  ok('bez odabranog dana nema gumba "‹ Cijeli raspored" (puna agenda je zadano stanje)',
+     D.querySelector('#screen-raspored').innerHTML.indexOf('Cijeli raspored') === -1);
+  var prevKasni = W.DATA.preventiva.filter(function(p){ return p.next < W.todayISO(); })[0];
+  app.rasporedDan(prevKasni.next); await cekaj(120);
+  ok('dodir na dan otvara panel s naslovom tog dana',
+     D.querySelector('#screen-raspored').textContent.indexOf(W.fmtDate(prevKasni.next)) > -1);
+  ok('panel prikazuje stavku tog dana', D.querySelector('#screen-raspored').textContent.indexOf(prevKasni.opis) > -1);
+  ok('panel zamjenjuje punu agendu — postoji "‹ Cijeli raspored"',
+     D.querySelector('#screen-raspored').innerHTML.indexOf('Cijeli raspored') > -1);
+  ok('ponovni dodir na isti dan vraća punu agendu', (function(){
+     app.rasporedDan(prevKasni.next);
+     return W.RASP_ODABRAN === null;
+  })());
+  /* prazan dan — traži unaprijed dok stvarno ne nađe dan bez ijedne stavke (seed se mijenja) */
+  var prazanDan = null;
+  for(var pd=25; pd<60 && !prazanDan; pd++){
+    var kandidat = W.addDaysISO(W.todayISO(), pd);
+    var stK = W.stavkeZaDan(kandidat);
+    if(!stK.prev.length && !stK.zad.length && !stK.san.length) prazanDan = kandidat;
+  }
+  ok('postoji prazan dan za test panela', !!prazanDan);
+  app.rasporedDan(prazanDan); await cekaj(120);
+  ok('prazan dan kaže "Slobodan dan"',
+     D.querySelector('#screen-raspored').textContent.indexOf('Slobodan dan') > -1);
+  ok('"+ Na ovaj dan" postoji za budući dan',
+     D.querySelector('#screen-raspored').innerHTML.indexOf("noviZadatak('"+prazanDan+"')") > -1);
+  app.noviZadatak(prazanDan); await cekaj(120);
+  jednako('obrazac zadatka predispuni rok s odabranog dana',
+     D.querySelector('#modal-root form').elements.rok.value, prazanDan);
+  app.closeModal();
+  app.rasporedDan(prazanDan);   /* natrag na punu agendu za sljedeću grupu */
+
+  grupa('Premještanje termina — K4');
+  var prevZaPremjestanje = W.DATA.preventiva[0];
+  var rokPrije = prevZaPremjestanje.next;
+  var noviDan = W.addDaysISO(W.todayISO(), 20);
+  app.akcijeStavke('preventiva', prevZaPremjestanje.id); await cekaj(120);
+  ok('list radnji nudi Obavljeno/Premjesti/Otvori stroj',
+     D.querySelector('#modal-root').textContent.indexOf('Premjesti na drugi dan') > -1);
+  app.pokreniPremjestanje('preventiva', prevZaPremjestanje.id); await cekaj(120);
+  ok('modal se zatvara i traka premještanja se prikaže',
+     !D.querySelector('#modal-root .modal') &&
+     D.querySelector('#screen-raspored').innerHTML.indexOf('rasp-premjesti') > -1);
+  ok('traka javlja što se premješta', D.querySelector('#screen-raspored').textContent.indexOf(prevZaPremjestanje.opis) > -1);
+  await app.izvrsiPremjestanje(noviDan); await cekaj(150);
+  jednako('preventiva.next je promijenjen', prevZaPremjestanje.next, noviDan);
+  ok('trag premještanja je u kanalu',
+     W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Premješteno') > -1 && p.tekst.indexOf(prevZaPremjestanje.opis) > -1; }));
+  ok('mod premještanja se ugasi nakon izvršenja', W.RASP_PREMJESTI === null);
+  prevZaPremjestanje.next = rokPrije;   /* vrati stanje za ostale testove */
+
+  /* zadatak bez roka: ista radnja se zove "Stavi na dan…" */
+  var zadBezRoka = W.otvoreniZadaci().filter(function(z){ return !z.rok; })[0];
+  if(zadBezRoka){
+    app.akcijeStavke('zadatak', zadBezRoka.id); await cekaj(120);
+    ok('zadatak bez roka nudi "Stavi na dan…"',
+       D.querySelector('#modal-root').textContent.indexOf('Stavi na dan') > -1);
+    app.closeModal();
+  }
+  /* odustajanje od premještanja ne mijenja ništa */
+  app.pokreniPremjestanje('preventiva', W.DATA.preventiva[1].id); await cekaj(100);
+  app.odustaniPremjestanje(); await cekaj(100);
+  ok('Odustani gasi mod premještanja bez izmjene', W.RASP_PREMJESTI === null);
+
+  grupa('Rok sanacije na kalendaru — K5');
+  var sanacijskiKvar = W.DATA.kvarovi.filter(function(k){ return k.privremeni && k.rok_sanacije; })[0];
+  ok('seed ima kvar s rokom sanacije', !!sanacijskiKvar);
+  if(sanacijskiKvar){
+    app.rasporedDan(sanacijskiKvar.rok_sanacije); await cekaj(120);
+    ok('rok sanacije se vidi kao stavka na svoj dan',
+       D.querySelector('#screen-raspored').textContent.indexOf('Sanacija:') > -1);
+    ok('sanacija nema ✓ radnju u prvoj verziji (svjesna odluka u detalju kvara)', (function(){
+       var red = Array.prototype.filter.call(D.querySelectorAll('#screen-raspored .row'),
+         function(r){ return r.textContent.indexOf('Sanacija:') > -1; })[0];
+       return !!red && !red.querySelector('.okbtn');
+    })());
+    app.rasporedDan(sanacijskiKvar.rok_sanacije);
+  }
   /* Pregled = stanje, Raspored = organizacija: Pregled više NE duplicira agendu */
   W.showScreen('pregled'); await cekaj(150);
   ok('Pregled ne duplicira agendu preventiva',
