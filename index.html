@@ -422,6 +422,7 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;
 .qval span{display:block;font-size:10px;color:var(--muted);font-weight:500}
 .qval.low{color:var(--red)}
 /* rastvoreni detalji dijela — radnje se pojave tek na dodir retka */
+.dio-info{padding:0 13px 9px;border-bottom:1px solid var(--border)}
 .dio-detalj{display:flex;align-items:center;gap:7px;padding:9px 13px 11px;
   border-bottom:1px solid var(--border);background:#f8f9fb}
 .dio-detalj:last-child{border-bottom:none}
@@ -1860,16 +1861,35 @@ function partRow(p){
   var otvoren = PART_OPEN === p.id;
   /* Sklopljen redak: naziv, oznaka i stanje — to je sve što se čita pri prolasku.
      Dobavljač, cijena, +/- i gumbi otvore se dodirom na redak. */
+  var preostaloNar = nar ? nar.kolicina - (nar.primljena_kolicina||0) : 0;
   var glava = '<div class="row click" onclick="app.otvoriDio(\''+p.id+'\')">'+
     '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(p.naziv)+chip+'</div>'+
     (otvoren ? '<div class="row-sub">'+esc(p.stroj)+' &middot; '+esc(p.dob)+
        (vidiFinancije() ? ' &middot; '+EUR(p.cijena) : '')+
-       (nar ? ' &middot; u dolasku &times;'+nar.kolicina+(nar.ocekivano ? ' do '+fmtDate(nar.ocekivano) : '') : '')+'</div>' : '')+
+       (nar ? ' &middot; u dolasku &times;'+preostaloNar+(nar.ocekivano ? ' do '+fmtDate(nar.ocekivano) : '') : '')+'</div>' : '')+
     '</div>'+
     '<div class="row-right"><span class="qval'+(low?' low':'')+'">'+p.stanje+'<span>min '+p.min+'</span></span>'+
     '<span class="chev" style="transform:rotate('+(otvoren?'90':'0')+'deg)">›</span></div></div>';
   if(!otvoren) return glava;
+  /* S8.2/S8.3: potrošnja kroz vrijeme i zadnje narudžbe — samo u rastvorenom retku,
+     da sklopljeni popis ostane miran (brojevi koje netko traži, ne brojevi koje gleda uvijek) */
+  var potr = potrosnjaDijela(p, 180);
+  var povijestN = (DATA.nabava||[]).filter(function(n){ return n.dio_id===p.id; })
+    .sort(function(a,b){ return String(b.narucen).localeCompare(String(a.narucen)); }).slice(0,3);
+  var infoHtml = (potr.komada
+      ? '<div class="row-sub" style="margin-top:8px">Potrošeno zadnjih 6 mj.: <b style="color:var(--text)">'+
+        potr.komada+' kom</b> (u '+potr.zahvata+(potr.zahvata===1?' kvaru':' kvarova')+')</div>'
+      : '')+
+    (povijestN.length
+      ? '<div class="row-sub" style="margin-top:6px"><b style="color:var(--text)">Zadnje narudžbe:</b>'+
+        povijestN.map(function(n){
+          return '<br>'+fmtDate(n.narucen)+' &middot; ×'+n.kolicina+
+            (vidiFinancije() && n.cijena ? ' &middot; '+EUR(n.cijena)+'/kom' : '')+
+            (n.primljeno ? ' &middot; stiglo' : ' &middot; u dolasku');
+        }).join('')+'</div>'
+      : '');
   return glava +
+    (infoHtml ? '<div class="dio-info" onclick="event.stopPropagation()">'+infoHtml+'</div>' : '')+
     '<div class="dio-detalj" onclick="event.stopPropagation()">'+
       (nar
         ? '<button class="btn-mini role-write" onclick="app.go(\'nabava\')">Otvori u Nabavi</button> '
@@ -1880,6 +1900,20 @@ function partRow(p){
         '<button class="qbtn" onclick="app.qty(\''+p.id+'\',1)">+</button>'+
       '</span>'+
     '</div>';
+}
+/* S8.2: procjena potrošnje iz slobodnog teksta "Zamijenjeno" — dio nema strukturiranu
+   vezu na kvar (namjerno, F3 je odbila tablicu veza za rijedak scenarij više dijelova
+   po kvaru), pa se broji podudaranje naziva; dovoljno dobro za "otprilike koliko trošimo". */
+function potrosnjaDijela(p, dana){
+  var od = dana ? isoShift(-dana) : '0000-00-00';
+  var re = new RegExp(p.naziv.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?:\\s*[×x](\\d+))?', 'i');
+  var zahvata = 0, komada = 0;
+  samoKvarovi().forEach(function(k){
+    if(!k.zam || k.date < od) return;
+    var m = re.exec(k.zam);
+    if(m){ zahvata++; komada += m[1] ? parseInt(m[1],10) : 1; }
+  });
+  return { zahvata:zahvata, komada:komada };
 }
 function partsListHtml(){
   var q = PART_Q.trim().toLowerCase();
@@ -2960,6 +2994,8 @@ var app = {
     var izvorK = (zadatak && k.izvor_kvar) ? DATA.kvarovi.filter(function(x){ return x.id===k.izvor_kvar; })[0] : null;
     var kontaktZ = (zadatak && k.kontakt_id) ? DATA.partneri.filter(function(x){ return x.id===k.kontakt_id; })[0] : null;
     var zadaciUzKvar = zadatak ? [] : DATA.kvarovi.filter(function(x){ return x.tip==='zadatak' && x.izvor_kvar===kId; });
+    /* K-3: narudžba koja zna za ovaj kvar — prikaži kao obvezu koja stiže, ne samo "čeka dio" */
+    var narudzbaZaKvar = zadatak ? null : (DATA.nabava||[]).filter(function(x){ return x.kvar_id===kId && !x.primljeno; })[0];
     var red = function(l, v){ return v ? '<div class="row-sub" style="margin-top:4px"><b style="color:var(--text)">'+l+':</b> '+v+'</div>' : ''; };
     var info =
       red('Datum', fmtDate(k.date)) +
@@ -2980,6 +3016,7 @@ var app = {
       (kontaktZ ? '<div class="row-sub" style="margin-top:4px"><b style="color:var(--text)">Kontakt:</b> '+esc(kontaktZ.naziv)+
         (kontaktZ.tel ? ' &middot; <a class="clink" href="tel:'+esc(String(kontaktZ.tel).replace(/[\s\/]/g,''))+'">'+esc(kontaktZ.tel)+'</a>' : '')+
         '</div>' : '') +
+      (narudzbaZaKvar ? red('Narudžba dijela', 'naručeno'+(narudzbaZaKvar.ocekivano ? ', stiže ~'+fmtDate(narudzbaZaKvar.ocekivano) : '')) : '') +
       red('Privremeni popravak', k.privremeni
         ? ('da &middot; rok trajne sanacije: '+(k.rok_sanacije
             ? (k.rok_sanacije < todayISO() && k.status!=='rijesen'
@@ -3007,6 +3044,9 @@ var app = {
       /* premješteno s kartice: prekidač koji ne mora stajati na svakoj kartici u popisu */
       akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.cekaDioIzDetalja(\''+kId+'\')">'+
         (k.ceka_dio ? '✓ Čeka dio — makni oznaku' : 'Čeka dio (naručeno, popravak stoji)')+'</button>';
+    if(jeOtvoren(k) && !zadatak && k.ceka_dio && !narudzbaZaKvar)
+      /* K-3: veza narudžba->kvar se upiše sama dolaskom iz ovog konteksta */
+      akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.naruciZaKvar(\''+kId+'\')">Naruči dio za ovaj kvar</button>';
     if(k.status!=='otkazan')
       akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.urediKvar(\''+kId+'\')">Uredi</button>';
     if(!zadatak && k.status!=='otkazan')
@@ -3596,25 +3636,46 @@ var app = {
     await apiUpdate('partneri', id, { naziv:pt.naziv, usluga:pt.usluga, mjesto:pt.mjesto,
       tel:pt.tel, email:pt.email, nap:pt.nap, tip:pt.tip });
   },
-  naruciDio: function(id){
+  naruciDio: function(id, kvarId){
     var p = dioPoId(id);
     if(!p) return;
     var dobOpts = DATA.partneri.map(function(x){
       return '<option'+(p.dob===x.naziv?' selected':'')+'>'+esc(x.naziv)+'</option>'; }).join('');
     var predlozena = Math.max(1, (p.min * 2) - p.stanje);
+    var kv = kvarId ? DATA.kvarovi.filter(function(x){ return x.id===kvarId; })[0] : null;
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Naruči dio</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<div style="font-size:15.5px;font-weight:650">'+esc(p.naziv)+'</div>'+
       '<div class="row-sub" style="margin-bottom:4px">stanje '+p.stanje+' / minimum '+p.min+
         (p.sku ? ' &middot; šifra '+esc(p.sku) : '')+'</div>'+
+      (kv ? '<div class="row-sub" style="margin-bottom:4px">Vezano uz kvar: '+esc(kv.opis)+'</div>' : '')+
       '<form onsubmit="app.saveNarudzbu(event,\''+id+'\')">'+
+        (kv ? '<input type="hidden" name="kvar_id" value="'+esc(kv.id)+'">' : '')+
         '<label>Količina</label><input type="number" name="kolicina" min="1" step="1" value="'+predlozena+'" required>'+
         '<label>Dobavljač</label><select name="dobavljac">'+dobOpts+'</select>'+
         '<label>Očekivana isporuka</label><input type="date" name="ocekivano" min="'+todayISO()+'">'+
         '<label>Cijena po komadu (€)</label><input type="number" name="cijena" min="0" step="0.01" value="'+(p.cijena||0)+'">'+
         '<label>Napomena</label><input name="napomena" placeholder="npr. hitno — stroj čeka">'+
         '<button class="btn primary block" type="submit">Zabilježi narudžbu</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</form></div></div>';
+  },
+  /* K-3: ulaz "naruči dio" IZ kvara koji čeka dio — veza se upiše sama */
+  naruciZaKvar: function(kId){
+    if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
+    var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
+    if(!k) return;
+    var opts = DATA.dijelovi.filter(function(p){ return (p.strojevi||[]).indexOf(k.m) > -1; });
+    if(!opts.length) opts = DATA.dijelovi;   /* nema dio vezan uz taj stroj u šifrarniku — ponudi sve */
+    if(!opts.length){ alert('Nema unesenih dijelova u skladištu.'); return; }
+    var dioOpts = opts.map(function(p){ return '<option value="'+p.id+'">'+esc(p.naziv)+' (stanje '+p.stanje+')</option>'; }).join('');
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
+      '<div class="modal-head"><h3>Naruči dio za ovaj kvar</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<form onsubmit="event.preventDefault();var d=this.elements.dio.value;app.closeModal();app.naruciDio(d,\''+kId+'\');">'+
+        '<label>Dio</label><select name="dio" required>'+dioOpts+'</select>'+
+        '<button class="btn primary block" type="submit">Dalje</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
@@ -3631,13 +3692,15 @@ var app = {
       primljeno: null, primljena_kolicina: null,
       cijena: parseFloat(f.get('cijena'))||0,
       napomena: String(f.get('napomena')||'').trim() || null,
+      kvar_id: f.get('kvar_id') || null,
       tko: SESSION.ime || ''
     };
     if(!DATA.nabava) DATA.nabava = [];
     DATA.nabava.push(n);
     app.closeModal(); showScreen('nabava');
     var spremljeno = await apiInsert('nabava', { dio_id:n.dio_id, kolicina:n.kolicina, dobavljac:n.dobavljac,
-      narucen:n.narucen, ocekivano:n.ocekivano, cijena:n.cijena, napomena:n.napomena, tko:n.tko }, n);
+      narucen:n.narucen, ocekivano:n.ocekivano, cijena:n.cijena, napomena:n.napomena, tko:n.tko,
+      kvar_id:n.kvar_id }, n);
     if(spremljeno || !REMOTE)
       sysPoruka('🧾 Naručeno: '+(p?p.naziv:'dio')+' ×'+n.kolicina+' kod '+(n.dobavljac||'—')+
         (n.ocekivano ? ', očekivano '+fmtDate(n.ocekivano) : '')+' ('+(SESSION.ime||'')+')');
@@ -3647,45 +3710,71 @@ var app = {
     if(!n) return;
     if(jeTempId(id)){ alert('Narudžba se upravo sprema — pokušaj za par sekundi.'); return; }
     var p = dioPoId(n.dio_id);
+    var preostalo = n.kolicina - (n.primljena_kolicina||0);
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Primitak narudžbe</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<div class="row-sub" style="margin-bottom:2px">'+esc(p?p.naziv:'dio')+' &middot; naručeno ×'+n.kolicina+
+        (n.primljena_kolicina ? ' &middot; dosad stiglo ×'+n.primljena_kolicina : '')+
         (n.dobavljac?' kod '+esc(n.dobavljac):'')+'</div>'+
       '<form onsubmit="app.savePrimitak(event,\''+id+'\')">'+
-        '<label>Koliko je komada stiglo?</label>'+
-        '<input type="number" name="kol" min="1" step="1" value="'+n.kolicina+'" required>'+
+        /* S8.1: djelomični primitak — stigne li manje od preostalog, narudžba ostaje
+           otvorena s ostatkom umjesto da nestane kao da je sve stiglo */
+        '<label>Koliko je komada stiglo (preostalo ×'+preostalo+')?</label>'+
+        '<input type="number" name="kol" min="1" max="'+preostalo+'" step="1" value="'+preostalo+'" required>'+
         '<button class="btn primary block" type="submit">Zaprimi</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   savePrimitak: async function(e, id){
     e.preventDefault();
-    var kol = Math.max(0, parseInt(new FormData(e.target).get('kol'),10) || 0);
-    if(!kol) return;
-    app.closeModal();
     var n = (DATA.nabava||[]).filter(function(x){ return x.id===id; })[0];
     if(!n || n.primljeno) return;
+    var preostalo = n.kolicina - (n.primljena_kolicina||0);
+    var kol = Math.max(0, Math.min(preostalo, parseInt(new FormData(e.target).get('kol'),10) || 0));
+    if(!kol) return;
+    app.closeModal();
     var p = dioPoId(n.dio_id);
-    n.primljeno = todayISO();
-    n.primljena_kolicina = kol;
+    var novaPrimljena = (n.primljena_kolicina||0) + kol;
+    var zavrseno = novaPrimljena >= n.kolicina;
+    n.primljena_kolicina = novaPrimljena;
+    n.primljeno = zavrseno ? todayISO() : null;
     if(p) p.stanje = p.stanje + kol;
     showScreen('nabava');
     if(REMOTE && naMrezi()){
       try{
-        var rpc = await sb.rpc('primi_nabavu', { p_id:id, p_kolicina:kol, p_datum:n.primljeno });
+        var rpc = await sb.rpc('primi_nabavu', { p_id:id, p_kolicina:kol, p_datum:todayISO() });
         if(!rpc.error && typeof rpc.data === 'number' && p) p.stanje = rpc.data;
         else throw rpc.error || new Error('rpc');
       }catch(e){
-        await apiUpdate('nabava', id, { primljeno:n.primljeno, primljena_kolicina:kol });
+        await apiUpdate('nabava', id, { primljeno:n.primljeno, primljena_kolicina:n.primljena_kolicina });
         if(p) await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
       }
     } else {
-      await apiUpdate('nabava', id, { primljeno:n.primljeno, primljena_kolicina:kol });
+      await apiUpdate('nabava', id, { primljeno:n.primljeno, primljena_kolicina:n.primljena_kolicina });
       if(p) await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
     }
-    sysPoruka('📦 Primljeno: '+(p?p.naziv:'dio')+' ×'+kol+' — na skladištu '+(p?p.stanje:'?')+' ('+(SESSION.ime||'')+')');
-    showScreen('nabava');
+    sysPoruka('📦 Primljeno: '+(p?p.naziv:'dio')+' ×'+kol+
+      (zavrseno ? ' — narudžba zatvorena' : ' (preostalo ×'+(n.kolicina-novaPrimljena)+', narudžba ostaje otvorena)')+
+      ' — na skladištu '+(p?p.stanje:'?')+' ('+(SESSION.ime||'')+')');
+    /* K-2/K-3: dio je stigao — javi majstoru koji čeka. Ciljano ako narudžba zna za
+       kvar (K-3); inače heuristikom po stroju na koji je dio vezan (K-2). */
+    var vecObavijesten = {};
+    if(n.kvar_id){
+      var kk = DATA.kvarovi.filter(function(x){ return x.id===n.kvar_id; })[0];
+      if(kk && jeOtvoren(kk) && kk.dodijeljen){
+        posaljiObavijest('📦 Stigao naručeni dio', (p?p.naziv:'dio')+' je stigao za tvoj kvar — možeš nastaviti.', '#kvarovi', kk.dodijeljen);
+        vecObavijesten[kk.id] = true;
+      }
+    }
+    if(p && (p.strojevi||[]).length){
+      DATA.kvarovi.filter(function(k){
+        return jeOtvoren(k) && k.ceka_dio && !vecObavijesten[k.id] && k.m && k.dodijeljen && p.strojevi.indexOf(k.m) > -1;
+      }).forEach(function(k){
+        var km = machineById(k.m);
+        posaljiObavijest('📦 Stigao dio', p.naziv+' je stigao — možda možeš nastaviti na '+(km?km.name:'')+'.', '#kvarovi', k.dodijeljen);
+      });
+    }
   },
   traziDio: function(v){
     PART_Q = v;

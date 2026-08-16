@@ -667,6 +667,67 @@ async function testovi(W, D){
   ok('dio više nije na popisu "Za naručiti"',
      D.querySelector('#screen-nabava').innerHTML.indexOf('app.naruciDio(\''+kritican2.id+'\')') === -1);
 
+  grupa('Skladište jače — G5 (djelomični primitak, povijest, K-2/K-3)');
+  /* S8.1: djelomični primitak — narudžba ostaje otvorena dok kumulativno ne stigne sve */
+  var dioZaDjel = W.DATA.dijelovi[0];
+  var stanjeZaDjel = dioZaDjel.stanje;
+  app.naruciDio(dioZaDjel.id); await cekaj(120);
+  var fD = D.querySelector('#modal-root form');
+  fD.elements.kolicina.value = '5';
+  posalji(fD); await cekaj(200);
+  var narDjel = W.DATA.nabava[W.DATA.nabava.length-1];
+  app.primiNabavu(narDjel.id); await cekaj(120);
+  var fp1 = D.querySelector('#modal-root form');
+  jednako('primitak predlaže punu preostalu količinu (prvi put = sve)', fp1.elements.kol.value, '5');
+  fp1.elements.kol.value = '2';
+  posalji(fp1); await cekaj(200);
+  ok('djelomičan primitak NE zatvara narudžbu', !narDjel.primljeno);
+  jednako('primljena_kolicina bilježi kumulativno stiglo', narDjel.primljena_kolicina, 2);
+  jednako('stanje dijela raste za primljeno', dioZaDjel.stanje, stanjeZaDjel + 2);
+  ok('narudžba i dalje u dolasku (djelomično)', !!W.narudzbaZaDio(dioZaDjel.id));
+  app.primiNabavu(narDjel.id); await cekaj(120);
+  var fp2 = D.querySelector('#modal-root form');
+  jednako('drugi primitak predlaže samo preostalo (3, ne ukupnih 5)', fp2.elements.kol.value, '3');
+  posalji(fp2); await cekaj(200);
+  ok('narudžba se zatvara kad kumulativno dosegne naručeno', !!narDjel.primljeno);
+  jednako('ukupno stanje raslo za svih 5 kroz dva primitka', dioZaDjel.stanje, stanjeZaDjel + 5);
+
+  /* S8.2/S8.3: potrošnja kroz vrijeme i povijest narudžbi — samo u rastvorenom retku */
+  app.go('dijelovi'); await cekaj(120);
+  app.otvoriDio(dioZaDjel.id); await cekaj(120);
+  ok('rastvoren dio prikazuje zadnje narudžbe',
+     D.querySelector('#parts-list').innerHTML.indexOf('Zadnje narudžbe') > -1);
+  app.otvoriDio(dioZaDjel.id); await cekaj(80);
+
+  /* K-3: narudžba iz konteksta kvara nosi vezu; primitak zna ciljano javiti baš tom kvaru */
+  var kvarCekaDio = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; })[0];
+  kvarCekaDio.ceka_dio = true; kvarCekaDio.dodijeljen = 'Majstor 2';
+  app.detaljKvara(kvarCekaDio.id); await cekaj(120);
+  ok('kvar koji čeka dio nudi "Naruči dio za ovaj kvar"',
+     D.querySelector('#modal-root').innerHTML.indexOf('Naruči dio za ovaj kvar') > -1);
+  app.naruciZaKvar(kvarCekaDio.id); await cekaj(120);
+  var fk3 = D.querySelector('#modal-root form');
+  posalji(fk3); await cekaj(150);
+  var fk3b = D.querySelector('#modal-root form');
+  ok('obrazac narudžbe iz kvara nosi skrivenu vezu na kvar', fk3b.elements.kvar_id.value === kvarCekaDio.id);
+  posalji(fk3b); await cekaj(200);
+  var narK3 = W.DATA.nabava[W.DATA.nabava.length-1];
+  jednako('narudžba iz kvara nosi kvar_id', narK3.kvar_id, kvarCekaDio.id);
+  app.detaljKvara(kvarCekaDio.id); await cekaj(120);
+  ok('detalj kvara prikazuje da je dio naručen', D.querySelector('#modal-root').textContent.indexOf('Narudžba dijela') > -1);
+  app.closeModal();
+  /* K-2/K-3: primitak javlja baš dodijeljenom majstoru — mock jer se u demo načinu ništa ne šalje */
+  var obavijesti = [];
+  var origObavijest = W.posaljiObavijest;
+  W.posaljiObavijest = function(naslov, tekst, ruta, samoZa){ obavijesti.push({naslov:naslov, samoZa:samoZa}); };
+  app.primiNabavu(narK3.id); await cekaj(120);
+  var fk3c = D.querySelector('#modal-root form');
+  fk3c.elements.kol.value = String(narK3.kolicina);
+  posalji(fk3c); await cekaj(200);
+  W.posaljiObavijest = origObavijest;
+  ok('primitak ciljano javlja majstoru vezanom na kvar preko narudžbe (K-3)',
+     obavijesti.some(function(o){ return o.samoZa===kvarCekaDio.dodijeljen && o.naslov.indexOf('Stigao') > -1; }));
+
   grupa('Iskustvo na stroju');
   app.openStroj('e1'); await cekaj(150);
   ok('kartica iskustva prikazuje ponovljene kvarove i rješenja',
