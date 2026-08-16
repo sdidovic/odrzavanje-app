@@ -1516,38 +1516,35 @@ function renderPregled(){
       }).join('')+'</div>'
     : '';
 
-  /* majstor ne vidi financije — njegov pregled počinje zadacima */
+  /* S2 (PLAN-KAIZEN): majstor ne vidi financije — njegov pregled počinje zadacima,
+     bigCard se za njega uopće ne iscrtava (Moji zadaci mu je u istom slotu). */
   /* mjesec još traje — to mora pisati, inače broj izgleda kao konačan */
   var mjesecSub = esc(monthLabel())+' — prvih '+danMj+' dana';
-  var bigCard = vidiFinancije()
-    ? '<div class="big-card" onclick="app.go(\'kvarovi\')">'+
-        '<div class="big-label">Trošak zastoja ovaj mjesec</div>'+
-        '<div class="big-num">'+EUR(cost)+trend+'</div>'+
-        '<div class="big-sub">'+mjesecSub+' &middot; '+mk.length+' zastoja &middot; ukupno '+H(hrs)+
-          (uTijekuCost > 0 ? '<br>+ '+EUR(uTijekuCost)+' iz kvarova koji još traju' : '')+'</div>'+
-      '</div>'
-    : '<div class="big-card" onclick="app.go(\'kvarovi\')">'+
-        '<div class="big-label">Zastoji ovaj mjesec</div>'+
-        '<div class="big-num">'+mk.length+'</div>'+
-        '<div class="big-sub">'+mjesecSub+' &middot; ukupno '+H(hrs)+' zastoja</div>'+
-      '</div>';
+  var bigCard = '<div class="big-card" onclick="app.go(\'kvarovi\')">'+
+      '<div class="big-label">Trošak zastoja ovaj mjesec</div>'+
+      '<div class="big-num">'+EUR(cost)+trend+'</div>'+
+      '<div class="big-sub">'+mjesecSub+' &middot; '+mk.length+' zastoja &middot; ukupno '+H(hrs)+
+        (uTijekuCost > 0 ? '<br>+ '+EUR(uTijekuCost)+' iz kvarova koji još traju' : '')+'</div>'+
+    '</div>';
+  /* S2 (PLAN-KAIZEN): prvo ono što gori, pa brojke, pa povijest — financije nisu
+     prva stvar koju voditelj traži ujutro, a majstora uopće ne zanimaju. */
+  var mojiZadaciHtml = (function(){
+    var moji = aktivni().filter(function(k){ return jeOtvoren(k) && k.dodijeljen===SESSION.ime; });
+    return moji.length
+      ? '<h2>Moji zadaci ('+moji.length+')</h2><div class="card">'+moji.map(function(k){ return kvarItem(k,true); }).join('')+'</div>'
+      : '';
+  })();
   $('#screen-pregled').innerHTML =
-    bigCard+
+    stojiHtml+
     '<div class="stat-grid">'+
       statCard(open.length, 'Otvoreni kvarovi',        open.length ? 'red'    : 'green', "app.goKvaroviOtvoreni()")+
       statCard(low.length,  'Dijelovi za naručiti',    low.length  ? 'red'    : 'green', "app.go('nabava')")+
       /* organizacija se radi na Rasporedu — i brojka vodi onamo */
       statCard(late.length, 'Preventive kasne',        late.length ? 'yellow' : 'green', "app.go('raspored')")+
     '</div>'+
-    stojiHtml+
-    (vidiFinancije() ? '<button class="btn sec sm block" style="margin-top:10px" onclick="app.go(\'analitika\')">Analitika i izvoz</button>' : '')+
-    (function(){
-      /* majstoru odmah pokaži njegove zadatke na vrhu */
-      var moji = aktivni().filter(function(k){ return jeOtvoren(k) && k.dodijeljen===SESSION.ime; });
-      return moji.length
-        ? '<h2>Moji zadaci ('+moji.length+')</h2><div class="card">'+moji.map(function(k){ return kvarItem(k,true); }).join('')+'</div>'
-        : '';
-    })()+
+    (vidiFinancije()
+      ? bigCard+'<button class="btn sec sm block" style="margin-top:10px" onclick="app.go(\'analitika\')">Analitika i izvoz</button>'+mojiZadaciHtml
+      : mojiZadaciHtml)+
     (vidiFinancije()
       ? '<h2>Najskuplji strojevi — zadnja 3 mj.</h2>'+
         '<div class="card">'+topHtml+'</div>'+

@@ -804,6 +804,25 @@ async function testovi(W, D){
     return html.slice(od, html.indexOf('<h2', od+5)).indexOf(upoz.opis) === -1;
   })());
 
+  grupa('Pregled presložen — S2 (prvo što gori, pa brojke, pa povijest)');
+  var html2 = D.querySelector('#screen-pregled').innerHTML;
+  var iStat = html2.indexOf('stat-grid');
+  var iBig = html2.indexOf('big-card');
+  var iNajskuplji = html2.indexOf('Najskuplji strojevi');
+  var iZadnji = html2.indexOf('Zadnji događaji');
+  ok('stat kartice dolaze prije velike kartice troška (voditelj)', iStat > -1 && iBig > -1 && iStat < iBig);
+  ok('velika kartica troška dolazi prije najskupljih strojeva', iBig < iNajskuplji);
+  ok('najskuplji strojevi dolaze prije zadnjih događaja', iNajskuplji < iZadnji);
+  if(stojiIma){
+    var iStoji2 = html2.indexOf('Trenutno stoji');
+    ok('"Trenutno stoji" dolazi prije stat kartica (najvažnije na vrhu)', iStoji2 > -1 && iStoji2 < iStat);
+  }
+  W.SESSION = { ime:'Majstor 1', role:'majstor' }; D.body.dataset.role = 'majstor';
+  W.showScreen('pregled'); await cekaj(120);
+  ok('majstor uopće ne dobije veliku karticu troška (Moji zadaci mu je u tom slotu)',
+     D.querySelector('#screen-pregled .big-card') === null);
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+
   grupa('Filtar "otvoreni + u radu"');
   W.SESSION = { ime:'Voditelj', role:'voditelj' };
   D.body.dataset.role = 'voditelj';
