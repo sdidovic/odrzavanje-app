@@ -185,30 +185,48 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .qr-slika img,.qr-slika canvas{display:block}
 .qr-upute{font-size:10.5px;color:var(--muted);margin-top:7px;line-height:1.35}
 
-/* ---------- kalendarska mreža na Rasporedu (K1-K2) — brojke, ne točkice ---------- */
+/* ---------- Raspored: agenda po hitnosti + kalendar na dodir ----------
+   Kalendar je sklopiv ulaz za grubo planiranje (zatvoren po defaultu), ne stalno
+   nametnut prikaz. Glavni sadržaj je JEDNA agenda u pet grupa (Kasni/Danas/Ovaj
+   tjedan/Kasnije/Bez roka) — svaka stavka postoji točno jednom, nikad dvaput. */
+.rasp-kal-traka{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;
+  border:1.5px solid var(--border);border-radius:10px;background:var(--card);margin-bottom:10px;
+  font-size:13.5px;font-weight:650;color:var(--text);cursor:pointer}
+.rasp-kal-traka:active{background:#f6f7f9}
 .rasp-nav{display:flex;align-items:center;justify-content:space-between;margin:6px 0 8px;gap:8px}
 .rasp-naslov{font-size:14.5px;font-weight:700;flex:1;text-align:center}
 .rasp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .rasp-h{text-align:center;font-size:10px;font-weight:700;color:var(--muted);
   text-transform:uppercase;padding:2px 0 5px}
-.rasp-d{min-height:54px;border-radius:9px;border:1.5px solid var(--border);background:var(--card);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+.rasp-d{min-height:50px;border-radius:9px;border:1.5px solid var(--border);background:var(--card);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   cursor:pointer;font-size:14px;font-weight:700;color:var(--text);padding:2px}
 .rasp-d:active{transform:scale(.96)}
 .rasp-d.prosli{color:var(--muted);border-color:transparent}
 .rasp-d.izvan{opacity:.42}   /* dan susjednog mjeseca — vidljiv i živ, ali prigušen */
 .rasp-d.danas{border-color:var(--accent);border-width:2px}
 .rasp-d.odabran{background:var(--accent-soft);border-color:var(--accent)}
-.rasp-broj{font-size:11.5px;font-weight:700;background:var(--accent-soft);color:var(--accent);
-  border-radius:20px;padding:1px 7px;min-width:18px;line-height:1.5;font-variant-numeric:tabular-nums}
-.rasp-broj.kasni{background:var(--red-bg);color:var(--red)}
+/* točka nosi JEDNO dosljedno značenje (isto kao chip "Zaustavlja liniju" u ostatku
+   appa): šuplja = ima nešto taj dan, puna crvena = nešto tog dana zaustavlja liniju.
+   Nikad "dan je prošao" — to govori isključivo sekcija "Kasni" ispod. */
+.rasp-tocka{display:inline-block;width:7px;height:7px;border-radius:50%;
+  border:1.5px solid var(--muted);background:transparent}
+.rasp-tocka.kritican{border-color:var(--red);background:var(--red)}
 .rasp-premjesti{padding:11px 13px;border:1.5px solid var(--accent);background:var(--accent-soft);
   border-radius:var(--radius-s);margin-bottom:10px}
 .rasp-premjesti .row-sub:first-child{color:var(--accent);font-weight:700}
-/* detalj odabranog dana — širi se unutar kalendara, odmah ispod retka tjedna (kao
-   TickTick/Todoist), ne kao zaseban panel negdje dolje koji korisnik mora tražiti */
-.rasp-dan-detalj{grid-column:1/-1;background:var(--bg);border:1.5px solid var(--accent-rub);
-  border-radius:10px;padding:10px 12px;margin:2px 0 4px}
+/* skupine agende: sklopive nose chevron, "Kasni"/"Danas"/"Ovaj tjedan" su trajno otvorene */
+.rasp-grupa-head{cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+.rasp-dan-sub{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.4px;padding:9px 13px 2px}
+.kasni-red .row{border-left:3px solid var(--red)}
+.grupa-tiho .row-title{font-size:12.5px;color:var(--muted)}
+.flash{animation:rasp-flash .9s ease}
+@keyframes rasp-flash{0%{background:var(--accent-soft)}100%{background:transparent}}
+/* detalj dana kao samostalan blok — danas samo fallback za prazan dan izvan svih
+   grupa (scrollNaDan), nikad umetnut usred kalendarske mreže */
+.rasp-dan-detalj{background:var(--bg);border:1.5px solid var(--accent-rub);
+  border-radius:10px;padding:10px 12px;margin:2px 0 10px}
 .rasp-dan-detalj h3{font-size:13.5px;font-weight:700;margin:0 0 6px;color:var(--text)}
 .rasp-dan-detalj .row{background:var(--card);border:1px solid var(--border);border-radius:9px;
   margin-bottom:6px;padding:9px 11px}
@@ -315,6 +333,7 @@ body[data-role="majstor"] .btn-audit{display:none}
 .login-logo{height:76px;margin-bottom:var(--r2)}
 .login-title{font-size:12px;font-weight:700;margin-bottom:var(--r5);color:var(--muted);
   text-transform:uppercase;letter-spacing:1px}
+.login-opis{font-size:13px;color:var(--text-2);line-height:1.5;margin:-4px 0 var(--r4)}
 .user-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--r2);margin-bottom:var(--r4)}
 /* neparan broj ljudi: zadnja pločica preko cijele širine, da ne visi pola reda */
 .user-tile:last-child:nth-child(odd){grid-column:1 / -1}
@@ -550,6 +569,11 @@ form .btn{margin-top:20px}
 <div id="screen-login"><div class="login-box">
   <img class="login-logo" id="login-logo" alt="Clarum">
   <div class="login-title">Održavanje — prijava</div>
+  <!-- AUDIT-FIX (UX): netko tko app vidi prvi put (novi zaposlenik, investitor na
+       razgovoru) nije dobivao nijednu rečenicu što alat radi — samo gole pločice
+       imena. Prvi dojam je često baš ovaj ekran. -->
+  <div class="login-opis">Prijava kvarova, planirano održavanje i skladište rezervnih
+    dijelova — na jednom mjestu za cijeli tim održavanja.</div>
   <div class="user-tiles" id="user-tiles"></div>
   <div class="pin-wrap">
     <input class="pin-input" id="pin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN"
@@ -588,7 +612,9 @@ form .btn{margin-top:20px}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="7.5" y1="2.5" x2="7.5" y2="6.5"/><line x1="16.5" y1="2.5" x2="16.5" y2="6.5"/><circle cx="8" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="8" cy="17.5" r="1.1" fill="currentColor" stroke="none"/></svg>
     Raspored</button>
   <button class="tab" data-tab="strojevi" onclick="app.go('strojevi')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.08A1.7 1.7 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.08A1.7 1.7 0 0 0 20.91 10H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg>
+    <!-- AUDIT-FIX (UX): zupčanik je univerzalni simbol za Postavke u gotovo svakoj app-i
+         (a "Sustav" nema nikakvu ikonu) — tab i ikona su radili jedno protiv drugog. -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="14" width="18" height="7" rx="1"/><path d="M6 14V8l4 3V8l4 3V8l4 3v3"/></svg>
     Strojevi</button>
   <button class="tab" data-tab="dijelovi" onclick="app.go('dijelovi')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8.6 12 3 3 8.6v6.8L12 21l9-5.6z"/><path d="M3 8.6l9 5.4 9-5.4"/><line x1="12" y1="14" x2="12" y2="21"/></svg>
@@ -753,6 +779,17 @@ var PRIJASNJI_EKRAN = null;   /* S9: renderPoruke razlikuje "tek otvoren ekran" 
 /* §11.5 dovršetak: pamćenje zadnjeg ekrana — samo glavni ekrani iz HASH_EKRANI (ne
    stroj/qr/sustav, koji trebaju kontekst koji ovdje nemamo). Deep-link hash uvijek
    pobjeđuje (initHash se pokuša prvi), ovo je samo zadano stanje bez hasha. */
+/* AUDIT-FIX (UX): jedino objašnjenje "kako se koristi" bilo je zakopano na dnu Pregleda
+   iza poveznice "Pomoć" — nitko ga automatski ne vidi. Prikaže se JEDNOM, prvi put kad
+   se app otvori na ovom uređaju (bilo pravom prijavom, bilo demo ulazom). */
+var UVOD_VIDEN_KEY = 'odrzavanje-uvod-viden';
+function prikaziUvodAkoPrvi(){
+  try{
+    if(localStorage.getItem(UVOD_VIDEN_KEY)) return;
+    localStorage.setItem(UVOD_VIDEN_KEY, '1');
+  }catch(e){ return; }
+  app.pomoc();
+}
 var ZADNJI_EKRAN_KEY = 'odrzavanje-zadnji-ekran';
 function zapamtiEkran(name){
   if(HASH_EKRANI.indexOf(name) === -1) return;
@@ -1608,6 +1645,9 @@ function velicinaTxt(bajtova){
 }
 
 /* =====================  render: Pregled  ===================== */
+var PREGLED_FIN_OTVOREN = false;   /* AUDIT-FIX (UX): financijski blok sklopiv, zatvoren po
+  defaultu — Pregled je jedini ekran gdje "gustoća iza dodira" (već primijenjeno na
+  Kvarovima/Skladištu) nije postojala, iako je ovo i prvi ekran nakon prijave i demo ekran. */
 function renderPregled(){
   var KV = samoKvarovi();  /* bez storniranih i bez zadataka — financije i brojke */
   var mm = todayISO().slice(0,7);
@@ -1705,7 +1745,7 @@ function renderPregled(){
         return '<div class="row click" onclick="app.detaljKvara(\''+k.id+'\')">'+
           '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(sm.name)+
             (k.prioritet==='hitno' ? ' <span class="chip kvar">HITNO</span>' : '')+
-            (k.ceka_dio ? ' <span class="chip upoz">Čeka dio</span>' : '')+'</div>'+
+            (k.ceka_dio ? ' <span class="chip upoz">Čeka dio · stoji</span>' : '')+'</div>'+
           '<div class="row-sub">'+esc(k.opis)+'</div>'+
           '<div class="row-sub">'+(trajanjeKvara(k) || 'u tijeku')+
             (k.dodijeljen ? ' &middot; <b>'+esc(k.dodijeljen)+'</b>' : ' &middot; nedodijeljen')+'</div></div>'+
@@ -1735,23 +1775,31 @@ function renderPregled(){
       ? '<h2>Moji zadaci ('+moji.length+')</h2><div class="card">'+moji.map(function(k){ return kvarItem(k,true); }).join('')+'</div>'
       : '';
   })();
+  /* AUDIT-FIX (UX): bigCard + oba bar-grafa su nekad uvijek stajala razvijena — najgušći
+     dio najgušćeg (i demo) ekrana, a bar-grafovi dupliraju ono što Analitika već pokazuje.
+     Sad su iza jednog sklopivog retka: prvi pogled ostaje "što gori" (Trenutno stoji, 3
+     stat kartice, Moji zadaci), financije su tu kad ih netko stvarno traži. */
+  var finTraka = '<div class="rasp-kal-traka" onclick="app.pregledFinToggle()">'+
+    '<span>Trošak zastoja ovaj mjesec — '+EUR(cost)+'</span>'+
+    '<span class="chev" style="transform:rotate('+(PREGLED_FIN_OTVOREN?90:0)+'deg)">›</span></div>';
+  var finDetalji = PREGLED_FIN_OTVOREN
+    ? bigCard+
+      '<button class="btn sec sm block" style="margin-top:10px" onclick="app.go(\'analitika\')">Analitika i izvoz</button>'+
+      '<h2>Najskuplji strojevi — zadnja 3 mj.</h2><div class="card">'+topHtml+'</div>'+
+      '<h2>Trošak zastoja po mjesecima</h2><div class="card">'+trendHtml+'</div>'
+    : '';
   $('#screen-pregled').innerHTML =
     stojiHtml+
     '<div class="stat-grid">'+
       statCard(open.length, 'Otvoreni kvarovi',        open.length ? 'red'    : 'green', "app.goKvaroviOtvoreni()")+
       statCard(low.length,  'Za naručiti',             low.length  ? 'red'    : 'green', "app.go('nabava')")+
-      /* organizacija se radi na Rasporedu — i brojka vodi onamo */
-      statCard(late.length, 'Preventive kasne',        late.length ? 'yellow' : 'green', "app.go('raspored')")+
+      /* organizacija se radi na Rasporedu — i brojka vodi onamo. AUDIT-FIX (UX):
+         "Preventive" je žargon bez imenice ("preventivni pregledi") — nekome tko nije
+         iz održavanja djeluje kao nedovršena rečenica. */
+      statCard(late.length, 'Zaostali servisi',        late.length ? 'yellow' : 'green', "app.go('raspored')")+
     '</div>'+
-    (vidiFinancije()
-      ? bigCard+'<button class="btn sec sm block" style="margin-top:10px" onclick="app.go(\'analitika\')">Analitika i izvoz</button>'+mojiZadaciHtml
-      : mojiZadaciHtml)+
-    (vidiFinancije()
-      ? '<h2>Najskuplji strojevi — zadnja 3 mj.</h2>'+
-        '<div class="card">'+topHtml+'</div>'+
-        '<h2>Trošak zastoja po mjesecima</h2>'+
-        '<div class="card">'+trendHtml+'</div>'
-      : '')+
+    mojiZadaciHtml+
+    (vidiFinancije() ? finTraka+finDetalji : '')+
     '<h2>Zadnji događaji</h2>'+
     '<div class="card">'+ last3.map(function(k){ return eventRow(k); }).join('') +'</div>'+
     '<div class="session-row">'+
@@ -1959,7 +2007,7 @@ function kvarItem(k, showMachine){
   if(jeOtvoren(k)){
     if(k.prioritet==='hitno') pChip += '<span class="chip kvar">HITNO</span> ';
     else if(k.prioritet==='visok') pChip += '<span class="chip upoz">Visok</span> ';
-    if(k.ceka_dio) pChip += '<span class="chip upoz">Čeka dio</span> ';
+    if(k.ceka_dio) pChip += '<span class="chip upoz">Čeka dio · stoji</span> ';
   }
   var sig = zadatak ? null : kvarSig(k);
   var rep = (sig && REPS[sig] >= 2) ? ' <span class="rep">'+REPS[sig]+'× u 3 mj.</span>' : '';
@@ -2061,9 +2109,13 @@ function renderKvarovi(){
      pet padajućih polja i dva datuma otvore se tek na dodir */
   var nAkt = brojAktivnihFiltera();
   $('#screen-kvarovi').innerHTML =
-    '<div class="role-write" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'+
-      '<button class="btn primary" onclick="app.brzaPrijava()">Brza prijava</button>'+
-      '<button class="btn sec" onclick="app.noviKvar()">Detaljna prijava</button>'+
+    /* AUDIT-FIX (UX): oba gumba su nekad bila jednake težine iako "Detaljna prijava"
+       otvara obrazac s ~3x više polja za identičnu svrhu (prijaviti kvar) — slučajan
+       dodir u žurbi bacao je korisnika u puno teži put. Brza prijava je sada vidno glavni
+       put, Detaljna je manja, sporedna opcija za rijetke slučajeve. */
+    '<div class="role-write" style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:12px;align-items:stretch">'+
+      '<button class="btn primary" onclick="app.brzaPrijava()">⚡ Brza prijava</button>'+
+      '<button class="btn sec sm" onclick="app.noviKvar()">Detaljno</button>'+
     '</div>'+
     '<div style="display:flex;gap:8px;margin-bottom:10px">'+
       '<input type="search" value="'+esc(FILTER.q)+'" placeholder="Pretraži opis…" oninput="app.setFilterTiho(\'q\',this.value)" style="flex:1">'+
@@ -2147,6 +2199,11 @@ function partRow(p){
         ? '<button class="btn-mini role-write" onclick="app.go(\'nabava\')">Otvori u Nabavi</button> '
         : '<button class="btn-mini role-write" onclick="app.naruciDio(\''+p.id+'\')">Naruči</button> ')+
       '<button class="btn-mini role-voditelj" onclick="app.urediDio(\''+p.id+'\')">Uredi</button>'+
+      /* AUDIT-FIX (UX): +/- mijenja stanje samo za 1 po dodiru — kod veće isporuke ili
+         ispravka nakon inventure to je deseci dodira. Izravan upis broja bio je dostupan
+         SAMO kroz "Uredi" (voditelj, uz cijenu/dobavljača) — ovo je lagana radnja
+         dostupna svima koji smiju pisati (role-write), bez diranja ostalih polja dijela. */
+      '<button class="btn-mini role-write" onclick="app.postaviKolicinu(\''+p.id+'\')">Upiši broj</button>'+
       '<span class="dio-qty role-write">'+
         '<button class="qbtn" onclick="app.qty(\''+p.id+'\',-1)">−</button>'+
         '<span class="qval" style="min-width:0">'+p.stanje+'</span>'+
@@ -2236,6 +2293,9 @@ function renderNabava(){
 
   $('#screen-nabava').innerHTML =
     '<button class="back" onclick="app.go(\'dijelovi\')">‹ Skladište</button>'+
+    /* AUDIT-FIX (UX): korisnik koji stigne preko brojke "Za naručiti" s Pregleda nije
+       nigdje vidio ime ekrana na kojem se nalazi — jedini orijentir bio je gumb "natrag". */
+    '<div style="font-size:18px;font-weight:700;margin:4px 0 10px">Nabava</div>'+
     '<h2>Za naručiti ('+zaNar.length+')</h2>'+
     '<div class="card">'+ (zaNar.length ? zaNar.map(function(p){
       return '<div class="row"><div class="grow">'+
@@ -2553,13 +2613,13 @@ function prevRedak(p){
     '<button class="okbtn role-write" onclick="event.stopPropagation();app.obaviPreventivu(\''+p.id+'\')">✓</button>'+
   '</div>';
 }
-function zadatakRedak(z, bezChipa){
+function zadatakRedak(z){
   var kasni = z.rok && z.rok < todayISO();
   var zm = z.m ? machineById(z.m) : null;
   var kont = z.kontakt_id ? DATA.partneri.filter(function(x){ return x.id===z.kontakt_id; })[0] : null;
   return '<div class="row click" onclick="app.akcijeStavke(\'zadatak\',\''+z.id+'\')">'+
     '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(z.opis)+'</div>'+
-    '<div class="row-sub">'+(bezChipa ? '' : '<span class="chip zadatak">Zadatak</span>')+
+    '<div class="row-sub"><span class="chip zadatak">Zadatak</span>'+
       (z.dodijeljen ? ' '+esc(z.dodijeljen) : '')+
       (z.rok ? ' &middot; rok '+fmtDate(z.rok) : '')+
       (kasni ? ' &middot; <b style="color:var(--red)">kasni</b>' : '')+
@@ -2571,15 +2631,18 @@ function zadatakRedak(z, bezChipa){
   '</div>';
 }
 
-/* ---------- kalendarska mreža (K1-K2): pisaljka i filtar, ne slika ---------- */
+/* ---------- kalendarska mreža: sklopiv ulaz za grubo planiranje, ne glavni prikaz ---------- */
 function ponedjeljakTjedna(iso){
   var d = new Date(iso+'T00:00:00');
   d.setDate(d.getDate() - (d.getDay()+6)%7);
   return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
 }
-var RASP_MJESEC = null;       /* 'GGGG-MM' prikazanog mjeseca (S6: kalendar po mjesecima) */
-var RASP_ODABRAN = null;      /* ISO odabranog dana, ili null */
-var RASP_PREMJESTI = null;    /* {tip:'preventiva'|'zadatak', id} dok traje premještanje */
+var RASP_MJESEC = null;         /* 'GGGG-MM' prikazanog mjeseca */
+var RASP_ODABRAN = null;        /* ISO zadnje dodirnutog dana (za isticanje ćelije/scroll cilj) */
+var RASP_PREMJESTI = null;      /* {tip:'preventiva'|'zadatak', id} dok traje premještanje */
+var RASP_KAL_OTVOREN = false;   /* je li mjesečna mreža razvijena — zatvorena po defaultu */
+var RASP_OTVORENE_GRUPE = { kasnije:false, bezRoka:false };   /* sklopive niskoprioritetne grupe agende; perzistira kroz re-rendere */
+var RASP_PRAZAN_DAN = null;     /* ISO dana bez ijedne stavke, dodirnutog u mreži — privremeni redak dok se ne dotakne drugi dan */
 function stavkeZaDan(iso){
   return {
     prev: DATA.preventiva.filter(function(p){ return p.next===iso; }),
@@ -2590,13 +2653,13 @@ function stavkeZaDan(iso){
 function rasporedCelija(iso, danas){
   var st = stavkeZaDan(iso);
   var ukupno = st.prev.length + st.zad.length + st.san.length;
+  /* točka nosi JEDNO app-wide značenje (isto kao chip "Zaustavlja liniju") — nikad "prošao je" */
+  var kritican = st.prev.some(function(p){ return p.zaustavlja_liniju; });
   var izvan = iso.slice(0,7) !== RASP_MJESEC;   /* dan susjednog mjeseca — prigušen, ali živ */
-  var prosli = iso < danas;
-  var klase = 'rasp-d'+(iso===danas?' danas':'')+(iso===RASP_ODABRAN?' odabran':'')+
-    (prosli?' prosli':'')+(izvan?' izvan':'');
-  var brojHtml = ukupno ? '<span class="rasp-broj'+(prosli?' kasni':'')+'">'+ukupno+'</span>' : '';
+  var klase = 'rasp-d'+(iso===danas?' danas':'')+(iso===RASP_ODABRAN?' odabran':'')+(izvan?' izvan':'');
+  var tockaHtml = ukupno ? '<span class="rasp-tocka'+(kritican?' kritican':'')+'"></span>' : '';
   return '<div class="'+klase+'" onclick="app.rasporedDan(\''+iso+'\')">'+
-    '<span>'+parseInt(iso.slice(8,10),10)+'</span>'+brojHtml+'</div>';
+    '<span>'+parseInt(iso.slice(8,10),10)+'</span>'+tockaHtml+'</div>';
 }
 function rasporedRaspon(){
   /* mjesec u punim tjednima: od ponedjeljka tjedna s 1. do nedjelje tjedna sa zadnjim danom */
@@ -2605,17 +2668,14 @@ function rasporedRaspon(){
   var zadnjiDan = new Date(parseInt(p[0],10), parseInt(p[1],10), 0).getDate();
   return { start: start, kraj: addDaysISO(ponedjeljakTjedna(RASP_MJESEC+'-'+pad2(zadnjiDan)), 6) };
 }
-/* detalj odabranog dana — umeće se u mrežu ODMAH ispod retka tjedna tog dana */
+/* fallback prikaz za dan bez ijedne stavke, dodirnut u mreži — jedini poziv je iz
+   scrollNaDan() kad agenda nema ništa na taj datum na što bi se moglo fokusirati */
 function rasporedDanDetalj(iso){
-  var st = stavkeZaDan(iso);
-  var ukupno = st.prev.length + st.zad.length + st.san.length;
   var danas = todayISO();
   var naslov = (iso===danas ? 'Danas' : (iso===isoShift(1) ? 'Sutra' : fmtDate(iso)))+' — '+danUTjednu(iso);
   return '<div class="rasp-dan-detalj">'+
     '<h3>'+naslov+'</h3>'+
-    (ukupno
-      ? st.prev.map(prevRedak).join('')+st.zad.map(zadatakRedak).join('')+st.san.map(sanacijaRedak).join('')
-      : '<div class="empty">Slobodan dan — ništa nije planirano.</div>')+
+    '<div class="empty">Slobodan dan — ništa nije planirano.</div>'+
     (iso >= danas
       ? '<button class="btn sec sm block role-write" style="margin-top:8px" onclick="app.noviZadatak(\''+iso+'\')">+ Na ovaj dan</button>'
       : '')+
@@ -2630,24 +2690,19 @@ function renderKalendarskaMreza(){
   DANI_TJEDNA.slice(1).concat([DANI_TJEDNA[0]]).forEach(function(dn){   /* P U S Č P S N */
     zaglavlje += '<div class="rasp-h">'+dn.slice(0,1).toUpperCase()+'</div>';
   });
-  /* tjedan po tjedan: odabrani dan širi svoj tjedan detaljem (TickTick/Todoist uzorak) —
-     sadržaj dana je odmah ispod prsta, ne u zasebnom panelu negdje niže */
+  /* mreža ostaje GEOMETRIJSKI CIJELA — dodir na dan više ništa ne umeće ovdje, samo
+     scrolla/ističe postojeći redak dolje u agendi (scrollNaDan) */
   var tjedni = '';
   for(var pon = raspon.start; pon <= raspon.kraj; pon = addDaysISO(pon, 7)){
-    var celije = '';
-    for(var d = 0; d < 7; d++) celije += rasporedCelija(addDaysISO(pon, d), danas);
-    tjedni += celije;
-    if(RASP_ODABRAN && RASP_ODABRAN >= pon && RASP_ODABRAN <= addDaysISO(pon, 6))
-      tjedni += rasporedDanDetalj(RASP_ODABRAN);
+    for(var d = 0; d < 7; d++) tjedni += rasporedCelija(addDaysISO(pon, d), danas);
   }
   var pomaknuto = RASP_MJESEC !== danas.slice(0,7);
-  var odabranDrugi = RASP_ODABRAN && RASP_ODABRAN !== danas;
   var naslov = MJESECI[parseInt(p[1],10)-1]+' '+p[0]+'.';
   return '<div class="card" style="padding:8px">'+
     '<div class="rasp-nav">'+
       '<button class="qbtn" onclick="app.rasporedMjesec(-1)" aria-label="Prethodni mjesec">‹</button>'+
       '<div class="rasp-naslov">'+naslov+'</div>'+
-      (pomaknuto||odabranDrugi ? '<button class="btn-mini" onclick="app.rasporedDanas()">Danas</button>' : '<span style="width:34px"></span>')+
+      (pomaknuto ? '<button class="btn-mini" onclick="app.rasporedDanas()">Danas</button>' : '<span style="width:34px"></span>')+
       '<button class="qbtn" onclick="app.rasporedMjesec(1)" aria-label="Sljedeći mjesec">›</button>'+
     '</div>'+
     '<div class="rasp-grid">'+zaglavlje+tjedni+'</div>'+
@@ -2663,23 +2718,93 @@ function brziPremjestaj(tip, id){
   '</div>';
 }
 
-function renderRaspored(){
+/* ---------- agenda po hitnosti: JEDAN klasifikacijski prolaz, svaka stavka u točno
+   jednu od pet grupa — nikad dvaput na ekranu, za razliku od stare kalendar+agenda
+   duplikacije (korisnikov feedback 16.8.) ---------- */
+function grupaRedak(x){
+  return x.tip==='prev' ? prevRedak(x.item) : x.tip==='zad' ? zadatakRedak(x.item) : sanacijaRedak(x.item);
+}
+function klasifikacijaStavki(){
+  var danas = todayISO();
+  var tjedanKraj = isoShift(7);   /* klizni prozor idućih 7 dana — uvijek ista duljina, ne "do nedjelje" */
+  var kasni = [], danasArr = [], tjedan = [], kasnije = [], bezRoka = [];
+  function razvrstaj(datum, stavka){
+    if(datum < danas) kasni.push(stavka);
+    else if(datum === danas) danasArr.push(stavka);
+    else if(datum <= tjedanKraj) tjedan.push(stavka);
+    else kasnije.push(stavka);
+  }
+  DATA.preventiva.forEach(function(p){ razvrstaj(p.next, {tip:'prev', item:p, datum:p.next}); });
+  otvoreniZadaci().forEach(function(z){
+    if(!z.rok){ bezRoka.push({tip:'zad', item:z}); return; }
+    razvrstaj(z.rok, {tip:'zad', item:z, datum:z.rok});
+  });
+  sanacijeOtvorene().forEach(function(k){ razvrstaj(k.rok_sanacije, {tip:'san', item:k, datum:k.rok_sanacije}); });
+  function sortDatum(a,b){ return a.datum < b.datum ? -1 : (a.datum > b.datum ? 1 : 0); }
+  kasni.sort(sortDatum); danasArr.sort(sortDatum); tjedan.sort(sortDatum); kasnije.sort(sortDatum);
+  return { kasni:kasni, danas:danasArr, tjedan:tjedan, kasnije:kasnije, bezRoka:bezRoka };
+}
+function renderGrupaZaglavlje(naslov, n, id, otvoreno, kritOznaka){
+  var sklopiva = !!id;
+  return '<h2'+
+    (sklopiva ? ' class="rasp-grupa-head" onclick="app.rasporedGrupaToggle(\''+id+'\')"' : (kritOznaka ? ' style="color:var(--red)"' : ''))+
+    '>'+'<span>'+naslov+(n!=null?' ('+n+')':'')+'</span>'+
+    (sklopiva ? '<span class="chev" style="transform:rotate('+(otvoreno?90:0)+'deg)">›</span>' : '')+
+  '</h2>';
+}
+function renderAgenda(){
+  var kl = klasifikacijaStavki();
   var danasISO = todayISO();
-  var zadaci = otvoreniZadaci();
-  var sanacije = sanacijeOtvorene();
+  var html = '';
 
-  /* kasni: preventive s prošlim terminom + zadaci s prošlim rokom + zakašnjele sanacije —
-     jedan popis, jer je sve troje "trebalo je biti napravljeno, a nije" */
-  var kasniHtml =
-    DATA.preventiva.filter(function(p){ return p.next < danasISO; })
-      .sort(function(a,b){ return a.next < b.next ? -1 : 1; }).map(prevRedak).join('')+
-    zadaci.filter(function(z){ return z.rok && z.rok < danasISO; })
-      .sort(function(a,b){ return a.rok < b.rok ? -1 : 1; }).map(zadatakRedak).join('')+
-    sanacije.filter(function(k){ return k.rok_sanacije < danasISO; })
-      .sort(function(a,b){ return a.rok_sanacije < b.rok_sanacije ? -1 : 1; }).map(sanacijaRedak).join('');
-  var brojKasnih = (kasniHtml.match(/class="row click"/g)||[]).length;
+  /* privremeni redak za dan bez ijedne stavke, upravo dodirnut u mreži — nestaje čim
+     korisnik dodirne drugi dan (scrollNaDan ga briše/postavlja) */
+  if(RASP_PRAZAN_DAN) html += '<div data-dan="'+RASP_PRAZAN_DAN+'">'+rasporedDanDetalj(RASP_PRAZAN_DAN)+'</div>';
 
-  /* traka premještanja (K4) — dok traje, dodir na bilo koji dan u mreži izvršava premještanje */
+  if(kl.kasni.length){
+    html += renderGrupaZaglavlje('Kasni', kl.kasni.length, null, false, true)+
+      '<div class="card kasni-red" style="border-color:var(--red-border)">'+
+        kl.kasni.map(function(x){ return '<div data-dan="'+x.datum+'">'+grupaRedak(x)+'</div>'; }).join('')+
+      '</div>';
+  }
+
+  html += '<h2>Danas — '+fmtDate(danasISO)+'</h2>'+
+    '<div class="card" data-dan="'+danasISO+'">'+
+      (kl.danas.length ? kl.danas.map(grupaRedak).join('') : '<div class="empty">Nema ništa za danas ✓</div>')+
+    '</div>';
+
+  if(kl.tjedan.length){
+    var poDanu = {}, redoslijedDana = [];
+    kl.tjedan.forEach(function(x){
+      if(!poDanu[x.datum]){ poDanu[x.datum] = []; redoslijedDana.push(x.datum); }
+      poDanu[x.datum].push(x);
+    });
+    html += '<h2>Ovaj tjedan</h2><div class="card">'+
+      redoslijedDana.map(function(iso){
+        return '<div data-dan="'+iso+'"><div class="rasp-dan-sub">'+danUTjednu(iso)+' &middot; '+fmtDate(iso)+'</div>'+
+          poDanu[iso].map(grupaRedak).join('')+'</div>';
+      }).join('')+
+    '</div>';
+  }
+
+  if(kl.kasnije.length){
+    html += renderGrupaZaglavlje('Kasnije', kl.kasnije.length, 'kasnije', RASP_OTVORENE_GRUPE.kasnije);
+    if(RASP_OTVORENE_GRUPE.kasnije)
+      html += '<div class="card grupa-tiho">'+
+        kl.kasnije.map(function(x){ return '<div data-dan="'+x.datum+'">'+grupaRedak(x)+'</div>'; }).join('')+
+      '</div>';
+  }
+
+  if(kl.bezRoka.length){
+    html += renderGrupaZaglavlje('Bez roka', kl.bezRoka.length, 'bezRoka', RASP_OTVORENE_GRUPE.bezRoka);
+    if(RASP_OTVORENE_GRUPE.bezRoka)
+      html += '<div class="card grupa-tiho">'+kl.bezRoka.map(grupaRedak).join('')+'</div>';
+  }
+
+  return html;
+}
+
+function renderRaspored(){
   var premjestiHtml = '';
   if(RASP_PREMJESTI){
     var st2 = RASP_PREMJESTI.tip==='preventiva'
@@ -2693,53 +2818,26 @@ function renderRaspored(){
     } else RASP_PREMJESTI = null;
   }
 
-  var mrezaHtml = renderKalendarskaMreza();
-
-  /* Puna agenda dolje UVIJEK ostaje — detalj odabranog dana više nije zaseban panel
-     koji ju zamjenjuje, nego se širi unutar samog kalendara ispod retka tjedna
-     (rasporedDanDetalj u renderKalendarskaMreza) — TickTick/Todoist uzorak. */
-  var danHtml = '';
-  for(var d=0; d<14; d++){
-    var iso = isoShift(d);
-    var ps = DATA.preventiva.filter(function(p){ return p.next===iso; });
-    var zs = zadaci.filter(function(z){ return z.rok===iso; });
-    var sn = sanacije.filter(function(k){ return k.rok_sanacije===iso; });
-    if(!ps.length && !zs.length && !sn.length) continue;
-    var naslov = (d===0 ? 'Danas' : (d===1 ? 'Sutra' : fmtDate(iso)))+' — '+danUTjednu(iso);
-    danHtml += '<h2>'+naslov+'</h2><div class="card">'+
-      ps.map(prevRedak).join('')+zs.map(zadatakRedak).join('')+sn.map(sanacijaRedak).join('')+'</div>';
-  }
-  if(!danHtml) danHtml = '<div class="card"><div class="empty">Sljedeća dva tjedna su prazna — '+
-    'ni preventive ni zadaci nemaju termin u ovom razdoblju.</div></div>';
-
-  /* dalje od 14 dana: samo najbliže, bez pretrpavanja */
-  var kasnije = DATA.preventiva.filter(function(p){ return p.next > isoShift(14); })
-    .sort(function(a,b){ return a.next < b.next ? -1 : 1; }).slice(0,6);
-  var bezRoka = zadaci.filter(function(z){ return !z.rok; });
-
-  var donjiDioHtml = danHtml+
-    (kasnije.length
-      ? '<h2>Kasnije</h2><div class="card">'+kasnije.map(prevRedak).join('')+'</div>' : '')+
-    (bezRoka.length
-      ? '<h2>Zadaci bez roka ('+bezRoka.length+')</h2><div class="card">'+
-        bezRoka.map(function(z){ return zadatakRedak(z, true); }).join('')+'</div>'
-      : '');
+  /* Kalendar je sklopiv ulaz za grubo planiranje, uvijek otvoren dok traje premještanje
+     (treba na što tapnuti). Agenda po hitnosti je jedini prikaz sadržaja — svaka stavka
+     postoji točno jednom (korisnikov feedback 16.8.: ista stavka se prikazivala dvaput). */
+  var kalOtvoren = RASP_KAL_OTVOREN || !!RASP_PREMJESTI;
+  var kalTraka = '<div class="rasp-kal-traka" onclick="app.rasporedKalToggle()">'+
+    '<span>🗓 Kalendar</span><span class="chev" style="transform:rotate('+(kalOtvoren?90:0)+'deg)">›</span></div>';
 
   $('#screen-raspored').innerHTML =
-    /* Kalendar prvo — to je orijentir na koji se sve ostalo nadovezuje (korisnikov
-       feedback iz pogona), tek onda "Kasni" i agenda. Raspored je vlastita kartica
-       u dnu — više nije pod-ekran Pregleda, pa nema "‹ Pregled". */
-    mrezaHtml+
+    kalTraka+
+    (kalOtvoren ? renderKalendarskaMreza() : '')+
     premjestiHtml+
-    (brojKasnih
-      ? '<h2 style="color:var(--red)">Kasni ('+brojKasnih+')</h2><div class="card" style="border-color:var(--red-border)">'+kasniHtml+'</div>'
-      : '')+
     '<button class="btn primary block role-write" style="margin:10px 0 4px" onclick="app.noviZadatak()">+ Novi zadatak</button>'+
-    donjiDioHtml;
+    renderAgenda();
 }
 
 /* =====================  render: Sustav (voditelj)  ===================== */
 var SUS_KORISNICI = null, SUS_GRESKE = null;
+var SUS_NAPREDNO_OTVOREN = false;   /* AUDIT-FIX (UX): dnevnik grešaka i brisanje podataka
+  su nekad uvijek stajali razvijeni — ~10 gumba odjednom, uklj. destruktivne rame uz rame
+  s rutinskim izvozom. Sad su iza jednog dodatnog koraka, ne samo bojom naslova. */
 function renderSustav(){
   var korHtml = SUS_KORISNICI
     ? (SUS_KORISNICI.length ? SUS_KORISNICI.map(function(k){
@@ -2765,8 +2863,22 @@ function renderSustav(){
       }).join('') : '<div class="empty">Nema zabilježenih grešaka ✓</div>')
     : '<div class="empty">Klikni "Učitaj greške"</div>';
 
+  var napredno = SUS_NAPREDNO_OTVOREN
+    ? '<h2>Dnevnik grešaka</h2>'+
+      '<div class="card">'+greskeHtml+'</div>'+
+      '<button class="btn sec sm block" style="margin-top:8px" onclick="app.ucitajGreske()">Učitaj greške</button>'+
+      '<h2 style="color:var(--red)">Opasna zona</h2>'+
+      '<div class="card"><div class="row"><div class="grow">'+
+        '<div class="row-title" style="font-size:13.5px">Brisanje demo podataka</div>'+
+        '<div class="row-sub">Prije prelaska na stvarne podatke: briše kvarove, preventivu, komentare i poruke. '+
+          'Strojevi, dijelovi i kontakti ostaju (osim ako odabereš i njih).</div>'+
+        '<div style="margin-top:6px"><button class="btn-mini opasno" onclick="app.obrisiDemo(false)">Obriši evidencije</button> '+
+          '<button class="btn-mini opasno" onclick="app.obrisiDemo(true)">Obriši baš sve</button></div>'+
+      '</div></div></div>'
+    : '';
   $('#screen-sustav').innerHTML =
     '<button class="back" onclick="app.go(\'pregled\')">‹ Pregled</button>'+
+    '<div style="font-size:18px;font-weight:700;margin:4px 0 10px">Sustav</div>'+
     '<h2>Korisnici</h2>'+
     '<div class="card">'+korHtml+'</div>'+
     '<button class="btn sec sm block" style="margin-top:8px" onclick="app.noviKorisnik()">+ Novi korisnik</button>'+
@@ -2790,17 +2902,12 @@ function renderSustav(){
       '</div></div></div></div>'+
     '<button class="btn sec sm block" style="margin-top:8px" onclick="app.uvozCSV()">Uvoz strojeva i dijelova (CSV)</button>'+
     '<button class="btn sec sm block" style="margin-top:8px" onclick="app.go(\'qr\')">QR naljepnice za strojeve</button>'+
-    '<h2>Dnevnik grešaka</h2>'+
-    '<div class="card">'+greskeHtml+'</div>'+
-    '<button class="btn sec sm block" style="margin-top:8px" onclick="app.ucitajGreske()">Učitaj greške</button>'+
-    '<h2 style="color:var(--red)">Opasna zona</h2>'+
-    '<div class="card"><div class="row"><div class="grow">'+
-      '<div class="row-title" style="font-size:13.5px">Brisanje demo podataka</div>'+
-      '<div class="row-sub">Prije prelaska na stvarne podatke: briše kvarove, preventivu, komentare i poruke. '+
-        'Strojevi, dijelovi i kontakti ostaju (osim ako odabereš i njih).</div>'+
-      '<div style="margin-top:6px"><button class="btn-mini opasno" onclick="app.obrisiDemo(false)">Obriši evidencije</button> '+
-        '<button class="btn-mini opasno" onclick="app.obrisiDemo(true)">Obriši baš sve</button></div>'+
-    '</div></div></div>'+
+    /* AUDIT-FIX (UX): dnevnik grešaka i brisanje podataka su rijetke, admin-radnje —
+       iza jednog dodatnog koraka, ne uvijek nametnute rame uz rame s rutinskim akcijama */
+    '<div class="rasp-kal-traka" style="margin-top:14px" onclick="app.susNaprednoToggle()">'+
+      '<span>Napredno (dnevnik grešaka, brisanje podataka)</span>'+
+      '<span class="chev" style="transform:rotate('+(SUS_NAPREDNO_OTVOREN?90:0)+'deg)">›</span></div>'+
+    napredno+
     '<div class="session-row" style="margin-bottom:20px">Verzija podataka: '+esc(LS_KEY)+
       (REMOTE ? ' &middot; baza spojena' : ' &middot; demo način')+'</div>';
 }
@@ -3074,14 +3181,22 @@ var app = {
     showScreen('sustav');
     if(REMOTE) app.ucitajKorisnike();
   },
+  susNaprednoToggle: function(){ SUS_NAPREDNO_OTVOREN = !SUS_NAPREDNO_OTVOREN; renderSustav(); },
   pomoc: function(){
+    /* AUDIT-FIX (UX): "Raspored" i "Skladište" u donjoj navigaciji nisu odmah jasni bez
+       konteksta (Raspored zvuči kao smjene, ne preventivno održavanje; Skladište u
+       tvornici hrane prvo asocira na sirovine, ne rezervne dijelove) — mikro-objašnjenje
+       ovdje, prvo što se pokaže, jer za sam izbornik nema mjesta za podnaslove. */
     var zaMajstora =
-      '<div class="a-item"><b>1. Prijava kvara</b><div class="a-sub">Kvarovi → ⚡ Brza prijava: stroj, fotografija, kratki opis. Gotovo u 15 sekundi.</div></div>'+
-      '<div class="a-item"><b>2. Moji zadaci</b><div class="a-sub">Na Pregledu, na vrhu — sve što je tebi dodijeljeno. Crveni broj na "Kvarovi" je tvoj broj zadataka.</div></div>'+
-      '<div class="a-item"><b>3. Rad na kvaru</b><div class="a-sub">Klikni kvar → prozor s detaljima. Piši komentare što je napravljeno; kad završiš: "Riješi kvar" i upiši utrošeni dio.</div></div>'+
-      '<div class="a-item"><b>4. Preventiva</b><div class="a-sub">Zelena kvačica ✓ znači obavljeno — termin se sam pomiče na sljedeći put.</div></div>'+
-      '<div class="a-item"><b>5. Bez mreže</b><div class="a-sub">Ako WiFi padne, sve i dalje radi. Unosi se spremaju na mobitel i šalju sami kad se veza vrati (traka gore to pokazuje).</div></div>'+
-      '<div class="a-item"><b>6. Obavijesti na mobitel</b><div class="a-sub">Rade kad aplikaciju dodaš na početni zaslon (Dodaj na početni zaslon / Add to Home Screen) i otvoriš je preko interneta. Uključuju se na dnu ekrana Poruke.</div></div>';
+      '<div class="a-item"><b>1. Snalaženje u izborniku</b><div class="a-sub">Kvarovi = prijave problema. '+
+        'Raspored = planirano održavanje (preventiva, dogovoreni servisi) i tvoji zadaci — ne kalendar smjena. '+
+        'Skladište = rezervni dijelovi za strojeve, ne sirovine ni gotov proizvod.</div></div>'+
+      '<div class="a-item"><b>2. Prijava kvara</b><div class="a-sub">Kvarovi → ⚡ Brza prijava: stroj, fotografija, kratki opis. Gotovo u 15 sekundi.</div></div>'+
+      '<div class="a-item"><b>3. Moji zadaci</b><div class="a-sub">Na Pregledu, na vrhu — sve što je tebi dodijeljeno. Crveni broj na "Kvarovi" je tvoj broj zadataka.</div></div>'+
+      '<div class="a-item"><b>4. Rad na kvaru</b><div class="a-sub">Klikni kvar → prozor s detaljima. Piši komentare što je napravljeno; kad završiš: "Riješi kvar" i upiši utrošeni dio.</div></div>'+
+      '<div class="a-item"><b>5. Preventiva</b><div class="a-sub">Zelena kvačica ✓ znači obavljeno — termin se sam pomiče na sljedeći put.</div></div>'+
+      '<div class="a-item"><b>6. Bez mreže</b><div class="a-sub">Ako WiFi padne, sve i dalje radi. Unosi se spremaju na mobitel i šalju sami kad se veza vrati (traka gore to pokazuje).</div></div>'+
+      '<div class="a-item"><b>7. Obavijesti na mobitel</b><div class="a-sub">Rade kad aplikaciju dodaš na početni zaslon (Dodaj na početni zaslon / Add to Home Screen) i otvoriš je preko interneta. Uključuju se na dnu ekrana Poruke.</div></div>';
     var zaVoditelja =
       '<div class="a-item"><b>Analitika</b><div class="a-sub">Pregled → 📊 Analitika: trošak po stroju, smjeni i kategoriji za bilo koje razdoblje + izvoz.</div></div>'+
       '<div class="a-item"><b>IFS izvještaj</b><div class="a-sub">Gumb gore desno → odaberi razdoblje → 📄 PDF.</div></div>'+
@@ -3424,6 +3539,7 @@ var app = {
     localLoad();
     if(!initHash()) showScreen(zadnjiEkran() || 'pregled');
     dobrodoslica();
+    prikaziUvodAkoPrvi();
   },
   /* Demo prekidač uloga — vlasnik alat pokazuje na razgovoru/probi i mora moći sam
      provjeriti "što vidi majstor / proizvodnja" bez izmišljanja PIN-ova ili odjave. */
@@ -3446,7 +3562,7 @@ var app = {
     else if(jeOtvoren(k)){
       if(k.prioritet==='hitno') chips += '<span class="chip kvar">HITNO</span> ';
       else if(k.prioritet==='visok') chips += '<span class="chip upoz">Visok</span> ';
-      if(k.ceka_dio) chips += '<span class="chip upoz">Čeka dio</span> ';
+      if(k.ceka_dio) chips += '<span class="chip upoz">Čeka dio · stoji</span> ';
       chips += (k.status==='u_radu') ? '<span class="chip rad">U radu</span>'
              : (k.upoz ? '<span class="chip upoz">Upozorenje</span>' : '<span class="chip kvar">Otvoren</span>');
     } else chips += '<span class="chip rijesen">Riješen</span>';
@@ -3572,7 +3688,11 @@ var app = {
   },
   brzaPrijava: function(){
     PENDING_FOTO = '';
-    var opts = DATA.machines.map(function(m){ return '<option value="'+m.id+'">'+esc(m.name)+'</option>'; }).join('');
+    /* AUDIT-FIX (UX): bez prazne opcije je prvi stroj s popisa tiho predodabran — u žurbi
+       lako prijaviš kvar na krivi stroj a da ni ne pogledaš to polje. "required" ovdje ne
+       štiti ništa dok postoji zadana vrijednost. */
+    var opts = '<option value="" disabled selected>— odaberi stroj —</option>'+
+      DATA.machines.map(function(m){ return '<option value="'+m.id+'">'+esc(m.name)+'</option>'; }).join('');
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>⚡ Brza prijava kvara</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
@@ -3582,7 +3702,10 @@ var app = {
         '<input type="file" id="foto-input" class="file-input" accept="image/*" capture="environment" onchange="app.fotoOdabrana(event)">'+
         '<label for="foto-input" class="btn sec block file-label" id="foto-label">📷 Slikaj ili odaberi fotografiju</label>'+
         '<img id="foto-prev" class="foto-prev" alt="pregled fotografije">'+
-        '<label>Što se dogodilo</label><textarea name="opis" rows="2" required placeholder="kratko — npr. puca remen, stroj stoji"></textarea>'+
+        '<label>Što se dogodilo</label><textarea name="opis" id="brza-opis" rows="2" required placeholder="kratko — npr. puca remen, stroj stoji"></textarea>'+
+        /* AUDIT-FIX (UX): app već interno prepoznaje uzak rječnik čestih kvarova
+           (autoKat) — isti rječnik sad nudi dodir umjesto tipkanja od nule svaki put */
+        brziOpisChipovi()+
         /* jedini prekidač u brzoj prijavi: hitan kvar se prijavljuje baš ovim obrascem */
         '<label class="hitno-prekidac"><input type="checkbox" name="hitno">'+
           '<span>HITNO — stoji linija</span></label>'+
@@ -3801,17 +3924,40 @@ var app = {
     RASP_ODABRAN = null;
     renderRaspored();
   },
+  rasporedKalToggle: function(){ RASP_KAL_OTVOREN = !RASP_KAL_OTVOREN; renderRaspored(); },
+  rasporedGrupaToggle: function(id){ RASP_OTVORENE_GRUPE[id] = !RASP_OTVORENE_GRUPE[id]; renderRaspored(); },
   rasporedDan: function(iso){
     if(RASP_PREMJESTI){ app.izvrsiPremjestanje(iso); return; }
-    RASP_ODABRAN = (RASP_ODABRAN===iso) ? null : iso;
-    /* detalj dana živi UNUTAR mreže — ako odabrani dan nije u prikazanom rasponu
-       (npr. programski skok na dan za 40 dana), mreža se prebaci na njegov mjesec */
-    if(RASP_ODABRAN){
-      if(!RASP_MJESEC) RASP_MJESEC = todayISO().slice(0,7);
-      var r = rasporedRaspon();
-      if(RASP_ODABRAN < r.start || RASP_ODABRAN > r.kraj) RASP_MJESEC = RASP_ODABRAN.slice(0,7);
-    }
+    app.scrollNaDan(iso);
+  },
+  /* Dodir na dan u mreži: FOKUSIRA postojeći redak dolje u agendi (scroll+highlight),
+     nikad ne umeće novi blok — TickTick/Google Calendar uzorak (korisnikov feedback 16.8.:
+     staro ponašanje je dodavalo pa je ista stavka bila ispisana dvaput na ekranu). */
+  scrollNaDan: function(iso){
+    RASP_ODABRAN = iso;
+    RASP_PRAZAN_DAN = null;
+    if(iso > isoShift(7)) RASP_OTVORENE_GRUPE.kasnije = true;   /* izvan "Ovaj tjedan" — živi u Kasnije */
+    /* ako odabrani dan nije u prikazanom mjesecu (npr. programski skok), mreža se prebaci */
+    if(!RASP_MJESEC) RASP_MJESEC = todayISO().slice(0,7);
+    var r = rasporedRaspon();
+    if(iso < r.start || iso > r.kraj) RASP_MJESEC = iso.slice(0,7);
     renderRaspored();
+    setTimeout(function(){
+      var el = document.querySelector('[data-dan="'+iso+'"]');
+      if(el){
+        el.scrollIntoView({behavior:'smooth', block:'center'});
+        el.classList.add('flash');
+        setTimeout(function(){ el.classList.remove('flash'); }, 900);
+        return;
+      }
+      /* prazan dan — nigdje u agendi nema stavke s tim datumom */
+      RASP_PRAZAN_DAN = iso;
+      renderRaspored();
+      setTimeout(function(){
+        var el2 = document.querySelector('[data-dan="'+iso+'"]');
+        if(el2) el2.scrollIntoView({behavior:'smooth', block:'center'});
+      }, 30);
+    }, 30);
   },
   /* Dodir na redak u agendi (K4) — donji list radnji umjesto izravnog bijega na stroj/detalj */
   akcijeStavke: function(tip, id){
@@ -3853,6 +3999,7 @@ var app = {
     app.closeModal();
     RASP_PREMJESTI = { tip:tip, id:id };
     RASP_ODABRAN = null;
+    RASP_KAL_OTVOREN = true;   /* mora biti vidljiva mreža da korisnik ima na što tapnuti */
     renderRaspored();
   },
   odustaniPremjestanje: function(){ RASP_PREMJESTI = null; renderRaspored(); },
@@ -3963,6 +4110,13 @@ var app = {
     FILTER = { stroj:'svi', status:'aktivni', majstor:'svi', od:'', do:'', q:'' };
     showScreen('kvarovi');
   },
+  pregledFinToggle: function(){ PREGLED_FIN_OTVOREN = !PREGLED_FIN_OTVOREN; renderPregled(); },
+  dodajBrziOpis: function(tekst){
+    var ta = document.getElementById('brza-opis');
+    if(!ta) return;
+    ta.value = ta.value ? (ta.value.replace(/\s+$/,'') + ' ' + tekst) : tekst;
+    ta.focus();
+  },
   traziStroj: function(v){
     STROJ_Q = v;
     var el = $('#strojevi-lista');
@@ -4022,8 +4176,12 @@ var app = {
         '<label>Naziv</label><input name="naziv" required value="'+esc(p.naziv)+'">'+
         '<label>Za koje strojeve</label>'+strojeviCheckbox(p.strojevi)+
         '<label style="margin-top:10px">Opis mjesta ugradnje (ako treba)</label><input name="stroj" value="'+esc(p.stroj)+'">'+
-        '<label>Lokacija na skladištu (neobavezno)</label><input name="lokacija" value="'+esc(p.lokacija||'')+'" placeholder="npr. polica B2, ormar alata">'+
-        '<label>Šifra dijela (neobavezno)</label><input name="sku" value="'+esc(p.sku||'')+'" placeholder="npr. interna šifra ili šifra dobavljača">'+
+        '<label>Lokacija na skladištu (neobavezno)</label>'+
+          '<input name="lokacija" list="dio-lok-dl" value="'+esc(p.lokacija||'')+'" placeholder="npr. polica B2, ormar alata">'+
+          dijeloviDatalist('lokacija','dio-lok-dl')+
+        '<label>Šifra dijela (neobavezno)</label>'+
+          '<input name="sku" list="dio-sku-dl" value="'+esc(p.sku||'')+'" placeholder="npr. interna šifra ili šifra dobavljača">'+
+          dijeloviDatalist('sku','dio-sku-dl')+
         '<label>Stanje</label><input type="number" name="stanje" min="0" step="1" value="'+p.stanje+'" required>'+
         '<label>Minimum</label><input type="number" name="min" min="0" step="1" value="'+p.min+'" required>'+
         '<label>Dobavljač</label><select name="dob">'+dobOpts+'</select>'+
@@ -4054,6 +4212,32 @@ var app = {
     await apiUpdate('dijelovi', id, { naziv:p.naziv, stroj:p.stroj, lokacija:p.lokacija, sku:p.sku, stanje:p.stanje,
       min:p.min, dob:p.dob, kategorija:p.kategorija, cijena:p.cijena,
       strojevi:p.strojevi, partner_id:p.partner_id });
+  },
+  /* lagana radnja za sve koji smiju pisati (majstor uklj.) — samo stanje, ništa drugo */
+  postaviKolicinu: function(id){
+    var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
+    if(!p) return;
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
+      '<div class="modal-head"><h3>Upiši količinu</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<div class="row-sub" style="margin-bottom:10px">'+esc(p.naziv)+'</div>'+
+      '<form onsubmit="app.saveKolicinu(event,\''+id+'\')">'+
+        '<label>Novo stanje</label><input type="number" name="stanje" min="0" step="1" value="'+p.stanje+'" required autofocus>'+
+        '<button class="btn primary block" type="submit" style="margin-top:8px">Spremi</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</form></div></div>';
+  },
+  saveKolicinu: async function(e, id){
+    e.preventDefault();
+    var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
+    if(!p) return;
+    var novo = Math.max(0, parseInt(new FormData(e.target).get('stanje'),10)||0);
+    app.closeModal();
+    var prije = p.stanje;
+    p.stanje = novo;
+    if(prije >= p.min && p.stanje < p.min)
+      sysPoruka('📦 Dio ispod minimuma: '+p.naziv+' (stanje '+p.stanje+', min '+p.min+') — naručiti!');
+    await apiUpdate('dijelovi', id, { stanje:p.stanje });
   },
   urediStroj: function(mId){
     var m = machineById(mId);
@@ -4319,8 +4503,12 @@ var app = {
         '<label>Naziv dijela</label><input name="naziv" required placeholder="npr. Remen, ležaj, brtva…">'+
         '<label>Za koje strojeve</label>'+strojeviCheckbox([])+
         '<label style="margin-top:10px">Opis mjesta ugradnje (neobavezno)</label><input name="stroj" placeholder="npr. pogon puža">'+
-        '<label>Lokacija na skladištu (neobavezno)</label><input name="lokacija" placeholder="npr. polica B2, ormar alata">'+
-        '<label>Šifra dijela (neobavezno)</label><input name="sku" placeholder="npr. interna šifra ili šifra dobavljača">'+
+        '<label>Lokacija na skladištu (neobavezno)</label>'+
+          '<input name="lokacija" list="dio-lok-dl" placeholder="npr. polica B2, ormar alata">'+
+          dijeloviDatalist('lokacija','dio-lok-dl')+
+        '<label>Šifra dijela (neobavezno)</label>'+
+          '<input name="sku" list="dio-sku-dl" placeholder="npr. interna šifra ili šifra dobavljača">'+
+          dijeloviDatalist('sku','dio-sku-dl')+
         '<label>Stanje na skladištu</label><input type="number" name="stanje" min="0" step="1" value="1" required>'+
         '<label>Minimum</label><input type="number" name="min" min="0" step="1" value="1" required>'+
         '<label>Dobavljač</label><select name="dob">'+dobOpts+'</select>'+
@@ -4586,16 +4774,24 @@ var app = {
           (k.sati > 0 ? ' value="'+k.sati+'"' : ' placeholder="koliko je linija stvarno stajala"')+'>'+
         (k.sati > 0 ? '' : '<div class="row-sub" style="margin-top:-4px">Upiši stvarno trajanje — iz ovoga se računa trošak zastoja.</div>')+
         '<label>Riješio</label><select name="tko">'+majstorOpts(SESSION.ime)+'</select>'+
-        '<label>Sudjelovali (ako je radilo više ljudi)</label><input name="sudjelovali" placeholder="npr. Marko 0,5 h + Ivica 1 h">'+
-        '<label>Utrošeni dio sa skladišta</label><select name="dio">'+dioOpts+'</select>'+
-        '<label>Količina</label><input type="number" name="kol" min="1" step="1" value="1">'+
-        '<label>Zamijenjeno (opis, ako dio nije sa skladišta)</label><input name="zam" placeholder="npr. remen, brtva… (prazno ako ništa)">'+
         '<label class="prekidac"><input type="checkbox" name="otpusteno"'+(k.otpusteno?' checked':'')+'>'+
           '<span>Linija otpuštena nakon čišćenja i pregleda na strana tijela</span></label>'+
-        '<label style="margin-top:12px">Fotografija popravka (izborno)</label>'+
-        '<input type="file" id="foto-input" class="file-input" accept="image/*" capture="environment" onchange="app.fotoOdabrana(event)">'+
-        '<label for="foto-input" class="btn sec block file-label" id="foto-label">📷 Slikaj gotov popravak</label>'+
-        '<img id="foto-prev" class="foto-prev" alt="pregled fotografije">'+
+        /* AUDIT-FIX (UX): 8 polja iste vizualne težine tražilo je skrolanje i procjenu
+           koje je od njih obavezno (samo Sati) za najčešću radnju "gotovo je, zatvori" —
+           isti princip "gustoća iza dodira" koji app već koristi na Kvarovima/Skladištu. */
+        '<button type="button" class="btn-mini" style="margin:4px 0 10px" '+
+          'onclick="this.nextElementSibling.style.display=\'block\';this.style.display=\'none\'">'+
+          '+ Dodatno (sudionici, utrošeni dio, foto)</button>'+
+        '<div style="display:none">'+
+          '<label>Sudjelovali (ako je radilo više ljudi)</label>'+sudjelovaliCheckbox('')+
+          '<label>Utrošeni dio sa skladišta</label><select name="dio">'+dioOpts+'</select>'+
+          '<label>Količina</label><input type="number" name="kol" min="1" step="1" value="1">'+
+          '<label>Zamijenjeno (opis, ako dio nije sa skladišta)</label><input name="zam" placeholder="npr. remen, brtva… (prazno ako ništa)">'+
+          '<label style="margin-top:12px">Fotografija popravka (izborno)</label>'+
+          '<input type="file" id="foto-input" class="file-input" accept="image/*" capture="environment" onchange="app.fotoOdabrana(event)">'+
+          '<label for="foto-input" class="btn sec block file-label" id="foto-label">📷 Slikaj gotov popravak</label>'+
+          '<img id="foto-prev" class="foto-prev" alt="pregled fotografije">'+
+        '</div>'+
         '<button class="btn primary block" type="submit" style="margin-top:8px">Zatvori kvar</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
@@ -4613,7 +4809,7 @@ var app = {
     /* IFS: u izvještaj ide samo ono što je netko stvarno potvrdio */
     k.otpusteno = !!f.get('otpusteno');
     k.tko = f.get('tko');
-    k.sudjelovali = String(f.get('sudjelovali')||'').trim() || null;
+    k.sudjelovali = f.getAll('sudjelovali_ime').join(', ') || null;
     k.zam = String(f.get('zam')||'').trim() || null;
     /* razduživanje skladišta: utrošeni dio smanjuje stanje i upisuje se u "Zamijenjeno" */
     var dioId = f.get('dio');
@@ -4666,7 +4862,7 @@ var app = {
       return '<option'+((k.kategorija||'Ostalo')===kk?' selected':'')+'>'+kk+'</option>'; }).join('');
     var rijeseno = k.status==='rijesen'
       ? '<label>Riješio</label><select name="tko">'+majstorOpts(k.tko)+'</select>'+
-        '<label>Sudjelovali</label><input name="sudjelovali" value="'+esc(k.sudjelovali||'')+'">'+
+        '<label>Sudjelovali</label>'+sudjelovaliCheckbox(k.sudjelovali||'')+
         '<label>Zamijenjeno</label><input name="zam" value="'+esc(k.zam||'')+'">'
       : '';
     $('#modal-root').innerHTML =
@@ -4730,7 +4926,7 @@ var app = {
     k.smjena     = f.get('smjena') || null;
     if(k.status==='rijesen'){
       k.tko = f.get('tko') || k.tko;
-      k.sudjelovali = String(f.get('sudjelovali')||'').trim() || null;
+      k.sudjelovali = f.getAll('sudjelovali_ime').join(', ') || null;
       k.zam = String(f.get('zam')||'').trim() || null;
     } else {
       k.ceka_dio = !!f.get('ceka');
@@ -5206,6 +5402,7 @@ async function postLogin(){
   osvjeziOfflineTraku();
   if(!initHash()) showScreen(zadnjiEkran() || 'pregled');
   dobrodoslica();
+  prikaziUvodAkoPrvi();
   sinkroniziraj();   /* pošalji što je ostalo od prošlog puta */
 }
 function dobrodoslica(){
@@ -5233,6 +5430,29 @@ function osobaOpts(sel){
 }
 function vidiFinancije(){ return SESSION.role !== 'majstor'; }
 /* dijelovi se vežu na strojeve preko šifri (ne slobodnog teksta) — podaci ne trunu */
+/* AUDIT-FIX (UX): "Sudjelovali" je bio slobodan tekst iako popis od 3 majstora već
+   postoji kao select jedan redak iznad — dodir umjesto tipkanja po zapamćenoj konvenciji.
+   Ne pamti se više trajanje po osobi (rijetko stvarno korišteno), samo tko je pomogao. */
+function sudjelovaliCheckbox(trenutno){
+  trenutno = trenutno || '';
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px">'+
+    MAJSTORI.map(function(ime){
+      return '<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;'+
+        'font-size:13px;font-weight:500;color:var(--text);margin:0">'+
+        '<input type="checkbox" name="sudjelovali_ime" value="'+esc(ime)+'" style="width:auto"'+
+        (trenutno.indexOf(ime)>-1?' checked':'')+'> '+esc(ime)+'</label>';
+    }).join('')+'</div>';
+}
+/* AUDIT-FIX (UX): lokacije i šifre dijelova se ponavljaju kroz desetke dijelova, ali
+   se svaki put tipkaju iznova bez ijednog prijedloga izvedenog iz postojećih vrijednosti. */
+function dijeloviDatalist(polje, id){
+  var vrijednosti = {};
+  DATA.dijelovi.forEach(function(p){ if(p[polje]) vrijednosti[p[polje]] = true; });
+  return '<datalist id="'+id+'">'+
+    Object.keys(vrijednosti).sort(function(a,b){ return a.localeCompare(b,'hr'); })
+      .map(function(v){ return '<option value="'+esc(v)+'">'; }).join('')+
+  '</datalist>';
+}
 function strojeviCheckbox(odabrani){
   odabrani = odabrani || [];
   return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px">'+
@@ -5265,6 +5485,16 @@ function autoKat(opis){
   if(/tlak|ventil|kompresor|rashlad|kondenzator|led/.test(o)) return 'Pneumatika i rashlada';
   if(/remen|ležaj|matric|brtv|nož|folij|traka|valj|dozator|reduktor/.test(o)) return 'Mehanički';
   return 'Ostalo';
+}
+/* AUDIT-FIX (UX): najčešći opisi kvara kao dodir, ne tipkanje od nule — dopunjuju
+   postojeći tekst, ne zamjenjuju ga (majstor može dodati i stroj/detalj ručno). */
+var BRZI_OPISI = ['stoji','curi','buka','vibracije','ne pali se','greška na senzoru'];
+function brziOpisChipovi(){
+  return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 10px">'+
+    BRZI_OPISI.map(function(o){
+      return '<button type="button" class="btn-mini" onclick="app.dodajBrziOpis(\''+o+'\')">'+o+'</button>';
+    }).join('')+
+  '</div>';
 }
 function sysPoruka(tekst, kvarId){
   /* automatski sistemski zapis u zajedničkom kanalu — živa knjiga smjene */
