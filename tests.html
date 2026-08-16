@@ -1524,6 +1524,186 @@ async function testovi(W, D){
     app.closeModal();
   }
 
+  grupa('Z1 — dovršetak §11.5 (bez migracije)');
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  /* prompt()/confirm() zamijenjeni modalima u Sustavu (korisnici, obriši demo) */
+  W.SUS_KORISNICI = [{ id:'suK1', ime:'TEST Korisnik', role:'majstor', email:'test@x.local', aktivan:true }];
+  var stariPrompt = W.prompt; var promptPozvan = false; W.prompt = function(){ promptPozvan = true; return null; };
+  app.korisnikUloga('suK1'); await cekaj(100);
+  ok('promjena uloge je modal sa select poljem, ne prompt()',
+     !promptPozvan && !!D.querySelector('#modal-root select[name="role"]'));
+  app.closeModal();
+  app.korisnikPin('suK1'); await cekaj(100);
+  ok('novi PIN je modal s poljem (min. 8 znamenki), ne prompt()',
+     !promptPozvan && !!D.querySelector('#modal-root input[name="pin"][minlength="8"]'));
+  app.closeModal();
+  app.obrisiDemo(false); await cekaj(100);
+  ok('brisanje demo podataka je modal s upisom OBRISI, ne prompt()',
+     !promptPozvan && !!D.querySelector('#modal-root input[name="potvrda"]'));
+  app.closeModal();
+  W.prompt = stariPrompt;
+
+  /* PIN "oko" — prikaži/sakrij (ekran za prijavu je fiksni overlay, ne ide kroz showScreen) */
+  D.getElementById('screen-login').classList.add('show');
+  var pinInp = D.querySelector('#pin');
+  jednako('PIN polje je zadano sakriveno', pinInp.type, 'password');
+  app.pinOko('pin', D.querySelector('.pin-oko'));
+  jednako('dodir na "oko" prikazuje PIN kao tekst', D.querySelector('#pin').type, 'text');
+  app.pinOko('pin', D.querySelector('.pin-oko'));
+  jednako('drugi dodir vraća sakrivanje', D.querySelector('#pin').type, 'password');
+  D.getElementById('screen-login').classList.remove('show');
+
+  /* "Preuzimam" ne zatvara prozor — ostaje na istom kvaru s osvježenim stanjem */
+  var otvZaPreuzmi = W.DATA.kvarovi.filter(function(k){ return k.status==='otvoren' && (k.tip||'kvar')==='kvar'; })[0];
+  app.detaljKvara(otvZaPreuzmi.id); await cekaj(100);
+  await app.preuzmiKvar(otvZaPreuzmi.id); await cekaj(150);
+  ok('"Preuzimam" ne zatvara prozor', !!D.querySelector('#modal-root .modal'));
+  ok('prozor se osvježio — "Riješi kvar" je sad primarni gumb', (function(){
+     var b = Array.prototype.filter.call(D.querySelectorAll('#modal-root .btn'),
+       function(x){ return x.textContent.indexOf('Riješi kvar') > -1; })[0];
+     return !!b && b.className.indexOf('primary') > -1;
+  })());
+  app.closeModal();
+
+  /* skraćena povijest kvarova na stroju */
+  var mZaPovijest = 'e1';
+  for(var pi=0; pi<12; pi++){
+    W.DATA.kvarovi.push({ id:'kvPOV'+pi, m:mZaPovijest, date:W.isoShift(-pi), opis:'TEST povijest '+pi,
+      sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo', created_at:new Date().toISOString() });
+  }
+  app.openStroj(mZaPovijest); await cekaj(120);
+  var ukupnoPovijest = W.DATA.kvarovi.filter(function(k){ return k.m===mZaPovijest; }).length;
+  ok('povijest kvarova je skraćena kad ih ima puno',
+     D.querySelectorAll('#screen-stroj .kvar-item').length < ukupnoPovijest &&
+     D.querySelector('#screen-stroj').innerHTML.indexOf('Prikaži svih') > -1);
+  app.prikaziSvuPovijest(); await cekaj(120);
+  jednako('"Prikaži svih" pokaže cijelu povijest',
+     D.querySelectorAll('#screen-stroj .kvar-item').length, ukupnoPovijest);
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id.indexOf('kvPOV')!==0; });
+
+  /* pretraga strojeva */
+  app.go('strojevi'); await cekaj(100);
+  var brSvihStrojeva = W.DATA.machines.length;
+  app.traziStroj('Ekstruder'); await cekaj(80);
+  ok('pretraga strojeva filtrira popis',
+     D.querySelectorAll('#strojevi-lista .row').length > 0 &&
+     D.querySelectorAll('#strojevi-lista .row').length < brSvihStrojeva);
+  ok('polje za pretragu ostaje isti element (fokus se ne gubi)',
+     D.querySelector('#screen-strojevi input[type="search"]') !== null);
+  app.traziStroj('');
+
+  /* "radi/stoji" jezik umjesto "U kvaru/OK" */
+  ok('status stroja govori "radi"/"stoji", ne tehnički "OK"/"U kvaru"',
+     D.querySelector('#screen-strojevi').textContent.indexOf('Radi') > -1);
+
+  /* "Kasni" značka na gumbu Nabava */
+  app.go('dijelovi'); await cekaj(100);
+  var dioZaKasni = W.DATA.dijelovi[0];
+  var nKasni = { id:'nbKASNI1', dio_id:dioZaKasni.id, kolicina:1, dobavljac:'Tokić', narucen:W.isoShift(-10),
+    ocekivano:W.isoShift(-3), primljeno:null, primljena_kolicina:null, cijena:5, tko:'Voditelj' };
+  W.DATA.nabava.push(nKasni);
+  app.go('dijelovi'); await cekaj(100);
+  ok('gumb Nabava nosi crvenu značku kad nešto kasni',
+     D.querySelector('#screen-dijelovi .badge') !== null);
+  W.DATA.nabava = W.DATA.nabava.filter(function(n){ return n.id !== 'nbKASNI1'; });
+
+  /* Analitika: redak Ukupno + odabir točnog mjeseca */
+  app.go('analitika'); await cekaj(150);
+  ok('tablice na Analitici imaju redak "Ukupno"',
+     D.querySelector('#screen-analitika .tbl-ukupno') !== null &&
+     D.querySelector('#screen-analitika .tbl-ukupno').textContent.indexOf('Ukupno') > -1);
+  var mjesecOdabran = W.todayISO().slice(0,7);
+  app.anaMjesec(mjesecOdabran); await cekaj(120);
+  ok('odabir točnog mjeseca mijenja prikazano razdoblje',
+     D.querySelector('#screen-analitika').textContent.indexOf(mjesecOdabran) === -1 &&
+     W.ANA_MJESEC === mjesecOdabran);
+  ok('period u zaglavlju piše naziv mjeseca, ne "zadnjih N dana"',
+     W.anaPeriodTekst().indexOf('dana') === -1);
+  app.anaPeriod('90');
+  jednako('promjena na "N dana" briše odabrani mjesec', W.ANA_MJESEC, null);
+  app.go('pregled');
+
+  grupa('Z2 — preventiva/kvar polja, maziva i mjerna oprema (§11.5 dovršetak)');
+  /* nova preventiva nudi dodijeljeno / procjenu trajanja / zaustavlja liniju */
+  app.novaPreventiva('e1'); await cekaj(100);
+  var fPrev = D.querySelector('#modal-root form');
+  ok('obrazac nove preventive nudi dodijeljeno/trajanje/zaustavlja liniju',
+     !!fPrev.elements.dodijeljen && !!fPrev.elements.trajanje_h && !!fPrev.elements.zaustavlja_liniju);
+  fPrev.elements.opis.value = 'TEST Z2 podmazivanje';
+  fPrev.elements.trajanje_h.value = '2.5';
+  fPrev.elements.zaustavlja_liniju.checked = true;
+  posalji(fPrev); await cekaj(120);
+  var novaPrev = W.DATA.preventiva.filter(function(p){ return p.opis === 'TEST Z2 podmazivanje'; })[0];
+  ok('nova preventiva nosi trajanje i zaustavlja_liniju',
+     !!novaPrev && novaPrev.trajanje_h === 2.5 && novaPrev.zaustavlja_liniju === true);
+  app.openStroj('e1'); await cekaj(120);
+  ok('plan preventive prikazuje "Zaustavlja liniju" i procjenu trajanja',
+     D.querySelector('#screen-stroj').textContent.indexOf('Zaustavlja liniju') > -1 &&
+     D.querySelector('#screen-stroj').textContent.indexOf('~2,5 h') > -1);
+
+  /* uređivanje preventive prihvaća iste izmjene */
+  app.urediPreventivu(novaPrev.id); await cekaj(100);
+  var fUrPrev = D.querySelector('#modal-root form');
+  jednako('obrazac uređivanja preventive predispuni trajanje', fUrPrev.elements.trajanje_h.value, '2.5');
+  ok('obrazac uređivanja preventive predispuni zaustavlja_liniju', fUrPrev.elements.zaustavlja_liniju.checked);
+  fUrPrev.elements.trajanje_h.value = '4';
+  posalji(fUrPrev); await cekaj(120);
+  jednako('izmijenjeno trajanje preventive je spremljeno', novaPrev.trajanje_h, 4);
+  W.DATA.preventiva = W.DATA.preventiva.filter(function(p){ return p.id !== novaPrev.id; });
+
+  /* kvar: procijenjeno gotovo do — samo na otvorenom kvaru, ne na zadatku
+     (svježi sintetički kvar — dosadašnji testovi su do sada zatvorili/preuzeli seed kvarove) */
+  var otvKvarZaProcjenu = { id:'kvZ2A', m:'e1', date:W.todayISO(), opis:'TEST Z2 procjena gotovosti',
+    sati:0, status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo', created_at:new Date().toISOString() };
+  W.DATA.kvarovi.push(otvKvarZaProcjenu);
+  app.urediKvar(otvKvarZaProcjenu.id); await cekaj(100);
+  var fUrKvar = D.querySelector('#modal-root form');
+  ok('obrazac uređivanja otvorenog kvara nudi procjenu gotovosti', !!fUrKvar.elements.procjena_gotovo);
+  fUrKvar.elements.procjena_gotovo.value = '2026-08-20T14:00';
+  posalji(fUrKvar); await cekaj(120);
+  jednako('procjena gotovosti je spremljena', otvKvarZaProcjenu.procjena_gotovo, '2026-08-20T14:00');
+  app.detaljKvara(otvKvarZaProcjenu.id); await cekaj(100);
+  ok('detalj kvara prikazuje procijenjeno gotovo',
+     D.querySelector('#modal-root').textContent.indexOf('Procijenjeno gotovo') > -1);
+  app.closeModal();
+
+  /* fotografija uz zatvaranje kvara (dokaz gotovog popravka, odvojeno od foto prijave) */
+  var otvKvarZaFoto = { id:'kvZ2B', m:'e1', date:W.todayISO(), opis:'TEST Z2 foto popravka',
+    sati:0, status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo', created_at:new Date().toISOString() };
+  W.DATA.kvarovi.push(otvKvarZaFoto);
+  app.rijesiKvar(otvKvarZaFoto.id);
+  W.PENDING_FOTO = 'data:image/jpeg;base64,AAAA';
+  var fFoto = D.querySelector('#modal-root form');
+  fFoto.elements.sati.value = '1';
+  fFoto.elements.tko.value = 'Majstor 1';
+  posalji(fFoto); await cekaj(150);
+  jednako('fotografija popravka je spremljena uz riješeni kvar', otvKvarZaFoto.foto_rijeseno, 'data:image/jpeg;base64,AAAA');
+  app.detaljKvara(otvKvarZaFoto.id); await cekaj(100);
+  ok('detalj prikazuje fotografiju popravka',
+     D.querySelector('#modal-root').textContent.indexOf('Fotografija popravka') > -1);
+  app.viewFotoRijeseno(otvKvarZaFoto.id); await cekaj(100);
+  ok('fotografija popravka se otvara u punom prikazu',
+     !!D.querySelector('#modal-root img.foto-full'));
+  app.closeModal();
+
+  /* maziva i mjerna oprema — bili tvrdo kodirani, sad postavka u Sustavu */
+  app.urediTvrtku(); await cekaj(100);
+  var fTvrtka = D.querySelector('#modal-root form');
+  ok('obrazac postavki nudi maziva i mjernu opremu, predispunjeno zadanim popisom',
+     !!fTvrtka.elements.maziva && fTvrtka.elements.maziva.value.trim().length > 0 &&
+     !!fTvrtka.elements.mjerna_oprema && fTvrtka.elements.mjerna_oprema.value.trim().length > 0);
+  fTvrtka.elements.maziva.value = 'TEST mast | NSF H1 | ležajevi';
+  fTvrtka.elements.mjerna_oprema.value = 'TEST sonda | umjeravanje svakih 90 dana';
+  posalji(fTvrtka); await cekaj(120);
+  jednako('nova maziva su spremljena u postavku', W.TVRTKA.maziva.length, 1);
+  jednako('naziv novog maziva je razdvojen po "|"', W.TVRTKA.maziva[0].naziv, 'TEST mast');
+  jednako('nova mjerna oprema je spremljena', W.TVRTKA.mjerna_oprema[0].naziv, 'TEST sonda');
+  jednako('aktivni popis maziva je preuzeo postavku', W.MAZIVA[0].naziv, 'TEST mast');
+  /* vrati zadano stanje da ne poremeti ostale testove (IFS izvještaj i sl.) */
+  W.TVRTKA.maziva = null; W.TVRTKA.mjerna_oprema = null; W.primijeniIdentitet();
+  jednako('vraćanje na zadano nakon testa vraća ugrađeni popis maziva', W.MAZIVA[0].naziv, W.MAZIVA_ZADANO[0].naziv);
+  app.go('pregled');
+
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
                        sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});
