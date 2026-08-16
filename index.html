@@ -3020,7 +3020,7 @@ var app = {
         '<input type="file" id="logo-input" class="file-input" accept="image/*" onchange="app.logoOdabran(event)">'+
         '<label for="logo-input" class="btn sec block file-label" id="logo-label">Odaberi logo</label>'+
         '<img id="logo-prev" class="foto-prev" alt="pregled loga"'+
-          (t.logo ? ' src="'+t.logo+'" style="display:block;max-height:70px"' : '')+'>'+
+          (t.logo ? ' src="'+esc(t.logo)+'" style="display:block;max-height:70px"' : '')+'>'+
         '<label>Osnovna boja</label><input type="color" name="boja" value="'+esc(t.boja)+'" style="height:48px;padding:4px">'+
         '<label>Boja isticanja</label><input type="color" name="boja_akcent" value="'+esc(t.boja_akcent)+'" style="height:48px;padding:4px">'+
         '<label>Sektori (jedan po retku — npr. Energetika, Pakiranje)</label>'+
@@ -3299,10 +3299,10 @@ var app = {
       '<div style="margin-bottom:8px">'+chips+'</div>'+
       '<div style="font-size:15.5px;font-weight:600;line-height:1.4">'+esc(k.opis)+'</div>'+
       info+
-      (k.foto ? '<img src="'+k.foto+'" alt="fotografija kvara" onclick="app.viewFoto(\''+kId+'\')" '+
+      (k.foto ? '<img src="'+esc(k.foto)+'" alt="fotografija kvara" onclick="app.viewFoto(\''+kId+'\')" '+
         'style="margin-top:10px;max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--border);cursor:pointer;display:block">' : '')+
       (k.foto_rijeseno ? '<div class="row-sub" style="margin-top:8px">Fotografija popravka:</div>'+
-        '<img src="'+k.foto_rijeseno+'" alt="fotografija popravka" onclick="app.viewFotoRijeseno(\''+kId+'\')" '+
+        '<img src="'+esc(k.foto_rijeseno)+'" alt="fotografija popravka" onclick="app.viewFotoRijeseno(\''+kId+'\')" '+
         'style="margin-top:4px;max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--border);cursor:pointer;display:block">' : '')+
       /* radnje odmah ispod podataka — majstor ne smije morati proskrolati komentare
          da dođe do "Preuzimam" / "Riješi kvar" */
@@ -4590,7 +4590,7 @@ var app = {
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Fotografija kvara</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<img class="foto-full" src="'+k.foto+'" alt="foto kvara">'+
+      '<img class="foto-full" src="'+esc(k.foto)+'" alt="foto kvara">'+
       '</div></div>';
   },
   viewFotoRijeseno: function(kId){
@@ -4599,7 +4599,7 @@ var app = {
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Fotografija — popravak gotov</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<img class="foto-full" src="'+k.foto_rijeseno+'" alt="foto popravka">'+
+      '<img class="foto-full" src="'+esc(k.foto_rijeseno)+'" alt="foto popravka">'+
       '</div></div>';
   },
 
