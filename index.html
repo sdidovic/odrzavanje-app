@@ -219,7 +219,18 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .msg.sustav{text-align:center;padding:4px 13px}
 .msg.sustav .msg-txt{background:none;border:none;font-size:12px;color:var(--muted);padding:2px 0;max-width:100%}
 .msg.sustav .msg-meta{display:none}
-.msg-form{margin-top:12px}
+/* S9: chat-layout — tanka traka umjesto kartice, unos zalijepljen za dno */
+.chat-traka{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:6px 2px 10px;margin-bottom:6px;border-bottom:1px solid var(--border);
+  font-size:12px;color:var(--muted)}
+.chat-traka a{color:var(--accent);font-weight:600;cursor:pointer}
+.chat-seg{font-weight:700;color:var(--text)}
+.msg-form{position:sticky;bottom:calc(78px + env(safe-area-inset-bottom));
+  background:var(--bg);padding-top:8px;margin-top:12px;z-index:5}
+.chat-dolje{position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(148px + env(safe-area-inset-bottom));z-index:6;
+  background:var(--accent);color:#fff;border:none;border-radius:20px;
+  padding:7px 16px;font-size:12.5px;font-weight:700;box-shadow:0 2px 8px rgba(16,24,40,.2);cursor:pointer}
 body[data-role="majstor"] .btn-audit{display:none}
 
 /* ---------- oznaka boje tvrtke ---------- */
@@ -682,6 +693,7 @@ var SESSION = { ime:'', role:'voditelj' };  // u demo načinu: voditelj (sve vid
 var LOGIN_SEL = '';
 var LOGIN_BUSY = false;
 var CURRENT_SCREEN = 'pregled';
+var PRIJASNJI_EKRAN = null;   /* S9: renderPoruke razlikuje "tek otvoren ekran" od "stiže uživo" */
 
 var LS_KEY = 'odrzavanje-app-v2';  /* odvojeno od demo datoteke odrzavanje.html */
 var DEMO_FOTO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAA8KCw0LCQ8NDA0REA8RFiUYFhQUFi0gIhslNS84NzQvNDM7QlVIOz9QPzM0SmRLUFdaX2BfOUdob2dcblVdX1v/2wBDARARERYTFisYGCtbPTQ9W1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1v/wAARCADwAUADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDDoooqiQooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAoop6Ru/wB1SaAGUVZSzY/eYD6VKtpGOuT9TTAo0VoiCIfwCneWn9xfyoAzKK0/LT+4v5UhhjP8C/lQBm0Vfa1iPQEfQ1E1mf4H/OgCrRUjwyJ95Tj1FR0gCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAp8cTynCj8akt7cyfM3C/zq58sadlUUwIo7VE5b5j79KlZ1QfMQBVaW7J4j4HqarEljkkk+9AFx7xB90Fv0qJruQ9MCq9FAEhnlPVz+FN8x/wC+3502igB3mP8A32/OnCaUfxmo6KAJ1u5R1wfqKlS8U/fUj6VTooA00kST7rA0yS3STnG0+oqgDg8VPFdMvD/MP1oAZLA8XUZHqKirTVlkXKkEGqtxbbcvH07j0oArUUUUgCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAqW3i81+fujrUVaNvH5cQHc8mmA5mWNMngCqE0zStz07Cn3Uu+TaPur/OoKACiiikAUUUUAFFFFABRRRQAUUUUAFFFFAD45Gjbcpq/FIJUyPxHpWbUkEhikB7HrTAkuodjb1Hyn9Kr1puokQqehFZpBBIPUUAJRRRSAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAdGN0ij1NaLttRm9BWfCcTJ9a2bXT5dR8yKFkUhc5ckD+VMDDoq9d6Y1silbq1uGZtoSCTe2fpirK+HLvKJJPaxTOMrC8vzn8MUhmRRV6LS5WuZYJ5YLWSPGRcPtz9PWrVx4dmtlBmvbJMjKhpSCw9sjmgDHoq/ZaRc3kDXAaKGBf+WszbVzSX+k3NhGkr7JIX+7LE25T+NAFGipbW3e6uY4IyA0jBQW6Vej0K7l1KSxQxl4hl3ydo49cUxGZRWg+jzCxmu45oZYoW2t5ZOc8eo6c0yz0ya7tJ7lHjSOAZYuTzxnjikMpUVo6Xo1zqiSNA0arGQCXJGT7YBqtFaSy3y2gwspfZ83QHOKfkIr0VtHwzd73jS5tJJkGTEsh3flj+dZkFrLPeLaquJWfZg9j70hkFFXtU0q40t41uCjeYCQUJI/UVRoA0LZt0C+3FVLoYnb35q1aDEA9yar3Z/fn2ApiIKKKKQBRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFACg4ORXV+F2Dzyt2MX9a5OtPRdSksXcRhCXGBuBpgXtMTTU162W2+07gzZ8/bjocYxVDWfP/t+fdu83zfkx1x/Dj8MU2eNmw8ZKyKcqQcGrH/CRXeVaSC1knQYEzxfOPxo7MZY8ZbPt0HTzfK+fH14/rS+Lutj/wBcv8KwrieW5naady8jnJY1Z1HU5tR8rzljXyl2rsBHH4mkBra9n/hH9M8r/UbRux03beP60lj/AMibeef9zefLz68dPxrMstXuLO3a32xTwNz5UyblBpt/qtxfokcmyOFPuxRLtUfhQ+vmC6eQaJ/yGbT/AK6rXWamrSWeoLpxAudw84fxEbR0/D+tcXa3D2tzHPGAWjYMA3Srqa3dx6o9+gjEkgwy4O0jGOmfb1pvVWEtHcu+FpFm+1afIfkuIyR9f8n9KdfhtM8MwWZG2a5cvIO+B/layl1GRNTF9FHHHIG3bVB2578Z70uoapPqN0k9wseUAARQdvXPrS3HsdJawtp+kWUa3FvbyNIJpPOk2Fh3H8hVXULQQeLbSVPuXDq4I6Zzz/j+NYmp6lPqc6yzhFKrtAQEAVM2t3LLaBo4ibQgxsQcnHrzT63F0sdKEtxrF/NaB31COMfJIcIeB0xz6VleGITJfXWoXG1fKB+Z/lAY9fp/9esz+17kaqdQUIsx6qAdpGMYxmpLjXLia1ntxDBEk7b3MakEnj39qQzY1O3a78Nl3uIbie2csXhfcME8j8j+lcqoLMAOpq5p+qTafHNHGkbpOMOsgJH6EetJaw7fnYcnoPSjqBOihEC9gKz5W3yM3qat3cuxNgPzN/KqNMQUUUUgCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAClBIOR1pKKAL9vOJBhuG/nRPbrLyOG9fWqIODkdatQ3XaT86YFZ0aM4YYoKMEVypCtnBI4OK0SFkXnDA1ca03SfuUV5Etk8lGUMO2TjueWoAw5InjCFxgOu5eeo6f0pldCbYtOhmh/fJajakcQf5txz8hIBOCeO3pxVaZo7dLmSO2AkDxDE8ABUkNn5eQAcdP/rUDMeityVLaS6liliiihhu0jBUBcKd2QW69h16VVvo5RZlru3SCYS4jCxiMsuDngYyBxz70gM2itawilbT4ntrWOaQzsGLRhztwvXPQe/b8aZdGGG0cW8cZV7mRQ5UMdgC4AJ+vWn1AznQxuVYgkf3WBH5ihELttBUH/aYAfma3NsUV4sQt4Sst88bbowfk+XgenXtUUUYukjkNvEp/frhUAGAmV+uCevWkBjU9IpJASiMwXqQOBW9NYwrZD925i8tSrLAuA3GSZM5PORipGCLqFzHHFHHEqyAhEA4APX8QKYGPBbBMM/LenpUk0yxLzyewqOa6VeI/mPr2qmzFmyxyTQIV2LsWY8mm0UUgCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAHpI8Z+VsVbGoM6Iko4QYBAqjRTA0kmjf7rinMit95QfqKy6cruv3WI+hoAvG3iP8H5Un2WL0P51VFzKP4/0p32qX1H5UAWzEht1hI+VWLD1yQB/QU0W0Q/h/Wq32uX2/Kmm5lP8X6UDLyxov3VA/CpEult1cfJuYY3HOQO+Ky2kdursfxplAi494o+4CfrURu5ijoGwrjDADtUFFABRRRSAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiilAJ6A0AJRTgjnojflSiGQ/wN+VADKKl+zy/3DSi2l/u/qKYENFTi0l9vzpRZydytAFeirIs27uKcLL1k/SgCpRUk0flSbc5qOkAUUUUAFFFFABRRT4lDyqp6E0AMoq/9li9D+dKLaL+5+ppgZ9FaIgiH8ApwijHRF/KgDMorUCKOij8qXgUAZYVj0B/KneW56I35VollHVh+dIZEHV1/OgCgIZD/AAN+VKLeU/wfrV3zov74ppuIh/H+lAFUWsv90fnSi0k/2fzqwbqL+8fypDdx/wC1+VAEQs37stL9jP8AfH5U83idlakN6OyH86AEFl6yfpSizXuxpv209k/WkN43ZRQBILOP1anC0i9D+dQG8k9F/KkN1L6j8qALItov7v6mlEEQ/gFVDcy/3v0FNM8p/jNAF7yo/wC4v5UoRB0VfyrPMsh/jb86Tex/iP50AaYAHQUhIHUiswknqaSgDTMiDq6/nSGaMfxr+dZtFAGibiIfxik+0xf3v0NZ9FAF43cXv+VIbyPsrVSooAuG8XshpDe+kf61UooAkmk8192McVHRRSAKKKKACiiigApVYqwYdRSUUATG6l9R+VJ9pl/v/oKiopgSGeX++aQyyHq7fnTKKAHFmPVj+dNoopAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFAH//Z';   /* demo fotografija kvara (JPEG data-URI) */
@@ -2526,6 +2538,9 @@ function oznaciProcitano(){
   try{ if(zadnja) localStorage.setItem('porukeSeen', zadnja); }catch(e){}
 }
 async function renderPoruke(){
+  /* S9: mjeri PRIJE zamjene DOM-a — bilo dna, ili je ovo tek otvoren ekran (ne uživo-dojava) */
+  var bioNaDnu = (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 60);
+  var svjezOtvoreno = PRIJASNJI_EKRAN !== 'poruke';
   var seenPrije = '';
   try{ seenPrije = localStorage.getItem('porukeSeen') || ''; }catch(e){}
   /* Filtar Sve/Ljudi/Sustav je izbačen (NASTAVAK §11.4) — 4 čovjeka je jedan kanal,
@@ -2556,38 +2571,36 @@ async function renderPoruke(){
   }).join('') : '<div class="empty">Nema poruka za odabrani prikaz.</div>';
 
   var stanjePusha = await pushStanje();
-  /* Kartica se prikazuje samo kad korisnik može nešto NAPRAVITI. Mrtva opcija koja
-     objašnjava zašto ne radi ("dostupno kad je app dodana na početni zaslon") samo
-     otvara pitanja — takvo objašnjenje pripada u Pomoć, ne na ekran. */
-  var pushRed = '';
-  if(stanjePusha==='ukljuceno' || stanjePusha==='iskljuceno' || stanjePusha==='blokirano'){
-    pushRed = '<div class="row" style="padding:9px 13px"><div class="grow">'+
-      '<div class="row-title" style="font-size:13px">Obavijesti na mobitel</div>'+
-      '<div class="row-sub">'+
-        (stanjePusha==='ukljuceno' ? 'Uključene — javljam hitne kvarove, dodjele i poruke.' :
-         stanjePusha==='blokirano' ? 'Blokirane u postavkama preglednika — uključi ih u postavkama stranice.' :
-         'Isključene — nećeš znati za hitan kvar dok ne otvoriš app.')+
-      '</div></div>'+
-      (stanjePusha==='ukljuceno'
-        ? '<button class="btn-mini" onclick="app.pushIskljuci()">Isključi</button>'
-        : (stanjePusha==='iskljuceno' ? '<button class="btn-mini" onclick="app.pushUkljuci()">Uključi</button>' : ''))+
-    '</div>';
-  }
+  /* S9: push-status i segment Poruke│Kontakti sele u jednu tanku traku na vrhu
+     (ne kartica) — chat počinje odmah, ne nakon dva reda objašnjenja. */
+  var pushMini = stanjePusha==='ukljuceno' ? '🔔 <a onclick="app.pushIskljuci()">isključi obavijesti</a>'
+    : stanjePusha==='iskljuceno' ? '<a onclick="app.pushUkljuci()">🔔 uključi obavijesti</a>'
+    : stanjePusha==='blokirano' ? '🔕 obavijesti blokirane'
+    : '';
+  var trakaHtml = '<div class="chat-traka">'+
+    '<span class="chat-seg">Poruke &middot; <a onclick="app.go(\'kontakti\')">Kontakti</a></span>'+
+    (pushMini ? '<span>'+pushMini+'</span>' : '')+
+  '</div>';
+
+  /* prikazi "↓ nove poruke" samo kad ekran vec gleda netko tko NIJE na dnu (uzivo-dojava) —
+     na tek otvorenom ekranu ili nakon vlastite poruke odmah skacemo na dno, gumb je suvisan */
+  var prikaziDolje = !svjezOtvoreno && !bioNaDnu;
 
   $('#screen-poruke').innerHTML =
-    segmentPorukeKontakti('poruke')+
-    '<div class="card">'+pushRed+'</div>'+
-    '<h2>Zajednički kanal — vide ga svi</h2>'+
+    trakaHtml+
     '<div class="card" style="padding:5px 0">'+html+'</div>'+
     '<form class="msg-form" onsubmit="app.posaljiPoruku(event)">'+
       '<textarea name="tekst" rows="2" required placeholder="Poruka svima — primopredaja, obavijest, upozorenje…"></textarea>'+
       '<button class="btn primary block" type="submit" style="margin-top:8px">Pošalji</button>'+
-    '</form>';
+    '</form>'+
+    (prikaziDolje ? '<button type="button" class="chat-dolje" onclick="app.porukeNaDno()">↓ Nove poruke</button>' : '');
   oznaciProcitano();
   updateBadge();
-  var crta = document.querySelector('.msg-nove');
-  if(crta) crta.scrollIntoView({block:'center'});
-  else window.scrollTo(0, document.body.scrollHeight);
+  if(!prikaziDolje){
+    var crta = document.querySelector('.msg-nove');
+    if(crta && svjezOtvoreno) crta.scrollIntoView({block:'center'});
+    else window.scrollTo(0, document.body.scrollHeight);
+  }
 }
 
 /* =====================  navigacija  ===================== */
@@ -2599,6 +2612,7 @@ var RENDERERS = {
   sustav: renderSustav, qr: renderQR, nabava: renderNabava, stroj: renderStroj
 };
 function showScreen(name){
+  PRIJASNJI_EKRAN = CURRENT_SCREEN;
   CURRENT_SCREEN = name;
   ['pregled','strojevi','kvarovi','dijelovi','kontakti','poruke','analitika','raspored','sustav','qr','nabava','stroj'].forEach(function(s){
     $('#screen-'+s).classList.toggle('hidden', s!==name);
@@ -3123,9 +3137,18 @@ var app = {
     var p = { id:'po'+Date.now(), tko:SESSION.ime||'Voditelj', tekst:txt, kvar_id:null, created_at:new Date().toISOString() };
     if(!DATA.poruke) DATA.poruke = [];
     DATA.poruke.push(p);
-    renderPoruke();
+    await renderPoruke();
+    /* S9: vlastita poruka uvijek odvede na dno i vrati fokus — bez obzira gdje je
+       korisnik čitao prije slanja (sticky obrazac dopušta slanje i dok se čita povijest) */
+    app.porukeNaDno();
+    var ta = document.querySelector('#screen-poruke textarea[name="tekst"]');
+    if(ta) ta.focus();
     var spremljenaPoruka = await apiInsert('poruke', { tko:p.tko, tekst:p.tekst }, p);
     if(spremljenaPoruka || !REMOTE) posaljiObavijest('Poruka — '+p.tko, txt.slice(0,120), '#poruke');
+  },
+  porukeNaDno: function(){
+    window.scrollTo(0, document.body.scrollHeight);
+    var b = document.querySelector('.chat-dolje'); if(b) b.remove();
   },
   dodajKomentar: async function(e, kId, pogled){
     e.preventDefault();

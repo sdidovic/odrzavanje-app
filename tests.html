@@ -559,7 +559,8 @@ async function testovi(W, D){
      D.querySelectorAll('#screen-poruke .msg.sustav').length > 0 &&
      D.querySelectorAll('#screen-poruke .msg:not(.sustav)').length > 0);
   ok('segment Poruke│Kontakti postoji na oba ekrana', (function(){
-    var naPorukama = D.querySelectorAll('#screen-poruke button[onclick*="go(\'kontakti\')"]').length === 1;
+    /* Poruke: S9 tanka traka (link, ne gumb-kartica); Kontakti: nepromijenjen segment */
+    var naPorukama = D.querySelectorAll('#screen-poruke .chat-traka [onclick*="go(\'kontakti\')"]').length === 1;
     app.go('kontakti'); var naKontaktima = D.querySelectorAll('#screen-kontakti button[onclick*="go(\'poruke\')"]').length === 1;
     app.go('poruke');
     return naPorukama && naKontaktima;
@@ -582,6 +583,38 @@ async function testovi(W, D){
   ok('zapis je kratak i vodi na kvar', zadnja.kvar_id === neki.id && zadnja.tekst.length < 160);
   app.closeModal();
   ok('nepročitane se broje', typeof W.brojNeprocitanih() === 'number');
+
+  grupa('Poruke kao chat — S9');
+  app.go('poruke'); await cekaj(150);
+  ok('tanka traka umjesto kartice za push/segment', D.querySelector('#screen-poruke .chat-traka') !== null);
+  ok('obrazac za slanje je zalijepljen za dno (sticky)',
+     W.getComputedStyle(D.querySelector('#screen-poruke .msg-form')).position === 'sticky');
+  var forma2 = D.querySelector('#screen-poruke form');
+  forma2.elements.tekst.value = 'TEST fokus nakon slanja';
+  posalji(forma2); await cekaj(250);
+  ok('fokus ostaje u polju za unos nakon slanja',
+     D.activeElement === D.querySelector('#screen-poruke textarea[name="tekst"]'));
+  ok('nema gumba "↓ Nove poruke" odmah nakon vlastite poruke',
+     D.querySelector('#screen-poruke .chat-dolje') === null);
+  /* dovoljno poruka da popis stvarno prijeđe visinu prozora — inače je "dno" trivijalno postignut */
+  for(var mi=0; mi<40; mi++){
+    W.DATA.poruke.push({id:'poFILL'+mi, tko:'Sustav', tekst:'TEST punjenje '+mi, kvar_id:null, created_at:new Date().toISOString()});
+  }
+  await W.renderPoruke(); await cekaj(100);
+  W.scrollTo(0,0);
+  W.PRIJASNJI_EKRAN = 'poruke';   /* simulira da je ekran već otvoren — ovo je uživo-dojava, ne svjež ulazak */
+  W.DATA.poruke.push({id:'poTESTdojava', tko:'Majstor 2', tekst:'TEST uživo poruka', kvar_id:null, created_at:new Date().toISOString()});
+  await W.renderPoruke(); await cekaj(100);
+  ok('gumb "↓ Nove poruke" se pojavi kad korisnik nije na dnu i stigne nova poruka',
+     D.querySelector('#screen-poruke .chat-dolje') !== null);
+  app.porukeNaDno();
+  ok('"↓ Nove poruke" nestane nakon dodira', D.querySelector('#screen-poruke .chat-dolje') === null);
+  /* svjež ulazak na ekran uvijek skoči na dno, bez obzira na prošlu poziciju */
+  app.go('pregled'); await cekaj(80);
+  W.scrollTo(0,0);
+  app.go('poruke'); await cekaj(150);
+  ok('svjež ulazak na Poruke nema gumb "↓" (skoči na dno)', D.querySelector('#screen-poruke .chat-dolje') === null);
+  W.DATA.poruke = W.DATA.poruke.filter(function(p){ return p.id.indexOf('poFILL')!==0 && p.id!=='poTESTdojava'; });
 
   grupa('Nabava');
   app.go('dijelovi'); await cekaj(150);
