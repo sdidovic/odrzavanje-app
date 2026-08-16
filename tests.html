@@ -1975,6 +1975,72 @@ async function testovi(W, D){
        man.icons && man.icons.length > 0 && man.icons.every(function(i){ return (i.purpose||'').indexOf('maskable') > -1; }));
   }catch(e){ ok('manifest ikone nose "maskable" svrhu (Android home-screen)', false, String(e)); }
 
+  grupa('AUDIT-FIX2 srednje — atomarni qty(), istekla sesija na izravnom putu');
+  /* app.qty() koristi isti atomarni RPC kao trošenje dijela na kvaru — ne slijepi upis */
+  var stariSb8 = W.sb, stariRemote5 = W.REMOTE, stariNM5 = W.naMrezi;
+  W.REMOTE = true; W.naMrezi = function(){ return true; };
+  var dioZaQty = W.DATA.dijelovi[0];
+  var stanjeZaQty = dioZaQty.stanje;
+  var rpcPoziv = null;
+  W.sb = { rpc: function(ime, args){ rpcPoziv = {ime:ime, args:args}; return Promise.resolve({data: stanjeZaQty+1, error:null}); } };
+  await W.app.qty(dioZaQty.id, 1); await cekaj(100);
+  ok('qty(+1) zove razduzi_dio s negativnom količinom (povećanje)',
+     !!rpcPoziv && rpcPoziv.ime==='razduzi_dio' && rpcPoziv.args.p_kolicina === -1);
+  jednako('stanje preuzima autoritativnu vrijednost iz RPC odgovora', dioZaQty.stanje, stanjeZaQty+1);
+  dioZaQty.stanje = stanjeZaQty;
+  W.sb = stariSb8; W.REMOTE = stariRemote5; W.naMrezi = stariNM5;
+
+  /* istekla sesija na izravnom putu (ne u redu čekanja) dobiva istu jasnu poruku */
+  var stariSb9 = W.sb, stariRemote6 = W.REMOTE, stariNM6 = W.naMrezi, stariToast2 = W.toast;
+  W.REMOTE = true; W.naMrezi = function(){ return true; };
+  var redPrijeSesija = W.RED.length;
+  var zadnjiToast2 = '';
+  W.toast = function(m){ zadnjiToast2 = m; };
+  W.sb = { from: function(){ return { update: function(){ return { eq:function(){ return { select:function(){
+    return Promise.resolve({error:{code:'PGRST301', message:'JWT expired'}}); } }; } }; } }; } };
+  await W.apiUpdate('kvarovi', 'bilo-koji-id', {opis:'x'});
+  ok('apiUpdate izravno javlja "sesija je istekla" umjesto generičke greške',
+     zadnjiToast2.indexOf('Sesija je istekla') > -1);
+  jednako('promjena je spremljena u red umjesto izgubljena', W.RED.length, redPrijeSesija+1);
+  W.RED.length = redPrijeSesija; W.redSpremi();
+  W.sb = stariSb9; W.REMOTE = stariRemote6; W.naMrezi = stariNM6; W.toast = stariToast2;
+
+  grupa('AUDIT-FIX2 nisko — pin-oko 44px, sdot boje iz varijabli');
+  var probniOko = D.createElement('button'); probniOko.className = 'pin-oko';
+  D.body.appendChild(probniOko);
+  ok('.pin-oko ima dodirnu površinu 44px',
+     parseInt(W.getComputedStyle(probniOko).minHeight,10) >= 44 &&
+     parseInt(W.getComputedStyle(probniOko).minWidth,10) >= 44);
+  probniOko.remove();
+
+  var probniDotOk = D.createElement('span'); probniDotOk.className = 'sdot ok';
+  var probniVarZelena = D.createElement('span'); probniVarZelena.style.background = 'var(--green)';
+  D.body.appendChild(probniDotOk); D.body.appendChild(probniVarZelena);
+  jednako('.sdot.ok koristi var(--green), ne vlastitu nijansu',
+     W.getComputedStyle(probniDotOk).backgroundColor, W.getComputedStyle(probniVarZelena).backgroundColor);
+  probniDotOk.remove(); probniVarZelena.remove();
+
+  grupa('AUDIT-FIX2 — pokrivenost: app.prijava() validacije');
+  /* poznat propust iz 2. kruga audita: app.prijava() nije imala nijedan test,
+     testovi su uvijek ulazili kroz demoUlaz() zaobilazeći pravu prijavu potpuno */
+  D.getElementById('screen-login').classList.add('show');
+  W.LOGIN_SEL = null;
+  D.querySelector('#pin').value = '';
+  await app.prijava();
+  jednako('prijava bez odabranog imena traži odabir', D.querySelector('#login-err').textContent, 'Odaberi svoje ime.');
+  app.odaberiKorisnika('Voditelj');
+  await app.prijava();
+  jednako('prijava bez PIN-a traži unos', D.querySelector('#login-err').textContent, 'Upiši PIN.');
+  var stariSb10 = W.sb;
+  D.querySelector('#pin').value = '99999999';
+  W.sb = { auth: { signInWithPassword: function(){ return Promise.resolve({error:{message:'Invalid login credentials'}}); } } };
+  await app.prijava();
+  jednako('pogrešan PIN javlja jasnu poruku, ne sirovu grešku baze', D.querySelector('#login-err').textContent, 'Pogrešan PIN.');
+  jednako('PIN polje se briše nakon pogrešnog pokušaja (ne ostaje vidljiv/upisan)', D.querySelector('#pin').value, '');
+  W.sb = stariSb10;
+  D.querySelector('#login-err').textContent = '';
+  D.getElementById('screen-login').classList.remove('show');
+
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
                        sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});

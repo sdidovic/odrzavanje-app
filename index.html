@@ -208,7 +208,7 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 
 /* ---------- statusna točka stroja ---------- */
 .sdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:0}
-.sdot.ok{background:#2e9e57}.sdot.upoz{background:#e5a50a}.sdot.kvar{background:var(--red)}
+.sdot.ok{background:var(--green)}.sdot.upoz{background:var(--yellow)}.sdot.kvar{background:var(--red)}   /* AUDIT-FIX: CSS varijable umjesto vlastite nijanse — prati boju tvrtke dosljedno kao ostatak sustava */
 
 /* ---------- poruke (chat) ---------- */
 .msg{padding:7px 13px}
@@ -313,7 +313,7 @@ body[data-role="majstor"] .btn-audit{display:none}
 .pin-input::placeholder{letter-spacing:normal}
 .pin-wrap{position:relative}
 .pin-oko{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;
-  font-size:19px;cursor:pointer;padding:10px;color:var(--muted);min-width:42px;min-height:42px}
+  font-size:19px;cursor:pointer;padding:11px;color:var(--muted);min-width:44px;min-height:44px}   /* AUDIT-FIX: 44px dosljedno s ostatkom sustava (rukavice, žurba) */
 .login-err{color:var(--red);font-size:13px;margin-top:var(--r3);min-height:18px;font-weight:600}
 .login-noga{margin-top:var(--r5);font-size:12.5px;color:var(--text-2);letter-spacing:.3px;line-height:1.8}   /* AUDIT-FIX: --muted na --bg je ~4.43:1, ispod WCAG AA 4.5:1 — ista logika kao komentar iznad */
 .login-noga a{color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline;
@@ -1227,7 +1227,7 @@ async function sinkroniziraj(rucno){
   if(!REMOTE || SYNC_U_TIJEKU || !RED.length) { if(rucno) toast('Sve je sinkronizirano ✓'); return; }
   if(!naMrezi()){ if(rucno) toast('Nema mreže — pokušat ću sam kad se vrati'); return; }
   SYNC_U_TIJEKU = true;
-  var poslano = 0, zapelo = false, preskoceno = 0, sesijaIstekla = false;
+  var poslano = 0, zapelo = false, preskoceno = 0, sesijaIsteklaSad = false;
   try{
     while(RED.length){
       var z = RED[0];
@@ -1235,11 +1235,11 @@ async function sinkroniziraj(rucno){
         ? await sb.from(z.table).insert(z.row).select().single()
         : await sb.from(z.table).update(z.row).eq('id', z.tempId).select('id');
       if(res.error){
-        if(res.error.code === 'PGRST301'){
+        if(sesijaIstekla(res.error)){
           /* AUDIT-FIX: istekla sesija — retry sa starim tokenom NIKAD neće uspjeti,
              pa se ovo dosad tiho pokušavalo iznova svakih 30s zauvijek. Zapis ostaje
              u redu (poslat će se nakon ponovne prijave), ali korisnik mora znati zašto. */
-          sesijaIstekla = true; zapelo = true; break;
+          sesijaIsteklaSad = true; zapelo = true; break;
         }
         if(res.error.code && naMrezi()){
           /* trajna greška (npr. RLS) — makni iz reda da ne blokira ostalo, zabilježi i javi korisniku */
@@ -1264,7 +1264,7 @@ async function sinkroniziraj(rucno){
   /* AUDIT-FIX: prije je korisnik koji je unos napravio ostajao bez ikakve povratne
      informacije kad bi red trajno odbacio njegov zapis — javljalo se samo u admin
      dnevniku grešaka koji obični korisnik ne vidi. Sad se to vidi u traci na dnu ekrana. */
-  if(sesijaIstekla){
+  if(sesijaIsteklaSad){
     toast('Sesija je istekla — ponovno se prijavi da nastaviš slanje');
   } else if(poslano || preskoceno){
     var dio = [];
@@ -1309,6 +1309,12 @@ async function apiInsert(table, row, localObj){
     cacheSpremi();
     return res.data;
   }catch(err){
+    if(sesijaIstekla(err)){
+      uRed(table, 'insert', row, localObj);   /* ne gubi unos — pošalji kasnije, nakon prijave */
+      toast('Sesija je istekla — spremljeno lokalno, poslat će se nakon ponovne prijave');
+      cacheSpremi();
+      return null;
+    }
     if(mreznaGreska(err)){
       uRed(table, 'insert', row, localObj);   /* ne gubi unos — pošalji kasnije */
       toast('Mreža nedostupna — spremljeno lokalno');
@@ -1341,6 +1347,12 @@ async function apiUpdate(table, id, patch){
     toast('Spremljeno ✓');
     cacheSpremi();
   }catch(err){
+    if(sesijaIstekla(err)){
+      uRed(table, 'update', patch, {id:id});
+      toast('Sesija je istekla — spremljeno lokalno, poslat će se nakon ponovne prijave');
+      cacheSpremi();
+      return;
+    }
     if(mreznaGreska(err)){
       uRed(table, 'update', patch, {id:id});
       toast('Mreža nedostupna — spremljeno lokalno');
@@ -1368,6 +1380,11 @@ function mozdaBazaSpava(err){
   var m = ((err && (err.message || err.msg)) || String(err)).toLowerCase();
   return m.indexOf('fetch') > -1 || m.indexOf('failed to') > -1 || m.indexOf('load failed') > -1;
 }
+/* AUDIT-FIX (2. krug): PGRST301 (istekla JWT sesija) je dosad prepoznat samo unutar
+   sinkroniziraj() reda čekanja — izravno spremanje (apiInsert/apiUpdate, korisnik online
+   s isteklom sesijom) padalo je na generičku "Spremanje NIJE uspjelo" s kriptičnom porukom
+   greške. Zajednička provjera koristi se na sva tri mjesta. */
+function sesijaIstekla(err){ return !!(err && err.code === 'PGRST301'); }
 
 /* =====================================================================
    PUSH OBAVIJESTI — stižu na mobitel i kad je aplikacija zatvorena.
@@ -3819,11 +3836,28 @@ var app = {
   qty: async function(id, delta){
     var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
     if(!p) return;
-    p.stanje = Math.max(0, p.stanje + delta);
+    p.stanje = Math.max(0, p.stanje + delta);   /* odmah na ekranu — brz dodir ne smije čekati mrežu */
     var el = $('#parts-list');
     if(el) el.innerHTML = partsListHtml();
     updateBadge();
-    await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
+    /* AUDIT-FIX: prije je ovo bio "pročitaj pa piši" (apiUpdate sa zadnjom poznatom
+       vrijednosti) — dva brza dodira ili dva uređaja mogla su izgubiti jednu promjenu.
+       Isti atomarni RPC koji već koristi trošenje dijela kod zatvaranja kvara: negativan
+       p_kolicina znači povećanje (greatest(0, stanje - p_kolicina) sa -delta = +delta). */
+    if(REMOTE && naMrezi()){
+      try{
+        var rpc = await sb.rpc('razduzi_dio', { p_id: p.id, p_kolicina: -delta });
+        if(!rpc.error && typeof rpc.data === 'number'){
+          p.stanje = rpc.data;
+          var el2 = $('#parts-list');
+          if(el2) el2.innerHTML = partsListHtml();
+        } else {
+          await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
+        }
+      }catch(e){ await apiUpdate('dijelovi', p.id, { stanje:p.stanje }); }
+    } else {
+      await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
+    }
   },
   urediDio: function(id){
     var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
