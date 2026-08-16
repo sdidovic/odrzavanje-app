@@ -1927,6 +1927,54 @@ async function testovi(W, D){
   ok('gumb se otključa čim se stvaran poziv završi', !probniBtn.disabled);
   probniForm.remove();
 
+  grupa('AUDIT-FIX nisko — dodirne mete, chip Otkazan, kontrast, maskable ikona');
+  /* .btn-mini i .btn.sm sad dosljedno 44px kao ostatak sustava */
+  var probniMini = D.createElement('button'); probniMini.className = 'btn-mini';
+  var probniSm = D.createElement('button'); probniSm.className = 'btn sm';
+  D.body.appendChild(probniMini); D.body.appendChild(probniSm);
+  ok('.btn-mini ima dodirnu površinu 44px', parseInt(W.getComputedStyle(probniMini).minHeight,10) >= 44);
+  ok('.btn.sm ima dodirnu površinu 44px', parseInt(W.getComputedStyle(probniSm).minHeight,10) >= 44);
+  probniMini.remove(); probniSm.remove();
+
+  /* "Otkazan" ima vlastiti stil, razlučiv od "Riješen" (novi je storniran u ranijoj grupi) */
+  jednako('kontrolni kvar je storniran (priprema za sljedeću provjeru)', novi.status, 'otkazan');
+  app.detaljKvara(novi.id); await cekaj(100);
+  ok('detalj storniranog kvara prikazuje chip.otkazan, vizualno odvojen od "riješen"',
+     D.querySelector('#modal-root .chip.otkazan') !== null &&
+     D.querySelector('#modal-root .chip.otkazan').textContent.indexOf('Otkazan') > -1);
+  app.closeModal();
+
+  /* preventiva na ekranu stroja: isti klik-na-redak uzorak kao na Rasporedu, "Uredi" u zajedničkom izborniku */
+  app.openStroj('e1'); await cekaj(120);
+  var prevRow = D.querySelector('#screen-stroj .card .row');
+  if(prevRow){
+    ok('redak preventive na ekranu stroja nema stalni gumb "Uredi"', !prevRow.querySelector('.btn-mini'));
+    prevRow.click(); await cekaj(100);
+    ok('dodir na redak otvara izbornik radnji koji uključuje "Uredi"',
+       D.querySelector('#modal-root').textContent.indexOf('Uredi') > -1);
+    app.closeModal();
+  }
+
+  /* login footer kontrast: --text-2 umjesto --muted (~4.43:1, ispod WCAG AA).
+     Uspoređuju se dvije IZRAČUNATE (computed) boje, ne sirova CSS varijabla vs.
+     computed vrijednost — inače "#3d4657" nikad ne bi bio jednak "rgb(61, 70, 87)". */
+  D.getElementById('screen-login').classList.add('show');
+  var noga = D.querySelector('.login-noga');
+  var bojaNoga = W.getComputedStyle(noga).color;
+  var probaText2 = D.createElement('div'); probaText2.style.color = 'var(--text-2)'; D.body.appendChild(probaText2);
+  var bojaText2 = W.getComputedStyle(probaText2).color;
+  probaText2.remove();
+  jednako('login footer koristi --text-2 (dovoljan kontrast), ne --muted', bojaNoga, bojaText2);
+  D.getElementById('screen-login').classList.remove('show');
+
+  /* manifest: ikone nose "maskable" svrhu za Android home-screen */
+  try{
+    var manRes = await W.fetch('manifest.json', {cache:'no-store'});
+    var man = await manRes.json();
+    ok('manifest ikone nose "maskable" svrhu (Android home-screen)',
+       man.icons && man.icons.length > 0 && man.icons.every(function(i){ return (i.purpose||'').indexOf('maskable') > -1; }));
+  }catch(e){ ok('manifest ikone nose "maskable" svrhu (Android home-screen)', false, String(e)); }
+
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
                        sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});

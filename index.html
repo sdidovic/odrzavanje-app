@@ -85,7 +85,6 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .chev{color:#aab1bd;font-size:19px;line-height:1}
 .grow{min-width:0;flex:1}
 .empty{padding:26px 16px;text-align:center;color:var(--muted);font-size:13.5px;line-height:1.55}
-.empty b{display:block;color:var(--text-2);font-size:14.5px;margin-bottom:3px}
 
 /* ---------- chips ---------- */
 .chip{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.6px;
@@ -96,6 +95,10 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .chip.kvar{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
 .chip.rijesen{background:#eef0f3;color:#4a545f;border:1px solid var(--border)}
 .chip.rad{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-rub)}
+/* AUDIT-FIX: "Otkazan" (stornirani pogrešan unos) i "Riješen" (uspješan popravak) su vrlo
+   različiti ishodi — dosad su dijelili identičan siv chip, teško razlučivo pod jarkim
+   svjetlom. Otkazan dobiva precrtan tekst i isprekidan rub umjesto pune linije. */
+.chip.otkazan{background:#eef0f3;color:#7c8894;border:1px dashed var(--border);text-decoration:line-through}
 .chip.zadatak{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-rub)}
 .chip.fg{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);text-transform:none;letter-spacing:.2px}
 
@@ -263,8 +266,8 @@ body[data-role="majstor"] .btn-audit{display:none}
   color:var(--green);font-size:16px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1}
 .okbtn:active{background:#d6ecdd}
 .btn-mini{border:1px solid var(--accent-rub);background:#fff;color:var(--accent);border-radius:7px;
-  padding:10px 13px;min-height:42px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;
-  transition:background .12s ease}   /* dodirna meta ≥42px; rub prati boju tvrtke, ne fiksnu Clarum ljubičastu */
+  padding:11px 13px;min-height:44px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;
+  transition:background .12s ease}   /* dodirna meta 44px — dosljedno s ostatkom sustava (rukavice, žurba) */
 .btn-mini:active{background:var(--accent-soft)}
 .btn-mini.opasno{color:var(--red);border-color:var(--red-border)}
 .btn-mini.opasno:active{background:var(--red-bg)}
@@ -312,7 +315,7 @@ body[data-role="majstor"] .btn-audit{display:none}
 .pin-oko{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;
   font-size:19px;cursor:pointer;padding:10px;color:var(--muted);min-width:42px;min-height:42px}
 .login-err{color:var(--red);font-size:13px;margin-top:var(--r3);min-height:18px;font-weight:600}
-.login-noga{margin-top:var(--r5);font-size:12.5px;color:var(--muted);letter-spacing:.3px;line-height:1.8}
+.login-noga{margin-top:var(--r5);font-size:12.5px;color:var(--text-2);letter-spacing:.3px;line-height:1.8}   /* AUDIT-FIX: --muted na --bg je ~4.43:1, ispod WCAG AA 4.5:1 — ista logika kao komentar iznad */
 .login-noga a{color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline;
   display:inline-block;padding:4px 2px}   /* demo nije ravnopravan "Prijavi se" — tekstualni link, ne gumb */
 
@@ -410,7 +413,7 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;
 .btn.primary:active{background:var(--accent-dark);border-color:var(--accent-dark)}
 .btn.sec{background:#fff;color:var(--accent);border-color:var(--accent-rub)}
 .btn.sec:active{background:var(--accent-soft)}
-.btn.sm{padding:9px 13px;min-height:40px;font-size:13.5px}
+.btn.sm{padding:10px 13px;min-height:44px;font-size:13.5px}
 .btn.block{display:block;width:100%}
 .btn.sec.block{margin-bottom:12px}
 .btn:disabled{opacity:.55;cursor:default}
@@ -1766,13 +1769,14 @@ function renderStroj(){
     var traj = p.trajanje_h ? ' &middot; ~'+H(p.trajanje_h) : '';
     var zadnje = p.zadnje ? '<div class="row-sub">zadnje obavljeno: '+fmtDate(p.zadnje)+
       (p.tkoZadnji ? ' ('+esc(p.tkoZadnji)+')' : '')+'</div>' : '';
-    return '<div class="row"><div class="grow">'+
+    /* AUDIT-FIX: isti klik-na-redak uzorak kao na Rasporedu (prevRedak) — dosad je ovaj
+       redak imao stalni gumb "Uredi" dok je Raspored za istu stavku nudio samo ✓ i
+       klik-kroz izbornik; "Uredi" je sad među radnjama u zajedničkom akcijeStavke() listu. */
+    return '<div class="row click" onclick="app.akcijeStavke(\'preventiva\',\''+p.id+'\')"><div class="grow">'+
       '<div class="row-title" style="font-size:13.5px">'+esc(p.opis)+
         (p.zaustavlja_liniju ? ' <span class="chip upoz">Zaustavlja liniju</span>' : '')+'</div>'+
       '<div class="row-sub">'+esc(p.interval)+' &middot; sljedeće: '+fmtDate(p.next)+izv+dod+traj+'</div>'+zadnje+
-      '<div style="margin-top:4px"><button class="btn-mini role-write" onclick="app.urediPreventivu(\''+p.id+'\')">Uredi</button></div></div>'+
-      '<div class="row-right">'+(late ? '<span class="chip upoz">Kasni</span>' : '')+
-      '<button class="okbtn role-write" title="Označi obavljeno" onclick="app.obaviPreventivu(\''+p.id+'\')">✓</button></div></div>';
+      '</div>'+(late ? '<div class="row-right"><span class="chip upoz">Kasni</span></div>' : '')+'</div>';
   }).join('') : '<div class="empty">Nema planiranih stavki.</div>';
 
   /* povijest kvarova skraćena na zadnjih 10 — starije se rijetko traže, a duga
@@ -1853,7 +1857,7 @@ function kvarItem(k, showMachine){
   var zadatak = (k.tip||'kvar') === 'zadatak';
   var m = machineById(k.m) || {id:'', name: zadatak ? 'Opći zadatak' : 'Nepoznat stroj'};
   var chip;
-  if(k.status==='otkazan') chip = '<span class="chip rijesen">Otkazan</span>';
+  if(k.status==='otkazan') chip = '<span class="chip otkazan">Otkazan</span>';
   else if(k.status==='u_radu') chip = '<span class="chip rad">U radu</span>';
   else if(k.status==='otvoren') chip = k.upoz ? '<span class="chip upoz">Upozorenje</span>' : '<span class="chip kvar">Otvoren</span>';
   else chip = '<span class="chip rijesen">Riješen</span>';
@@ -3278,7 +3282,7 @@ var app = {
     var m = machineById(k.m) || {name: zadatak ? 'Opći zadatak' : '—'};
     var chips = '';
     if(zadatak) chips += '<span class="chip zadatak">Zadatak</span> ';
-    if(k.status==='otkazan') chips += '<span class="chip rijesen">Otkazan</span>';
+    if(k.status==='otkazan') chips += '<span class="chip otkazan">Otkazan</span>';
     else if(jeOtvoren(k)){
       if(k.prioritet==='hitno') chips += '<span class="chip kvar">HITNO</span> ';
       else if(k.prioritet==='visok') chips += '<span class="chip upoz">Visok</span> ';
@@ -3655,6 +3659,7 @@ var app = {
         '<button class="btn primary block role-write" onclick="app.closeModal();app.obaviPreventivu(\''+id+'\')">✓ Obavljeno</button>'+
         brziPremjestaj('preventiva', id)+
         '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.pokreniPremjestanje(\'preventiva\',\''+id+'\')">Premjesti na drugi dan</button>'+
+        '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.urediPreventivu(\''+id+'\')">Uredi</button>'+
         '<button class="btn sec block" style="margin-top:8px" onclick="app.closeModal();app.openStroj(\''+p.m+'\')">Otvori stroj</button>'+
         '</div></div>';
     } else {
