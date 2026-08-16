@@ -102,6 +102,8 @@ async function testovi(W, D){
   await cekaj(120);
   /* determinizam: svaki run kreće od netaknutog seeda */
   try{ W.localStorage.removeItem(W.LS_KEY); }catch(e){}
+  try{ W.localStorage.removeItem(W.ZADNJI_EKRAN_KEY); W.localStorage.removeItem(W.ZADNJI_FILTER_KEY); }catch(e){}
+  W.FILTER = { stroj:'svi', status:'svi', majstor:'svi', od:'', do:'', q:'' };   /* moglo se učitati iz prošlog runa prije ovog čišćenja */
   W.DATA = W.buildSeedSFotkom();
   W.save();
   W.showScreen('pregled');
@@ -2040,6 +2042,106 @@ async function testovi(W, D){
   W.sb = stariSb10;
   D.querySelector('#login-err').textContent = '';
   D.getElementById('screen-login').classList.remove('show');
+
+  grupa('Z3 — push resubscribe nakon rotacije pretplate');
+  /* posaljiPushPretplatu(): dijele je pushUkljuci() i poruka od service workera
+     nakon automatske rotacije pretplate (pushsubscriptionchange u sw.js) */
+  var stariSb11 = W.sb, stariRemote7 = W.REMOTE;
+  W.REMOTE = true;
+  var upsertPoziv = null;
+  W.sb = { from: function(t){ return { upsert: function(row, opts){
+    upsertPoziv = {table:t, row:row, opts:opts}; return Promise.resolve({error:null}); } }; } };
+  await W.posaljiPushPretplatu({ endpoint:'https://push.test/abc', keys:{p256dh:'p', auth:'a'} });
+  ok('posaljiPushPretplatu šalje korisnika, endpoint i ključeve na push_pretplate',
+     !!upsertPoziv && upsertPoziv.table==='push_pretplate' &&
+     upsertPoziv.row.korisnik===W.SESSION.ime && upsertPoziv.row.endpoint==='https://push.test/abc');
+
+  if(W.navigator.serviceWorker){
+    upsertPoziv = null;
+    W.navigator.serviceWorker.dispatchEvent(new W.MessageEvent('message', { data:
+      { type:'push-resubscribed', subscription:{ endpoint:'https://push.test/rotirano', keys:{p256dh:'p2', auth:'a2'} } } }));
+    await cekaj(80);
+    ok('poruka "push-resubscribed" od service workera šalje novu pretplatu na server',
+       !!upsertPoziv && upsertPoziv.row.endpoint==='https://push.test/rotirano');
+  }
+  W.sb = stariSb11; W.REMOTE = stariRemote7;
+
+  grupa('Testovi: Sustav — noviKorisnik/korisnikAktivan (2. krug audita)');
+  /* mockira app.fnKorisnici (ne fetch/sb.auth) — testira da pozivatelji šalju
+     ispravan payload i ispravno reagiraju, ne ponovno unutarnju logiku fnKorisnici.
+     Bilježi POVIJEST poziva, ne samo zadnji — i saveKorisnik i korisnikAktivan nakon
+     uspjeha (bez await) i sami pozivaju ucitajKorisnike(), koji odmah šalje akciju
+     "popis" i tiho bi prepisao jedan dijeljeni "zadnji poziv". */
+  var stariFn = W.app.fnKorisnici;
+  var pozivi = [];
+  W.app.fnKorisnici = function(payload){ pozivi.push(payload); return Promise.resolve({ok:true, korisnici:[]}); };
+
+  app.noviKorisnik(); await cekaj(100);
+  var fNk = D.querySelector('#modal-root form');
+  ok('obrazac novog korisnika postoji', !!fNk);
+  fNk.elements.ime.value = 'TEST Majstor 9';
+  fNk.elements.user.value = 'testmajstor9';
+  fNk.elements.pin.value = '12345678';
+  fNk.elements.role.value = 'majstor';
+  var stariAlert3 = W.alert; W.alert = function(){};
+  posalji(fNk); await cekaj(120);
+  W.alert = stariAlert3;
+  ok('novi korisnik šalje akciju "dodaj" s ispravnim poljima',
+     pozivi.some(function(p){ return p.akcija==='dodaj' && p.ime==='TEST Majstor 9' &&
+       p.email==='testmajstor9@odrzavanje.local' && p.pin==='12345678' && p.role==='majstor'; }));
+
+  /* korisnikAktivan: deaktivacija traži potvrdu, aktivacija ne */
+  W.SUS_KORISNICI = [{id:'testK1', ime:'TEST Korisnik', role:'majstor', email:'x@y.local', aktivan:true}];
+  pozivi = [];
+  var stariConfirm = W.confirm, confirmZvan = false;
+  W.confirm = function(){ confirmZvan = true; return true; };
+  await app.korisnikAktivan('testK1', false); await cekaj(80);
+  ok('deaktivacija traži potvrdu', confirmZvan);
+  ok('deaktivacija šalje akciju "aktivan":false',
+     pozivi.some(function(p){ return p.akcija==='aktivan' && p.id==='testK1' && p.aktivan===false; }));
+  confirmZvan = false; pozivi = [];
+  await app.korisnikAktivan('testK1', true); await cekaj(80);
+  ok('aktivacija NE traži potvrdu', !confirmZvan);
+  ok('aktivacija šalje akciju "aktivan":true',
+     pozivi.some(function(p){ return p.akcija==='aktivan' && p.id==='testK1' && p.aktivan===true; }));
+  W.confirm = stariConfirm;
+  W.app.fnKorisnici = stariFn;
+
+  grupa('Testovi: uvozCSV/saveUvoz (2. krug audita)');
+  var strojevaPrije = W.DATA.machines.length;
+  app.uvozCSV(); await cekaj(100);
+  var fUvoz = D.querySelector('#modal-root form');
+  fUvoz.elements.vrsta.value = 'machines';
+  fUvoz.elements.csv.value = 'e9;TEST Ekstruder E9;Energetika;350\nneispravan-redak-bez-dovoljno-polja';
+  var stariAlert4 = W.alert, alertPoruka2 = '';
+  W.alert = function(m){ alertPoruka2 = m; };
+  posalji(fUvoz); await cekaj(150);
+  W.alert = stariAlert4;
+  jednako('uvoz strojeva dodaje ispravan redak', W.DATA.machines.length, strojevaPrije+1);
+  ok('uvoz javlja koliko je preskočeno zbog neispravnog retka', alertPoruka2.indexOf('Preskočeno') > -1);
+  var noviStroj = W.DATA.machines.filter(function(m){ return m.id==='e9'; })[0];
+  ok('novi stroj iz uvoza ima ispravna polja',
+     !!noviStroj && noviStroj.name==='TEST Ekstruder E9' && noviStroj.program==='Energetika');
+  W.DATA.machines = W.DATA.machines.filter(function(m){ return m.id!=='e9'; });
+
+  grupa('§11.5 — pamćenje zadnjeg ekrana i filtera');
+  app.go('dijelovi'); await cekaj(80);
+  jednako('showScreen pamti zadnji glavni ekran', W.zadnjiEkran(), 'dijelovi');
+  app.openStroj('e1'); await cekaj(80);
+  jednako('pod-ekran (stroj) ne prepisuje zapamćeni glavni ekran', W.zadnjiEkran(), 'dijelovi');
+  app.go('pregled'); await cekaj(80);
+
+  app.go('kvarovi'); await cekaj(80);
+  app.setFilter('status', 'rijesen');
+  var zapamceno = JSON.parse(W.localStorage.getItem(W.ZADNJI_FILTER_KEY));
+  jednako('setFilter odmah sprema filter u localStorage', zapamceno.status, 'rijesen');
+  W.FILTER.status = 'svi';   /* simuliraj svježe pokretanje prije učitavanja spremljenog filtera */
+  W.ucitajZapamceneFiltere();
+  jednako('ucitajZapamceneFiltere vraća spremljeni filter', W.FILTER.status, 'rijesen');
+  app.resetFiltere();
+  var zapamcenoNakonReset = JSON.parse(W.localStorage.getItem(W.ZADNJI_FILTER_KEY));
+  jednako('resetFiltere briše zapamćeni filter natrag na zadano', zapamcenoNakonReset.status, 'svi');
+  try{ W.localStorage.removeItem(W.ZADNJI_EKRAN_KEY); W.localStorage.removeItem(W.ZADNJI_FILTER_KEY); }catch(e){}
 
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',

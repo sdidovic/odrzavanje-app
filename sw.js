@@ -2,7 +2,7 @@
    Kešira statiku (ljuska aplikacije) da se app otvara brzo i da ikona na
    home screenu radi kao aplikacija. Podaci se NE keširaju — svježina ima
    prednost; bez mreže app jasno javi grešku (papirnati fallback u pogonu). */
-var CACHE = 'odrzavanje-static-v40';
+var CACHE = 'odrzavanje-static-v41';
 var STATIKA = ['./index.html', './manifest.json', './vendor/supabase-js.js',
                './assets/icon-192.png', './assets/icon-512.png'];
 
@@ -32,6 +32,31 @@ self.addEventListener('push', function(e){
     vibrate: [120, 60, 120],
     data: { ruta: p.ruta || '' }
   }));
+});
+
+/* AUDIT-FIX (Z3/§10): preglednik ponekad sam rotira push pretplatu (istekla, promijenjen
+   ključ na serveru davatelja...). Bez ovoga stara pretplata u bazi ostaje mrtva dok
+   korisnik ručno ne isključi/uključi obavijesti. Service worker nema pristup Supabase
+   sesiji (nema localStorage u ovom kontekstu) — ponovno se pretplati pa preko poruke
+   javi otvorenim prozorima da ONI pošalju novu pretplatu na server (imaju sesiju). */
+var VAPID_PUB = 'BHFE8J6blBatRrkvb7mCK8LErrSNMieIUA3IifazylyENNc58UhvSPO_bEyB81kIR5WCQsiox00RKn7ZBaRldJ4';
+function b64uUArray(b64){
+  var pad = '='.repeat((4 - b64.length % 4) % 4);
+  var s = (b64 + pad).replace(/-/g,'+').replace(/_/g,'/');
+  var raw = atob(s), arr = new Uint8Array(raw.length);
+  for(var i=0;i<raw.length;i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+self.addEventListener('pushsubscriptionchange', function(e){
+  var opcije = (e.oldSubscription && e.oldSubscription.options) ||
+    { userVisibleOnly: true, applicationServerKey: b64uUArray(VAPID_PUB) };
+  e.waitUntil(
+    self.registration.pushManager.subscribe(opcije).then(function(sub){
+      return self.clients.matchAll({ type:'window', includeUncontrolled:true }).then(function(lista){
+        lista.forEach(function(c){ c.postMessage({ type:'push-resubscribed', subscription: sub.toJSON() }); });
+      });
+    }).catch(function(){ /* nema otvorenog prozora ili ponovna pretplata nije uspjela — sljedeći ručni pushUkljuci() popravlja */ })
+  );
 });
 
 self.addEventListener('notificationclick', function(e){

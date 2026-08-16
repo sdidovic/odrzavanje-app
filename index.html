@@ -720,6 +720,20 @@ var LOGIN_SEL = '';
 var LOGIN_BUSY = false;
 var CURRENT_SCREEN = 'pregled';
 var PRIJASNJI_EKRAN = null;   /* S9: renderPoruke razlikuje "tek otvoren ekran" od "stiže uživo" */
+/* §11.5 dovršetak: pamćenje zadnjeg ekrana — samo glavni ekrani iz HASH_EKRANI (ne
+   stroj/qr/sustav, koji trebaju kontekst koji ovdje nemamo). Deep-link hash uvijek
+   pobjeđuje (initHash se pokuša prvi), ovo je samo zadano stanje bez hasha. */
+var ZADNJI_EKRAN_KEY = 'odrzavanje-zadnji-ekran';
+function zapamtiEkran(name){
+  if(HASH_EKRANI.indexOf(name) === -1) return;
+  try{ localStorage.setItem(ZADNJI_EKRAN_KEY, name); }catch(e){}
+}
+function zadnjiEkran(){
+  try{
+    var v = localStorage.getItem(ZADNJI_EKRAN_KEY);
+    return HASH_EKRANI.indexOf(v) > -1 ? v : null;
+  }catch(e){ return null; }
+}
 
 var LS_KEY = 'odrzavanje-app-v2';  /* odvojeno od demo datoteke odrzavanje.html */
 var DEMO_FOTO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAA8KCw0LCQ8NDA0REA8RFiUYFhQUFi0gIhslNS84NzQvNDM7QlVIOz9QPzM0SmRLUFdaX2BfOUdob2dcblVdX1v/2wBDARARERYTFisYGCtbPTQ9W1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1v/wAARCADwAUADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDDoooqiQooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAoop6Ru/wB1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RQ5UMdgC4AJ+vWn1AznQxuVYgkf3WBH5ihELttBUH/aYAfma3NsUV4sQt4Sst88bbowfk+XgenXtUUUYukjkNvEp/frhUAGAmV+uCevWkBjU9IpJASiMwXqQOBW9NYwrZD925i8tSrLAuA3GSZM5PORipGCLqFzHHFHHEqyAhEA4APX8QKYGPBbBMM/LenpUk0yxLzyewqOa6VeI/mPr2qmzFmyxyTQIV2LsWY8mm0UUgCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAHpI8Z+VsVbGoM6Iko4QYBAqjRTA0kmjf7rinMit95QfqKy6cruv3WI+hoAvG3iP8H5Un2WL0P51VFzKP4/0p32qX1H5UAWzEht1hI+VWLD1yQB/QU0W0Q/h/Wq32uX2/Kmm5lP8X6UDLyxov3VA/CpEult1cfJuYY3HOQO+Ky2kdursfxplAi494o+4CfrURu5ijoGwrjDADtUFFABRRRSAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiilAJ6A0AJRTgjnojflSiGQ/wN+VADKKl+zy/3DSi2l/u/qKYENFTi0l9vzpRZydytAFeirIs27uKcLL1k/SgCpRUk0flSbc5qOkAUUUUAFFFFABRRT4lDyqp6E0AMoq/9li9D+dKLaL+5+ppgZ9FaIgiH8ApwijHRF/KgDMorUCKOij8qXgUAZYVj0B/KneW56I35VollHVh+dIZEHV1/OgCgIZD/AAN+VKLeU/wfrV3zov74ppuIh/H+lAFUWsv90fnSi0k/2fzqwbqL+8fypDdx/wC1+VAEQs37stL9jP8AfH5U83idlakN6OyH86AEFl6yfpSizXuxpv209k/WkN43ZRQBILOP1anC0i9D+dQG8k9F/KkN1L6j8qALItov7v6mlEEQ/gFVDcy/3v0FNM8p/jNAF7yo/wC4v5UoRB0VfyrPMsh/jb86Tex/iP50AaYAHQUhIHUiswknqaSgDTMiDq6/nSGaMfxr+dZtFAGibiIfxik+0xf3v0NZ9FAF43cXv+VIbyPsrVSooAuG8XshpDe+kf61UooAkmk8192McVHRRSAKKKKACiiigApVYqwYdRSUUATG6l9R+VJ9pl/v/oKiopgSGeX++aQyyHq7fnTKKAHFmPVj+dNoopAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFAH//Z';   /* demo fotografija kvara (JPEG data-URI) */
@@ -1410,6 +1424,20 @@ async function pushStanje(){
     return sub ? 'ukljuceno' : 'iskljuceno';
   }catch(e){ return 'iskljuceno'; }
 }
+/* dijeli je pushUkljuci() i poruka od service workera nakon automatske rotacije pretplate */
+async function posaljiPushPretplatu(sub){
+  if(!REMOTE || !SESSION || !SESSION.ime) return;
+  var j = sub.toJSON ? sub.toJSON() : sub;
+  if(!j || !j.endpoint || !j.keys) return;
+  try{
+    await sb.from('push_pretplate').upsert({
+      korisnik: SESSION.ime,
+      endpoint: j.endpoint,
+      p256dh: j.keys.p256dh,
+      auth: j.keys.auth
+    }, { onConflict:'endpoint' });
+  }catch(e){ zapisiGresku('Push pretplata nije uspjela', String(e)); }
+}
 async function pushUkljuci(){
   if(!pushPodrzan()){
     alert('Obavijesti rade kad je aplikacija dodana na početni zaslon i otvorena preko interneta (https).');
@@ -1426,13 +1454,7 @@ async function pushUkljuci(){
         applicationServerKey: b64uUArray(VAPID_PUB)
       });
     }
-    var j = sub.toJSON();
-    await sb.from('push_pretplate').upsert({
-      korisnik: SESSION.ime,
-      endpoint: j.endpoint,
-      p256dh: j.keys.p256dh,
-      auth: j.keys.auth
-    }, { onConflict:'endpoint' });
+    await posaljiPushPretplatu(sub);
     toast('Obavijesti uključene ✓');
     return true;
   }catch(e){ zapisiGresku('Push pretplata nije uspjela', String(e)); toast('Ne mogu uključiti obavijesti'); return false; }
@@ -1934,6 +1956,22 @@ function kvarItem(k, showMachine){
    Zadaci (kupiti, dogovoriti…) su organizacija i žive na Rasporedu — miješati ih
    među kvarove nije imalo logike ni za brojku na kartici ni za majstora u hali. */
 var FILTER = { stroj:'svi', status:'svi', majstor:'svi', od:'', do:'', q:'' };
+/* §11.5 dovršetak: pamćenje filtera na Kvarovima kroz osvježavanje stranice */
+var ZADNJI_FILTER_KEY = 'odrzavanje-zadnji-filter-kvarovi';
+function zapamtiFiltere(){
+  try{ localStorage.setItem(ZADNJI_FILTER_KEY, JSON.stringify(FILTER)); }catch(e){}
+}
+function ucitajZapamceneFiltere(){
+  try{
+    var v = JSON.parse(localStorage.getItem(ZADNJI_FILTER_KEY) || 'null');
+    if(v && typeof v==='object'){
+      ['stroj','status','majstor','od','do','q'].forEach(function(k){
+        if(typeof v[k] === 'string') FILTER[k] = v[k];
+      });
+    }
+  }catch(e){}
+}
+ucitajZapamceneFiltere();
 var KV_FILTRI_OTVORENI = false;
 var PENDING_FOTO = '';
 var PENDING_DOK = null;   /* {dataUrl, mime, naziv, velicina} — dokument uz stroj čeka spremanje */
@@ -2875,6 +2913,7 @@ var RENDERERS = {
 function showScreen(name){
   PRIJASNJI_EKRAN = CURRENT_SCREEN;
   CURRENT_SCREEN = name;
+  zapamtiEkran(name);
   ['pregled','strojevi','kvarovi','dijelovi','kontakti','poruke','analitika','raspored','sustav','qr','nabava','stroj'].forEach(function(s){
     $('#screen-'+s).classList.toggle('hidden', s!==name);
   });
@@ -3289,7 +3328,7 @@ var app = {
     $('#demo-banner').style.display = '';
     $('#screen-login').classList.remove('show');
     localLoad();
-    if(!initHash()) showScreen('pregled');
+    if(!initHash()) showScreen(zadnjiEkran() || 'pregled');
     dobrodoslica();
   },
   detaljKvara: function(kId){
@@ -3820,10 +3859,10 @@ var app = {
   },
   openStroj: function(id){ CURRENT_M = id; POV_SVE = false; showScreen('stroj'); },
   prikaziSvuPovijest: function(){ POV_SVE = true; renderStroj(); },
-  setFilter: function(key,val){ FILTER[key]=val; renderKvarovi(); },
+  setFilter: function(key,val){ FILTER[key]=val; zapamtiFiltere(); renderKvarovi(); },
   setFilterTiho: function(key,val){
     /* pretraga bez re-rendera inputa (fokus ostaje) — osvježi samo listu */
-    FILTER[key]=val;
+    FILTER[key]=val; zapamtiFiltere();
     var card = document.querySelector('#screen-kvarovi .card:last-of-type');
     if(card){
       var stara = card.outerHTML; renderKvarovi();
@@ -3831,7 +3870,7 @@ var app = {
       if(inp){ inp.focus(); var v=inp.value; inp.setSelectionRange(v.length,v.length); }
     }
   },
-  resetFiltere: function(){ FILTER = { stroj:'svi', status:'svi', majstor:'svi', od:'', do:'', q:'' }; renderKvarovi(); },
+  resetFiltere: function(){ FILTER = { stroj:'svi', status:'svi', majstor:'svi', od:'', do:'', q:'' }; zapamtiFiltere(); renderKvarovi(); },
   prekidacFiltre: function(){ KV_FILTRI_OTVORENI = !KV_FILTRI_OTVORENI; renderKvarovi(); },
   qty: async function(id, delta){
     var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
@@ -5047,7 +5086,7 @@ async function postLogin(){
     else { $('#login-err').textContent = 'Nema veze s bazom i nema lokalne kopije.'; throw e; }
   }
   osvjeziOfflineTraku();
-  if(!initHash()) showScreen('pregled');
+  if(!initHash()) showScreen(zadnjiEkran() || 'pregled');
   dobrodoslica();
   sinkroniziraj();   /* pošalji što je ostalo od prošlog puta */
 }
@@ -5180,7 +5219,7 @@ async function start(){
     document.body.dataset.role = 'voditelj';
     SESSION = { ime:'Voditelj', role:'voditelj' };
     localLoad();
-    if(!initHash()) showScreen('pregled');
+    if(!initHash()) showScreen(zadnjiEkran() || 'pregled');
     return;
   }
   renderLoginTiles();
@@ -5248,6 +5287,14 @@ if('serviceWorker' in navigator && location.protocol.indexOf('http') === 0){
   navigator.serviceWorker.addEventListener('controllerchange', function(){
     if(!vecKontroliran){ vecKontroliran = true; return; }
     prikaziNovuVerziju();
+  });
+  /* AUDIT-FIX (Z3): sw.js se sam ponovno pretplati na push kad preglednik rotira
+     pretplatu (pushsubscriptionchange), ali nema pristup Supabase sesiji da to javi
+     serveru — javlja ovom prozoru porukom, mi imamo sesiju pa dovršimo posao. */
+  navigator.serviceWorker.addEventListener('message', function(ev){
+    if(ev.data && ev.data.type === 'push-resubscribed' && ev.data.subscription){
+      posaljiPushPretplatu(ev.data.subscription);
+    }
   });
 }
 function prikaziNovuVerziju(){
