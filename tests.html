@@ -351,24 +351,30 @@ async function testovi(W, D){
   ok('preventiva se može potvrditi i iz agende',
      D.querySelector('#screen-raspored .okbtn') !== null);
 
-  grupa('Kalendarska mreža — K1/K2 (brojke, ne točkice)');
-  jednako('mreža ima 28 ćelija (4 tjedna × 7 dana)', D.querySelectorAll('#screen-raspored .rasp-d').length, 28);
+  grupa('Kalendarska mreža — K1/K2/S6 (brojke, ne točkice; po mjesecima)');
+  jednako('mreža ima cijeli broj tjedana (djeljivo sa 7)',
+     D.querySelectorAll('#screen-raspored .rasp-d').length % 7, 0);
+  ok('mreža ima barem 28 ćelija (najmanje 4 tjedna)',
+     D.querySelectorAll('#screen-raspored .rasp-d').length >= 28);
   jednako('zaglavlje ima 7 dana u tjednu', D.querySelectorAll('#screen-raspored .rasp-h').length, 7);
   ok('nijedna ćelija ne nosi obojenu točku — samo tekst/brojke',
      D.querySelector('#screen-raspored .rasp-grid').querySelectorAll('[style*="background"]').length === 0);
-  ok('mreža počinje ponedjeljkom tekućeg tjedna', W.RASP_POCETAK === W.ponedjeljakTjedna(W.todayISO()));
+  ok('mreža počinje na tekućem mjesecu', W.RASP_MJESEC === W.todayISO().slice(0,7));
   ok('današnja ćelija je označena', D.querySelector('#screen-raspored .rasp-d.danas') !== null);
+  ok('dani susjednog mjeseca su prigušeni, ali klikabilni',
+     D.querySelector('#screen-raspored .rasp-d.izvan') !== null);
   ok('gumb "Danas" se ne prikazuje kad ništa nije pomaknuto (mrtva opcija se ne prikazuje)',
      Array.prototype.every.call(D.querySelectorAll('#screen-raspored .btn-mini'),
        function(b){ return b.textContent !== 'Danas'; }));
-  var pocetakPrije = W.RASP_POCETAK;
-  app.rasporedTjedni(1); await cekaj(100);
-  ok('› pomiče mrežu za 28 dana', W.RASP_POCETAK === W.addDaysISO(pocetakPrije, 28));
+  var mjesecPrije = W.RASP_MJESEC;
+  app.rasporedMjesec(1); await cekaj(100);
+  var p1 = mjesecPrije.split('-'); var d1 = new Date(parseInt(p1[0],10), parseInt(p1[1],10), 1);
+  jednako('› pomiče mrežu za jedan mjesec', W.RASP_MJESEC, d1.getFullYear()+'-'+W.pad2(d1.getMonth()+1));
   ok('gumb "Danas" se pojavi kad je mreža pomaknuta',
      Array.prototype.some.call(D.querySelectorAll('#screen-raspored .btn-mini'),
        function(b){ return b.textContent === 'Danas'; }));
   app.rasporedDanas(); await cekaj(100);
-  jednako('"Danas" vraća mrežu na tekući tjedan', W.RASP_POCETAK, pocetakPrije);
+  jednako('"Danas" vraća mrežu na tekući mjesec', W.RASP_MJESEC, mjesecPrije);
 
   grupa('Panel dana — K3');
   ok('bez odabranog dana nema gumba "‹ Cijeli raspored" (puna agenda je zadano stanje)',
@@ -434,6 +440,43 @@ async function testovi(W, D){
   app.pokreniPremjestanje('preventiva', W.DATA.preventiva[1].id); await cekaj(100);
   app.odustaniPremjestanje(); await cekaj(100);
   ok('Odustani gasi mod premještanja bez izmjene', W.RASP_PREMJESTI === null);
+
+  grupa('Brzi premještaj — S5 (Danas/Sutra/+7 bez otvaranja mreže)');
+  var prevZaBrzo = W.DATA.preventiva[2];
+  var rokBrzoPrije = prevZaBrzo.next;
+  app.akcijeStavke('preventiva', prevZaBrzo.id); await cekaj(120);
+  ok('list radnji nudi brze chipove Danas/Sutra/+7 dana', (function(){
+     var t = D.querySelector('#modal-root').textContent;
+     return t.indexOf('Danas') > -1 && t.indexOf('Sutra') > -1 && t.indexOf('+7 dana') > -1;
+  })());
+  await app.premjestiNa('preventiva', prevZaBrzo.id, W.isoShift(1)); await cekaj(150);
+  jednako('"Sutra" premjesti bez otvaranja mreže', prevZaBrzo.next, W.isoShift(1));
+  ok('nema otvorenog moda premještanja nakon brzog premještaja', W.RASP_PREMJESTI === null);
+  prevZaBrzo.next = rokBrzoPrije;
+
+  grupa('Ponavljanje zadatka — S5');
+  app.go('raspored'); await cekaj(100);
+  app.noviZadatak(); await cekaj(100);
+  f = D.querySelector('#modal-root form');
+  f.elements.opis.value = 'TEST ponavljajući zadatak';
+  f.elements.ponavljanje.value = '7';
+  posalji(f); await cekaj(200);
+  var zadPon = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST ponavljajući zadatak'; })[0];
+  ok('ponavljajući zadatak bez roka dobije rok danas kao sidro', !!zadPon && zadPon.rok === W.todayISO());
+  jednako('ponavljanje je spremljeno (svaki tjedan = 7)', zadPon.ponavljanje, 7);
+  var brZadPrijeObavljanja = W.otvoreniZadaci().length;
+  await app.obaviZadatak(zadPon.id); await cekaj(150);
+  jednako('obavljeni zadatak je riješen', zadPon.status, 'rijesen');
+  jednako('obavljanjem se stvori točno jedan sljedeći termin', W.otvoreniZadaci().length, brZadPrijeObavljanja);
+  var sljedeci = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST ponavljajući zadatak' && k.status==='otvoren'; })[0];
+  ok('sljedeći termin postoji i nosi isto ponavljanje', !!sljedeci && sljedeci.ponavljanje === 7);
+  jednako('sljedeći termin je +7 dana od prvog', sljedeci.rok, W.addDaysISO(zadPon.rok, 7));
+  ok('zapis o ponavljanju je u kanalu',
+     W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Ponavlja se') > -1; }));
+  /* jednokratan zadatak (bez ponavljanja) ne stvara sljedeći — zadIzK je iz F3 grupe, još otvoren */
+  var brPrijeJednokratnog = W.otvoreniZadaci().length;
+  await app.obaviZadatak(zadIzK.id); await cekaj(150);
+  jednako('jednokratan zadatak obavljanjem NE stvara novi', W.otvoreniZadaci().length, brPrijeJednokratnog - 1);
 
   grupa('Rok sanacije na kalendaru — K5');
   var sanacijskiKvar = W.DATA.kvarovi.filter(function(k){ return k.privremeni && k.rok_sanacije; })[0];

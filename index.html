@@ -190,6 +190,7 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
   cursor:pointer;font-size:14px;font-weight:700;color:var(--text);padding:2px}
 .rasp-d:active{transform:scale(.96)}
 .rasp-d.prosli{color:var(--muted);border-color:transparent}
+.rasp-d.izvan{opacity:.42}   /* dan susjednog mjeseca — vidljiv i živ, ali prigušen */
 .rasp-d.danas{border-color:var(--accent);border-width:2px}
 .rasp-d.odabran{background:var(--accent-soft);border-color:var(--accent)}
 .rasp-broj{font-size:11.5px;font-weight:700;background:var(--accent-soft);color:var(--accent);
@@ -2233,6 +2234,7 @@ function zadatakRedak(z){
       (z.dodijeljen ? ' '+esc(z.dodijeljen) : '')+
       (z.rok ? ' &middot; rok '+fmtDate(z.rok) : '')+
       (kasni ? ' &middot; <b style="color:var(--red)">kasni</b>' : '')+
+      (z.ponavljanje ? ' &middot; ↻ svakih '+z.ponavljanje+' d' : '')+
       (zm ? ' &middot; '+esc(zm.name) : '')+
       (kont ? ' &middot; '+esc(kont.naziv) : '')+
       (z.izvor_kvar ? ' &middot; iz kvara' : '')+'</div></div>'+
@@ -2246,11 +2248,7 @@ function ponedjeljakTjedna(iso){
   d.setDate(d.getDate() - (d.getDay()+6)%7);
   return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
 }
-function fmtDatKratko(iso){
-  var p = iso.split('-');
-  return parseInt(p[2],10)+'.'+parseInt(p[1],10)+'.';
-}
-var RASP_POCETAK = null;      /* ISO ponedjeljak — početak prikazana 4 tjedna */
+var RASP_MJESEC = null;       /* 'GGGG-MM' prikazanog mjeseca (S6: kalendar po mjesecima) */
 var RASP_ODABRAN = null;      /* ISO odabranog dana, ili null */
 var RASP_PREMJESTI = null;    /* {tip:'preventiva'|'zadatak', id} dok traje premještanje */
 function stavkeZaDan(iso){
@@ -2263,34 +2261,47 @@ function stavkeZaDan(iso){
 function rasporedCelija(iso, danas){
   var st = stavkeZaDan(iso);
   var ukupno = st.prev.length + st.zad.length + st.san.length;
-  var p = iso.split('-');
-  var prviUMjesecu = parseInt(p[2],10) === 1;
-  var oznaka = prviUMjesecu ? (parseInt(p[2],10)+'.'+parseInt(p[1],10)+'.') : String(parseInt(p[2],10));
+  var izvan = iso.slice(0,7) !== RASP_MJESEC;   /* dan susjednog mjeseca — prigušen, ali živ */
   var prosli = iso < danas;
-  var klase = 'rasp-d'+(iso===danas?' danas':'')+(iso===RASP_ODABRAN?' odabran':'')+(prosli?' prosli':'');
+  var klase = 'rasp-d'+(iso===danas?' danas':'')+(iso===RASP_ODABRAN?' odabran':'')+
+    (prosli?' prosli':'')+(izvan?' izvan':'');
   var brojHtml = ukupno ? '<span class="rasp-broj'+(prosli?' kasni':'')+'">'+ukupno+'</span>' : '';
   return '<div class="'+klase+'" onclick="app.rasporedDan(\''+iso+'\')">'+
-    '<span>'+esc(oznaka)+'</span>'+brojHtml+'</div>';
+    '<span>'+parseInt(iso.slice(8,10),10)+'</span>'+brojHtml+'</div>';
 }
 function renderKalendarskaMreza(){
   var danas = todayISO();
-  if(RASP_POCETAK===null) RASP_POCETAK = ponedjeljakTjedna(danas);
+  if(!RASP_MJESEC) RASP_MJESEC = danas.slice(0,7);
+  var p = RASP_MJESEC.split('-');
+  /* mjesec u punim tjednima: od ponedjeljka tjedna s 1. do nedjelje tjedna sa zadnjim danom */
+  var start = ponedjeljakTjedna(RASP_MJESEC+'-01');
+  var zadnjiDan = new Date(parseInt(p[0],10), parseInt(p[1],10), 0).getDate();
+  var kraj = addDaysISO(ponedjeljakTjedna(RASP_MJESEC+'-'+pad2(zadnjiDan)), 6);
   var celije = '';
   DANI_TJEDNA.slice(1).concat([DANI_TJEDNA[0]]).forEach(function(dn){   /* P U S Č P S N */
     celije += '<div class="rasp-h">'+dn.slice(0,1).toUpperCase()+'</div>';
   });
-  for(var i=0; i<28; i++) celije += rasporedCelija(addDaysISO(RASP_POCETAK, i), danas);
-  var pomaknuto = RASP_POCETAK !== ponedjeljakTjedna(danas);
+  for(var iso = start; iso <= kraj; iso = addDaysISO(iso, 1)) celije += rasporedCelija(iso, danas);
+  var pomaknuto = RASP_MJESEC !== danas.slice(0,7);
   var odabranDrugi = RASP_ODABRAN && RASP_ODABRAN !== danas;
-  var naslov = fmtDatKratko(RASP_POCETAK)+' – '+fmtDatKratko(addDaysISO(RASP_POCETAK,27));
+  var naslov = MJESECI[parseInt(p[1],10)-1]+' '+p[0]+'.';
   return '<div class="card" style="padding:8px">'+
     '<div class="rasp-nav">'+
-      '<button class="qbtn" onclick="app.rasporedTjedni(-1)" aria-label="Prethodna 4 tjedna">‹</button>'+
+      '<button class="qbtn" onclick="app.rasporedMjesec(-1)" aria-label="Prethodni mjesec">‹</button>'+
       '<div class="rasp-naslov">'+naslov+'</div>'+
       (pomaknuto||odabranDrugi ? '<button class="btn-mini" onclick="app.rasporedDanas()">Danas</button>' : '<span style="width:34px"></span>')+
-      '<button class="qbtn" onclick="app.rasporedTjedni(1)" aria-label="Sljedeća 4 tjedna">›</button>'+
+      '<button class="qbtn" onclick="app.rasporedMjesec(1)" aria-label="Sljedeći mjesec">›</button>'+
     '</div>'+
     '<div class="rasp-grid">'+celije+'</div>'+
+  '</div>';
+}
+
+/* S5: brzi premještaj bez otvaranja mreže — Danas · Sutra · +7 dana */
+function brziPremjestaj(tip, id){
+  return '<div class="role-write" style="display:flex;gap:8px;margin-top:8px">'+
+    '<button class="btn sec" style="flex:1" onclick="app.premjestiNa(\''+tip+'\',\''+id+'\',\''+todayISO()+'\')">Danas</button>'+
+    '<button class="btn sec" style="flex:1" onclick="app.premjestiNa(\''+tip+'\',\''+id+'\',\''+isoShift(1)+'\')">Sutra</button>'+
+    '<button class="btn sec" style="flex:1" onclick="app.premjestiNa(\''+tip+'\',\''+id+'\',\''+isoShift(7)+'\')">+7 dana</button>'+
   '</div>';
 }
 
@@ -3164,6 +3175,15 @@ var app = {
           (rok ? ' value="'+esc(rok)+'"' : '')+'>'+
         '<label>Tko</label><select name="dodijeljen"><option value="">—</option>'+osobaOpts('')+'</select>'+
         '<label>Kontakt (izborno)</label><select name="kontakt_id">'+kontOpts+'</select>'+
+        /* S5: ponavljanje — kad se obavi, sljedeći se stvori sam */
+        '<label>Ponavljanje</label>'+
+        '<select name="ponavljanje" onchange="document.getElementById(\'pon-n\').style.display = this.value===\'n\' ? \'\' : \'none\'">'+
+          '<option value="">Ne ponavlja se</option>'+
+          '<option value="7">Svaki tjedan</option>'+
+          '<option value="30">Svaki mjesec</option>'+
+          '<option value="n">Svakih N dana…</option>'+
+        '</select>'+
+        '<input type="number" id="pon-n" name="ponavljanje_n" min="1" step="1" placeholder="broj dana" style="display:none">'+
         '<button class="btn primary block" type="submit">Spremi zadatak</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
@@ -3171,14 +3191,20 @@ var app = {
   saveZadatak: async function(e){
     e.preventDefault();
     var f = new FormData(e.target);
+    var pon = f.get('ponavljanje');
+    pon = pon==='n' ? (parseInt(f.get('ponavljanje_n'),10) || null) : (parseInt(pon,10) || null);
+    var rok = f.get('rok') || null;
+    /* ponavljanje bez roka nema sidro — prvi termin je danas */
+    if(pon && !rok) rok = todayISO();
     var z = {
       id:'kv'+Date.now(), m:f.get('m') || null, date:todayISO(),
       opis:String(f.get('opis')||'').trim(), sati:0,
       status:'otvoren', upoz:false, tko:null, zam:null, foto:null,
       dodijeljen:f.get('dodijeljen') || null, prioritet:'normalno', smjena:null,
-      ceka_dio:false, sudjelovali:null, tip:'zadatak', rok:f.get('rok') || null,
+      ceka_dio:false, sudjelovali:null, tip:'zadatak', rok:rok,
       kategorija:'Ostalo', otpusteno:false, privremeni:false, rok_sanacije:null,
       izvor_kvar:f.get('izvor_kvar') || null, kontakt_id:f.get('kontakt_id') || null,
+      ponavljanje:pon,
       created_at:new Date().toISOString()
     };
     DATA.kvarovi.push(z);
@@ -3186,7 +3212,8 @@ var app = {
     var spremljen = REMOTE
       ? await apiInsert('kvarovi', { m:z.m, date:z.date, opis:z.opis, sati:0, status:'otvoren',
           upoz:false, dodijeljen:z.dodijeljen, prioritet:'normalno', tip:'zadatak', rok:z.rok,
-          kategorija:'Ostalo', izvor_kvar:z.izvor_kvar, kontakt_id:z.kontakt_id }, z)
+          kategorija:'Ostalo', izvor_kvar:z.izvor_kvar, kontakt_id:z.kontakt_id,
+          ponavljanje:z.ponavljanje }, z)
       : (save(), true);
     if(spremljen){
       if(REMOTE) zapamtiMojUnos(z.id);
@@ -3199,18 +3226,47 @@ var app = {
     var z = DATA.kvarovi.filter(function(x){ return x.id===id; })[0];
     if(!z) return;
     z.status = 'rijesen'; z.tko = SESSION.ime || null;
+    /* S5: ponavljajući zadatak — obavljanjem se sam stvori sljedeći.
+       Sidro je rok (Todoist pravilo); za davno zakasnjeli zadatak broji se od danas,
+       inače bi sljedeći termin odmah bio u prošlosti. */
+    var novi = null;
+    if(z.ponavljanje && z.rok){
+      var baza = z.rok > todayISO() ? z.rok : todayISO();
+      novi = {
+        id:'kv'+Date.now(), m:z.m||null, date:todayISO(), opis:z.opis, sati:0,
+        status:'otvoren', upoz:false, tko:null, zam:null, foto:null,
+        dodijeljen:z.dodijeljen||null, prioritet:'normalno', smjena:null,
+        ceka_dio:false, sudjelovali:null, tip:'zadatak',
+        rok:addDaysISO(baza, z.ponavljanje),
+        kategorija:'Ostalo', otpusteno:false, privremeni:false, rok_sanacije:null,
+        izvor_kvar:z.izvor_kvar||null, kontakt_id:z.kontakt_id||null,
+        ponavljanje:z.ponavljanje, created_at:new Date().toISOString()
+      };
+      DATA.kvarovi.push(novi);
+    }
     rerender();
     sysPoruka('✅ Zadatak obavljen: '+z.opis+' ('+(SESSION.ime||'')+')', z.id);
     await apiUpdate('kvarovi', z.id, { status:'rijesen', tko:z.tko, closed_at:new Date().toISOString() });
+    if(novi){
+      var spremljen = REMOTE
+        ? await apiInsert('kvarovi', { m:novi.m, date:novi.date, opis:novi.opis, sati:0,
+            status:'otvoren', upoz:false, dodijeljen:novi.dodijeljen, prioritet:'normalno',
+            tip:'zadatak', rok:novi.rok, kategorija:'Ostalo', izvor_kvar:novi.izvor_kvar,
+            kontakt_id:novi.kontakt_id, ponavljanje:novi.ponavljanje }, novi)
+        : (save(), true);
+      if(spremljen) sysPoruka('🔁 Ponavlja se: '+novi.opis+' — sljedeći termin '+fmtDate(novi.rok), novi.id);
+    }
   },
 
-  /* ---- kalendarska mreža na Rasporedu (K1-K4) ---- */
-  rasporedTjedni: function(smjer){
-    RASP_POCETAK = addDaysISO(RASP_POCETAK || ponedjeljakTjedna(todayISO()), smjer*28);
+  /* ---- kalendarska mreža na Rasporedu (K1-K4, S6: po mjesecima) ---- */
+  rasporedMjesec: function(smjer){
+    var p = (RASP_MJESEC || todayISO().slice(0,7)).split('-');
+    var d = new Date(parseInt(p[0],10), parseInt(p[1],10)-1+smjer, 1);
+    RASP_MJESEC = d.getFullYear()+'-'+pad2(d.getMonth()+1);
     renderRaspored();
   },
   rasporedDanas: function(){
-    RASP_POCETAK = ponedjeljakTjedna(todayISO());
+    RASP_MJESEC = todayISO().slice(0,7);
     RASP_ODABRAN = null;
     renderRaspored();
   },
@@ -3230,6 +3286,7 @@ var app = {
         '<div class="modal-head"><h3>'+esc(p.opis)+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
         '<div class="row-sub" style="margin-bottom:10px">'+esc(m.name)+' &middot; sljedeće '+fmtDate(p.next)+'</div>'+
         '<button class="btn primary block role-write" onclick="app.closeModal();app.obaviPreventivu(\''+id+'\')">✓ Obavljeno</button>'+
+        brziPremjestaj('preventiva', id)+
         '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.pokreniPremjestanje(\'preventiva\',\''+id+'\')">Premjesti na drugi dan</button>'+
         '<button class="btn sec block" style="margin-top:8px" onclick="app.closeModal();app.openStroj(\''+p.m+'\')">Otvori stroj</button>'+
         '</div></div>';
@@ -3241,10 +3298,17 @@ var app = {
         '<div class="modal-head"><h3>'+esc(z.opis)+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
         (z.rok ? '<div class="row-sub" style="margin-bottom:10px">rok '+fmtDate(z.rok)+'</div>' : '')+
         '<button class="btn primary block role-write" onclick="app.closeModal();app.obaviZadatak(\''+id+'\')">✓ Obavljeno</button>'+
+        brziPremjestaj('zadatak', id)+
         '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.pokreniPremjestanje(\'zadatak\',\''+id+'\')">'+(z.rok?'Premjesti rok':'Stavi na dan…')+'</button>'+
         '<button class="btn sec block" style="margin-top:8px" onclick="app.closeModal();app.detaljKvara(\''+id+'\')">Detalji</button>'+
         '</div></div>';
     }
+  },
+  premjestiNa: async function(tip, id, iso){
+    /* isti tok kao dodir na dan u mreži — dijeli guardove i trag u kanalu */
+    app.closeModal();
+    RASP_PREMJESTI = { tip:tip, id:id };
+    await app.izvrsiPremjestanje(iso);
   },
   pokreniPremjestanje: function(tip, id){
     app.closeModal();
@@ -3942,6 +4006,11 @@ var app = {
         '<label>Prioritet</label><select name="prioritet">'+priOpts+'</select>'+
         '<label>Smjena</label><select name="smjena"><option value=""'+(k.smjena?'':' selected')+'>—</option>'+smjOpts+'</select>'+
         '<label>Dodijeljen</label><select name="dodijeljen">'+majOpts+'</select>'+
+        (k.tip==='zadatak'
+          ? '<label>Rok</label><input type="date" name="rok" value="'+esc(k.rok||'')+'">'+
+            '<label>Ponavljanje (dana; prazno = ne ponavlja se)</label>'+
+            '<input type="number" name="ponavljanje" min="1" step="1" value="'+(k.ponavljanje||'')+'">'
+          : '')+
         rijeseno+
         (k.status!=='rijesen'
           ? '<div style="margin-top:12px"><label style="display:inline;text-transform:none;letter-spacing:0">'+
@@ -3988,6 +4057,10 @@ var app = {
     } else {
       k.ceka_dio = !!f.get('ceka');
     }
+    if(k.tip==='zadatak'){
+      k.rok = f.get('rok') || null;
+      k.ponavljanje = parseInt(f.get('ponavljanje'),10) || null;
+    }
     k.privremeni = !!f.get('privremeni');
     k.rok_sanacije = k.privremeni ? (f.get('rok_sanacije') || null) : null;
     if(k.dodijeljen && k.dodijeljen !== prijeDodijeljen && jeOtvoren(k)){
@@ -3996,10 +4069,12 @@ var app = {
     }
     app.closeModal();
     showScreen($('#screen-stroj').classList.contains('hidden') ? 'kvarovi' : 'stroj');
-    await apiUpdate('kvarovi', k.id, { m:k.m, opis:k.opis, date:k.date, sati:k.sati,
+    var patch = { m:k.m, opis:k.opis, date:k.date, sati:k.sati,
       kategorija:k.kategorija, dodijeljen:k.dodijeljen, prioritet:k.prioritet,
       smjena:k.smjena, ceka_dio:k.ceka_dio, tko:k.tko, sudjelovali:k.sudjelovali, zam:k.zam,
-      privremeni:k.privremeni, rok_sanacije:k.rok_sanacije });
+      privremeni:k.privremeni, rok_sanacije:k.rok_sanacije };
+    if(k.tip==='zadatak'){ patch.rok = k.rok; patch.ponavljanje = k.ponavljanje; }
+    await apiUpdate('kvarovi', k.id, patch);
   },
   brzoDodijeli: async function(kId, ime){
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
