@@ -88,14 +88,15 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .empty b{display:block;color:var(--text-2);font-size:14.5px;margin-bottom:3px}
 
 /* ---------- chips ---------- */
-.chip{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.6px;
-  padding:3.5px 8px;border-radius:20px;text-transform:uppercase;white-space:nowrap;vertical-align:1px;
-  line-height:1.15}
+.chip{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.6px;
+  padding:4px 9px;border-radius:20px;text-transform:uppercase;white-space:nowrap;vertical-align:1px;
+  line-height:1.15}   /* HITNO/Čeka dio nose najvažniju informaciju — ne smiju biti najsitniji tekst */
 .chip.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
 .chip.upoz{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-border)}
 .chip.kvar{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
 .chip.rijesen{background:#eef0f3;color:#4a545f;border:1px solid var(--border)}
-.chip.rad{background:var(--accent-soft);color:var(--accent);border:1px solid #cdc9ec}
+.chip.rad{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-rub)}
+.chip.zadatak{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-rub)}
 .chip.fg{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);text-transform:none;letter-spacing:.2px}
 
 /* ---------- dashboard ---------- */
@@ -119,8 +120,8 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .stat.static:active{transform:none}   /* KPI kartice na Analitici ne rade ništa na dodir — ne smiju izgledati klikabilno */
 .stat-num{display:block;font-size:26px;font-weight:800;line-height:1.1;letter-spacing:-.7px;
   font-variant-numeric:tabular-nums}
-.stat-label{display:block;font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.3;
-  font-weight:600;letter-spacing:.1px}
+.stat-label{display:block;font-size:11px;color:var(--text-2);margin-top:4px;line-height:1.3;
+  font-weight:600;letter-spacing:.1px}   /* kontrast na obojenoj podlozi — hala, sunce */
 /* 4 KPI broja na Analitici — ista veličina, jer su jednako važni. 2×2 mreža daje dovoljno
    prostora da broj stane u jedan red — overflow-wrap:anywhere je prije lomio brojku usred znamenke */
 .stat-num.kpi{font-size:17px;letter-spacing:-.3px;white-space:nowrap}
@@ -129,8 +130,8 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .stat.green{background:var(--green-bg);border-color:var(--green-border)} .stat.green .stat-num{color:var(--green)}
 
 /* ---------- trend na velikoj kartici ---------- */
-.trend{display:inline-block;font-size:12px;font-weight:700;background:rgba(255,255,255,.14);
-  padding:3px 9px;border-radius:20px;margin-left:10px;vertical-align:9px;letter-spacing:.2px}
+.trend{display:block;font-size:12px;font-weight:700;background:rgba(255,255,255,.14);
+  width:fit-content;padding:3px 9px;border-radius:20px;margin:2px 0 0;vertical-align:0;letter-spacing:.2px}
 .trend.up{color:#ffb4ad}
 .trend.down{color:#96e6b0}
 
@@ -273,6 +274,13 @@ body[data-role="majstor"] .btn-audit{display:none}
   font-size:15px;font-weight:700;color:var(--red);cursor:pointer;
   text-transform:none;letter-spacing:0}
 .hitno-prekidac input{width:24px;height:24px;flex-shrink:0;accent-color:var(--red);margin:0}
+/* neutralna inačica za manje dramatične prekidače (Čeka dio, Privremeni popravak,
+   Linija otpuštena) — isti raspored i dodirna meta, bez crvenog naglaska HITNO gumba */
+.prekidac{display:flex;align-items:center;gap:11px;margin-top:12px;padding:12px 14px;
+  border:1.5px solid var(--border);background:#f8f9fb;border-radius:var(--radius-s);
+  font-size:14px;font-weight:600;color:var(--text);cursor:pointer;
+  text-transform:none;letter-spacing:0}
+.prekidac input{width:24px;height:24px;flex-shrink:0;accent-color:var(--accent);margin:0}
 
 /* ---------- fotografije kvara ---------- */
 .kthumb{margin-top:7px;max-width:170px;max-height:120px;border-radius:6px;border:1px solid var(--border);display:block;cursor:pointer}
@@ -1771,15 +1779,14 @@ function kvarItem(k, showMachine){
     meta = 'Zastoj '+H(k.sati)+(vidiFinancije() ? ' &middot; <b>'+EUR(kvarCost(k))+'</b>' : '');
     if(k.kategorija && k.kategorija!=='Ostalo') meta += ' &middot; '+esc(k.kategorija);
   }
-  if(k.smjena && !zadatak) meta += ' &middot; '+esc(k.smjena);
+  /* kartica ostaje na najviše 3 segmenta (zastoj/€, kategorija, dodijeljeno-ili-riješio) —
+     smjena, sudjelovali, zamijenjeno i razlog storna već su potpuno vidljivi u detalju
+     koji se otvara dodirom na karticu; tri retka sitnog teksta na svakoj kartici je šum */
   if(jeOtvoren(k) && k.dodijeljen) meta += ' &middot; Dodijeljeno: <b>'+esc(k.dodijeljen)+'</b>';
-  if(k.tko) meta += ' &middot; Riješio: '+esc(k.tko);
-  if(k.sudjelovali) meta += ' &middot; Sudjelovali: '+esc(k.sudjelovali);
-  if(k.zam) meta += ' &middot; Zamijenjeno: '+esc(k.zam);
-  if(k.status==='otkazan' && k.storno_razlog) meta += ' &middot; Storno: '+esc(k.storno_razlog);
+  else if(k.tko) meta += ' &middot; Riješio: '+esc(k.tko);
   var brKom = (DATA.komentari||[]).filter(function(c){ return c.kvar_id===k.id; }).length;
   var pChip = '';
-  if(zadatak) pChip += '<span class="chip" style="background:var(--accent-soft);color:var(--accent);border:1px solid #d5d2ef">Zadatak</span> ';
+  if(zadatak) pChip += '<span class="chip zadatak">Zadatak</span> ';
   if(jeOtvoren(k)){
     if(k.prioritet==='hitno') pChip += '<span class="chip kvar">HITNO</span> ';
     else if(k.prioritet==='visok') pChip += '<span class="chip upoz">Visok</span> ';
@@ -1899,7 +1906,9 @@ function renderKvarovi(){
       ? '<button class="btn-mini" style="margin-bottom:10px" onclick="app.resetFiltere()">✕ Poništi filtere ('+list.length+' rezultata)</button>' : '')+
     '<div class="card">'+
       (list.length ? list.map(function(k){ return kvarItem(k,true); }).join('')
-                   : '<div class="empty">Nema kvarova za odabrani filter.</div>')+
+                   : '<div class="empty">'+((FILTER.q||nAkt)
+                       ? 'Nema kvarova za odabrani filter.'
+                       : 'Nema prijavljenih kvarova. Prvi prijavi gumbom Brza prijava.')+'</div>')+
     '</div>';
 }
 
@@ -1961,6 +1970,7 @@ function partRow(p){
       '<button class="btn-mini role-voditelj" onclick="app.urediDio(\''+p.id+'\')">Uredi</button>'+
       '<span class="dio-qty role-write">'+
         '<button class="qbtn" onclick="app.qty(\''+p.id+'\',-1)">−</button>'+
+        '<span class="qval" style="min-width:0">'+p.stanje+'</span>'+
         '<button class="qbtn" onclick="app.qty(\''+p.id+'\',1)">+</button>'+
       '</span>'+
     '</div>';
@@ -2056,7 +2066,7 @@ function renderNabava(){
           (vidiFinancije() ? ' &middot; '+EUR(p.cijena) : '')+'</div>'+
         '<div style="margin-top:6px"><button class="btn-mini role-write" onclick="app.naruciDio(\''+p.id+'\')">Naruči</button></div>'+
       '</div></div>';
-    }).join('') : '<div class="empty"><b>Ništa ne treba naručiti</b>Sve je iznad minimuma.</div>')+'</div>'+
+    }).join('') : '<div class="empty">Ništa ne treba naručiti — sve je iznad minimuma.</div>')+'</div>'+
     '<h2>U dolasku ('+otv.length+')</h2>'+
     '<div class="card">'+ (otv.length ? otv.map(nabavaRedak).join('')
       : '<div class="empty">Nema otvorenih narudžbi.</div>')+'</div>'+
@@ -2331,13 +2341,13 @@ function prevRedak(p){
     '<button class="okbtn role-write" onclick="event.stopPropagation();app.obaviPreventivu(\''+p.id+'\')">✓</button>'+
   '</div>';
 }
-function zadatakRedak(z){
+function zadatakRedak(z, bezChipa){
   var kasni = z.rok && z.rok < todayISO();
   var zm = z.m ? machineById(z.m) : null;
   var kont = z.kontakt_id ? DATA.partneri.filter(function(x){ return x.id===z.kontakt_id; })[0] : null;
   return '<div class="row click" onclick="app.akcijeStavke(\'zadatak\',\''+z.id+'\')">'+
     '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(z.opis)+'</div>'+
-    '<div class="row-sub"><span class="chip" style="background:var(--accent-soft);color:var(--accent);border:1px solid #d5d2ef">Zadatak</span>'+
+    '<div class="row-sub">'+(bezChipa ? '' : '<span class="chip zadatak">Zadatak</span>')+
       (z.dodijeljen ? ' '+esc(z.dodijeljen) : '')+
       (z.rok ? ' &middot; rok '+fmtDate(z.rok) : '')+
       (kasni ? ' &middot; <b style="color:var(--red)">kasni</b>' : '')+
@@ -2421,7 +2431,7 @@ function panelDana(iso){
   var html = '<h2>'+naslov+'</h2>';
   html += ukupno
     ? '<div class="card">'+st.prev.map(prevRedak).join('')+st.zad.map(zadatakRedak).join('')+st.san.map(sanacijaRedak).join('')+'</div>'
-    : '<div class="card"><div class="empty"><b>Slobodan dan</b>Ništa nije planirano.</div></div>';
+    : '<div class="card"><div class="empty">Slobodan dan — ništa nije planirano.</div></div>';
   if(iso >= danas)
     html += '<button class="btn sec sm block role-write" style="margin-top:8px" onclick="app.noviZadatak(\''+iso+'\')">+ Na ovaj dan</button>';
   html += '<button class="btn-mini" style="margin-top:8px" onclick="app.rasporedDan(\''+iso+'\')">‹ Cijeli raspored</button>';
@@ -2477,8 +2487,8 @@ function renderRaspored(){
       danHtml += '<h2>'+naslov+'</h2><div class="card">'+
         ps.map(prevRedak).join('')+zs.map(zadatakRedak).join('')+sn.map(sanacijaRedak).join('')+'</div>';
     }
-    if(!danHtml) danHtml = '<div class="card"><div class="empty"><b>Sljedeća dva tjedna su prazna</b>'+
-      'Ni preventive ni zadaci nemaju termin u ovom razdoblju.</div></div>';
+    if(!danHtml) danHtml = '<div class="card"><div class="empty">Sljedeća dva tjedna su prazna — '+
+      'ni preventive ni zadaci nemaju termin u ovom razdoblju.</div></div>';
 
     /* dalje od 14 dana: samo najbliže, bez pretrpavanja */
     var kasnije = DATA.preventiva.filter(function(p){ return p.next > isoShift(14); })
@@ -2489,7 +2499,8 @@ function renderRaspored(){
       (kasnije.length
         ? '<h2>Kasnije</h2><div class="card">'+kasnije.map(prevRedak).join('')+'</div>' : '')+
       (bezRoka.length
-        ? '<h2>Zadaci bez roka ('+bezRoka.length+')</h2><div class="card">'+bezRoka.map(zadatakRedak).join('')+'</div>'
+        ? '<h2>Zadaci bez roka ('+bezRoka.length+')</h2><div class="card">'+
+          bezRoka.map(function(z){ return zadatakRedak(z, true); }).join('')+'</div>'
         : '');
   }
 
@@ -3060,7 +3071,7 @@ var app = {
     var zadatak = (k.tip||'kvar')==='zadatak';
     var m = machineById(k.m) || {name: zadatak ? 'Opći zadatak' : '—'};
     var chips = '';
-    if(zadatak) chips += '<span class="chip" style="background:var(--accent-soft);color:var(--accent);border:1px solid #d5d2ef">Zadatak</span> ';
+    if(zadatak) chips += '<span class="chip zadatak">Zadatak</span> ';
     if(k.status==='otkazan') chips += '<span class="chip rijesen">Otkazan</span>';
     else if(jeOtvoren(k)){
       if(k.prioritet==='hitno') chips += '<span class="chip kvar">HITNO</span> ';
@@ -4147,9 +4158,8 @@ var app = {
         '<label>Utrošeni dio sa skladišta</label><select name="dio">'+dioOpts+'</select>'+
         '<label>Količina</label><input type="number" name="kol" min="1" step="1" value="1">'+
         '<label>Zamijenjeno (opis, ako dio nije sa skladišta)</label><input name="zam" placeholder="npr. remen, brtva… (prazno ako ništa)">'+
-        '<div style="margin-top:12px"><label style="display:inline;text-transform:none;letter-spacing:0">'+
-          '<input type="checkbox" name="otpusteno"'+(k.otpusteno?' checked':'')+'> '+
-          'Linija otpuštena nakon čišćenja i pregleda na strana tijela</label></div>'+
+        '<label class="prekidac"><input type="checkbox" name="otpusteno"'+(k.otpusteno?' checked':'')+'>'+
+          '<span>Linija otpuštena nakon čišćenja i pregleda na strana tijela</span></label>'+
         '<button class="btn primary block" type="submit">Zatvori kvar</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
@@ -4239,13 +4249,12 @@ var app = {
           : '')+
         rijeseno+
         (k.status!=='rijesen'
-          ? '<div style="margin-top:12px"><label style="display:inline;text-transform:none;letter-spacing:0">'+
-            '<input type="checkbox" name="ceka"'+(k.ceka_dio?' checked':'')+'> Čeka dio (naručeno, popravak stoji)</label></div>'
+          ? '<label class="prekidac"><input type="checkbox" name="ceka"'+(k.ceka_dio?' checked':'')+'>'+
+            '<span>Čeka dio (naručeno, popravak stoji)</span></label>'
           : '')+
         /* privremeni popravak ide u IFS odjeljak 3. — vrijedi i dok kvar traje i nakon zatvaranja */
-        '<div style="margin-top:10px"><label style="display:inline;text-transform:none;letter-spacing:0">'+
-          '<input type="checkbox" name="privremeni"'+(k.privremeni?' checked':'')+
-          ' onchange="app.prekidacSanacije(this.checked)"> Privremeni popravak (traži trajnu sanaciju)</label></div>'+
+        '<label class="prekidac" style="margin-top:8px"><input type="checkbox" name="privremeni"'+(k.privremeni?' checked':'')+
+          ' onchange="app.prekidacSanacije(this.checked)"><span>Privremeni popravak (traži trajnu sanaciju)</span></label>'+
         '<div id="polje-sanacije" style="margin-top:8px'+(k.privremeni?'':';display:none')+'">'+
           '<label>Rok trajne sanacije</label>'+
           '<input type="date" name="rok_sanacije" value="'+esc(k.rok_sanacije||'')+'">'+

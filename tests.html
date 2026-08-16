@@ -1451,6 +1451,79 @@ async function testovi(W, D){
     return vraceno;
   })());
 
+  grupa('Vizualni snop B — dovršetak audita');
+  /* #6: hardkodirana ljubičasta zamijenjena tokenom — chip "Zadatak" koristi klasu, ne inline stil */
+  var zadTest = W.DATA.kvarovi.filter(function(k){ return k.tip==='zadatak'; })[0];
+  if(zadTest){
+    app.detaljKvara(zadTest.id); await cekaj(100);
+    ok('chip "Zadatak" koristi CSS klasu, ne hardkodiranu boju',
+       D.querySelector('#modal-root .chip.zadatak') !== null &&
+       D.querySelector('#modal-root').innerHTML.indexOf('d5d2ef') === -1);
+    app.closeModal();
+  }
+  /* #9: trend pilula u vlastitom retku, ne zalijepljena za veliki broj */
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  app.go('pregled'); await cekaj(100);
+  var trendEl = D.querySelector('#screen-pregled .trend');
+  if(trendEl) ok('trend pilula je u vlastitom retku (display:block)', W.getComputedStyle(trendEl).display === 'block');
+  /* #12: prazna stanja su dosljedno jednoredna (bez podebljanog naslova) */
+  var stanjaPrije = W.DATA.dijelovi.map(function(p){ return p.stanje; });
+  W.DATA.dijelovi.forEach(function(p){ p.stanje = p.min + 10; });
+  app.go('nabava'); await cekaj(100);
+  ok('"Ništa ne treba naručiti" više nije dvoredno (bez <b>)',
+     D.querySelector('#screen-nabava').innerHTML.indexOf('empty"><b>') === -1 &&
+     D.querySelector('#screen-nabava').textContent.indexOf('Ništa ne treba naručiti') > -1);
+  W.DATA.dijelovi.forEach(function(p,i){ p.stanje = stanjaPrije[i]; });
+  /* #13: "Zadaci bez roka" ne ponavlja chip "Zadatak" u svakom retku (šum) */
+  var bezRokaZad = W.DATA.kvarovi.filter(function(k){ return k.tip==='zadatak' && !k.rok && W.jeOtvoren(k); })[0];
+  if(!bezRokaZad){
+    W.DATA.kvarovi.push({id:'kvBezRokaTest', m:null, date:W.todayISO(), opis:'TEST zadatak bez roka za snop B',
+      sati:0, status:'otvoren', upoz:false, tip:'zadatak', rok:null, kategorija:'Ostalo', created_at:new Date().toISOString()});
+  }
+  app.go('raspored'); await cekaj(150);
+  var bezRokaHtml = (function(){
+    var h2 = Array.prototype.filter.call(D.querySelectorAll('#screen-raspored h2'),
+      function(h){ return h.textContent.indexOf('Zadaci bez roka') > -1; })[0];
+    return h2 ? h2.nextElementSibling.innerHTML : '';
+  })();
+  ok('"Zadaci bez roka" sekcija postoji i ne ponavlja chip "Zadatak" u retku',
+     bezRokaHtml.length > 0 && bezRokaHtml.indexOf('chip zadatak') === -1);
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== 'kvBezRokaTest'; });
+  /* #14: Kvarovi prazno stanje razlikuje "nema ničega" od "filter ne pogađa ništa" */
+  app.go('kvarovi'); await cekaj(100);
+  var sviKvarovi = W.DATA.kvarovi.slice();
+  W.DATA.kvarovi = [];
+  app.resetFiltere(); await cekaj(80);
+  ok('prazno skladište kvarova kaže da nema prijava, ne "nema za filter"',
+     D.querySelector('#screen-kvarovi').textContent.indexOf('Prvi prijavi') > -1);
+  app.setFilterTiho('q','xyz-ne-postoji'); await cekaj(80);
+  ok('prazan REZULTAT filtera i dalje kaže "za odabrani filter"',
+     D.querySelector('#screen-kvarovi').textContent.indexOf('za odabrani filter') > -1);
+  app.resetFiltere();
+  W.DATA.kvarovi = sviKvarovi;
+  app.go('kvarovi'); await cekaj(100); app.resetFiltere();
+  /* #15: brojka stanja vidljiva između +/- gumba u rastvorenom retku dijela */
+  app.go('dijelovi'); await cekaj(100);
+  var dioZaQval = W.DATA.dijelovi[0];
+  app.otvoriDio(dioZaQval.id); await cekaj(100);
+  ok('rastvoreni redak dijela ima brojku stanja između +/- gumba',
+     D.querySelector('#parts-list .dio-detalj .qval') !== null &&
+     D.querySelector('#parts-list .dio-detalj .qval').textContent === String(dioZaQval.stanje));
+  app.otvoriDio(dioZaQval.id);
+  /* #21: kartica kvara na max 3 segmenta — sudjelovali/zamijenjeno/storno žive u detalju */
+  var rijesenSaZam = W.DATA.kvarovi.filter(function(k){ return k.status==='rijesen' && k.zam; })[0];
+  if(rijesenSaZam){
+    app.go('kvarovi'); await cekaj(100);
+    var kartica = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
+      function(el){ return el.textContent.indexOf(rijesenSaZam.opis) > -1; })[0];
+    ok('kartica ne prikazuje "Zamijenjeno" (ostaje u detalju)',
+       !!kartica && kartica.querySelector('.kvar-meta').textContent.indexOf('Zamijenjeno') === -1);
+    app.detaljKvara(rijesenSaZam.id); await cekaj(100);
+    ok('detalj I DALJE prikazuje "Zamijenjeno"',
+       D.querySelector('#modal-root').textContent.indexOf('Zamijenjeno') > -1);
+    app.closeModal();
+  }
+
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
                        sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});
