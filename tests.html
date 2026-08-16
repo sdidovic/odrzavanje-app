@@ -234,6 +234,46 @@ async function testovi(W, D){
   ok('zapis o obavljenom zadatku je u kanalu',
      W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Zadatak obavljen') > -1; }));
 
+  grupa('Zadaci v2 — veza s kvarom i kontaktom (F3)');
+  var kvarZaZad = W.DATA.kvarovi.filter(function(k){ return (k.tip||'kvar')==='kvar' && k.status!=='otkazan'; })[0];
+  app.detaljKvara(kvarZaZad.id); await cekaj(120);
+  ok('kvar nudi gumb "+ Zadatak iz ovog kvara"',
+     D.querySelector('#modal-root').innerHTML.indexOf('+ Zadatak iz ovog kvara') > -1);
+  app.noviZadatak(null, kvarZaZad.id); await cekaj(120);
+  f = D.querySelector('#modal-root form');
+  ok('obrazac iz kvara ima skrivenu vezu na kvar', f.elements.izvor_kvar.value === kvarZaZad.id);
+  ok('obrazac iz kvara predispuni stroj kvara', f.elements.m.value === (kvarZaZad.m||''));
+  var kontZaTest = W.DATA.partneri[0];
+  f.elements.opis.value = 'TEST zadatak iz kvara';
+  f.elements.kontakt_id.value = kontZaTest.id;
+  posalji(f); await cekaj(200);
+  var zadIzK = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST zadatak iz kvara'; })[0];
+  ok('zadatak iz kvara nosi izvor_kvar', !!zadIzK && zadIzK.izvor_kvar === kvarZaZad.id);
+  ok('zadatak iz kvara nosi stroj kvara', !!zadIzK && zadIzK.m === kvarZaZad.m);
+  ok('zadatak iz kvara nosi kontakt_id', !!zadIzK && zadIzK.kontakt_id === kontZaTest.id);
+  app.detaljKvara(kvarZaZad.id); await cekaj(120);
+  ok('kvar prikazuje sekciju "Zadaci uz ovaj kvar"',
+     D.querySelector('#modal-root').textContent.indexOf('Zadaci uz ovaj kvar') > -1 &&
+     D.querySelector('#modal-root').textContent.indexOf('TEST zadatak iz kvara') > -1);
+  app.detaljKvara(zadIzK.id); await cekaj(120);
+  ok('detalj zadatka prikazuje vezu "Iz kvara"',
+     D.querySelector('#modal-root').textContent.indexOf('Iz kvara') > -1);
+  ok('detalj zadatka prikazuje kontakt s tel. linkom',
+     D.querySelector('#modal-root').textContent.indexOf(kontZaTest.naziv) > -1 &&
+     !!D.querySelector('#modal-root a.clink[href^="tel:"]'));
+  app.closeModal();
+  app.noviZadatak(); await cekaj(80);
+  f = D.querySelector('#modal-root form');
+  ok('dropdown "Tko" u novom zadatku nudi i Voditelja (OSOBE, ne samo majstore)',
+     Array.prototype.some.call(f.elements.dodijeljen.options, function(o){ return o.value==='Voditelj'; }));
+  app.closeModal();
+  ok('zadatak sa strojem NE prikazuje stroj kao "u kvaru"', (function(){
+    /* zadIzK je otvoren i nosi stroj kvara; ako je taj stroj inače čist, status mora ostati ok */
+    var drugiNaStroju = W.DATA.kvarovi.some(function(k){
+      return k.m===zadIzK.m && k.id!==zadIzK.id && W.jeOtvoren(k) && (k.tip||'kvar')==='kvar' && !k.upoz; });
+    return drugiNaStroju || W.machineStatus(zadIzK.m) !== 'kvar';
+  })());
+
   grupa('Preventiva');
   var prev = W.DATA.preventiva.filter(function(p){ return p.next < W.todayISO(); })[0];
   ok('postoji preventiva koja kasni', !!prev);
@@ -628,7 +668,8 @@ async function testovi(W, D){
 
   grupa('Trajanje otvorenog kvara');
   /* grupa iznad zatvara kvarove — ako više nijedan nije otvoren, prijavi novi */
-  var otvKv = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && k.m; })[0];
+  /* zadatak od F3 može nositi stroj — "otvoren s m" više nije dokaz da je kvar */
+  var otvKv = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && k.m && (k.tip||'kvar')==='kvar'; })[0];
   if(!otvKv){
     app.brzaPrijava();
     var nf3 = D.querySelector('#modal-root form');
@@ -704,7 +745,7 @@ async function testovi(W, D){
   grupa('Trenutno stoji');
   W.showScreen('pregled'); await cekaj(120);
   var stojiIma = D.querySelector('#screen-pregled').textContent.indexOf('Trenutno stoji') > -1;
-  var imaPravihKvarova = W.DATA.kvarovi.some(function(k){ return W.jeOtvoren(k) && !k.upoz && k.m; });
+  var imaPravihKvarova = W.DATA.kvarovi.some(function(k){ return W.jeOtvoren(k) && !k.upoz && k.m && (k.tip||'kvar')==='kvar'; });
   jednako('sekcija se prikazuje točno kad nešto stoji', stojiIma, imaPravihKvarova);
   ok('upozorenja se ne broje kao zastoj', (function(){
     var upoz = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && k.upoz; })[0];

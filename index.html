@@ -587,6 +587,9 @@ var KORISNICI_DEMO = [
 ];
 var KORISNICI = KORISNICI_DEMO.slice();
 var MAJSTORI = ['Majstor 1','Majstor 2','Majstor 3'];
+/* Zadatak se može dodijeliti i voditelju (nabava, dogovori) — ne samo majstoru.
+   "Riješio" kod kvara ostaje MAJSTORI, jer kvar rješava onaj tko je na terenu. */
+var OSOBE = MAJSTORI.concat(['Voditelj']);
 
 /* --- boje izvedene iz jedne osnovne boje tvrtke --- */
 function hexUTamnije(hex, faktor){
@@ -869,7 +872,8 @@ function machineById(id){ for(var i=0;i<DATA.machines.length;i++) if(DATA.machin
 function kvarCost(k){ var m = machineById(k.m); return k.sati * (m ? m.rate : 350); }
 function byDateDesc(a,b){ return b.date===a.date ? 0 : (b.date>a.date?1:-1); }
 function machineStatus(id){
-  var open = DATA.kvarovi.filter(function(k){ return k.m===id && jeOtvoren(k); });
+  /* zadatak vezan uz stroj (npr. "naruči ležaj za P2") NIJE kvar — stroj zbog njega ne stoji */
+  var open = DATA.kvarovi.filter(function(k){ return k.m===id && jeOtvoren(k) && (k.tip||'kvar')==='kvar'; });
   for(var i=0;i<open.length;i++) if(!open[i].upoz) return 'kvar';
   return open.length ? 'upoz' : 'ok';
 }
@@ -2219,12 +2223,17 @@ function prevRedak(p){
 }
 function zadatakRedak(z){
   var kasni = z.rok && z.rok < todayISO();
+  var zm = z.m ? machineById(z.m) : null;
+  var kont = z.kontakt_id ? DATA.partneri.filter(function(x){ return x.id===z.kontakt_id; })[0] : null;
   return '<div class="row click" onclick="app.akcijeStavke(\'zadatak\',\''+z.id+'\')">'+
     '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(z.opis)+'</div>'+
     '<div class="row-sub"><span class="chip" style="background:var(--accent-soft);color:var(--accent);border:1px solid #d5d2ef">Zadatak</span>'+
       (z.dodijeljen ? ' '+esc(z.dodijeljen) : '')+
       (z.rok ? ' &middot; rok '+fmtDate(z.rok) : '')+
-      (kasni ? ' &middot; <b style="color:var(--red)">kasni</b>' : '')+'</div></div>'+
+      (kasni ? ' &middot; <b style="color:var(--red)">kasni</b>' : '')+
+      (zm ? ' &middot; '+esc(zm.name) : '')+
+      (kont ? ' &middot; '+esc(kont.naziv) : '')+
+      (z.izvor_kvar ? ' &middot; iz kvara' : '')+'</div></div>'+
     '<button class="okbtn role-write" title="Označi obavljeno" onclick="event.stopPropagation();app.obaviZadatak(\''+z.id+'\')">✓</button>'+
   '</div>';
 }
@@ -2921,6 +2930,9 @@ var app = {
       chips += (k.status==='u_radu') ? '<span class="chip rad">U radu</span>'
              : (k.upoz ? '<span class="chip upoz">Upozorenje</span>' : '<span class="chip kvar">Otvoren</span>');
     } else chips += '<span class="chip rijesen">Riješen</span>';
+    var izvorK = (zadatak && k.izvor_kvar) ? DATA.kvarovi.filter(function(x){ return x.id===k.izvor_kvar; })[0] : null;
+    var kontaktZ = (zadatak && k.kontakt_id) ? DATA.partneri.filter(function(x){ return x.id===k.kontakt_id; })[0] : null;
+    var zadaciUzKvar = zadatak ? [] : DATA.kvarovi.filter(function(x){ return x.tip==='zadatak' && x.izvor_kvar===kId; });
     var red = function(l, v){ return v ? '<div class="row-sub" style="margin-top:4px"><b style="color:var(--text)">'+l+':</b> '+v+'</div>' : ''; };
     var info =
       red('Datum', fmtDate(k.date)) +
@@ -2935,6 +2947,12 @@ var app = {
       red('Riješio', k.tko ? esc(k.tko) : '') +
       red('Sudjelovali', k.sudjelovali ? esc(k.sudjelovali) : '') +
       red('Zamijenjeno', k.zam ? esc(k.zam) : '') +
+      (izvorK ? '<div class="row-sub" style="margin-top:4px"><b style="color:var(--text)">Iz kvara:</b> '+
+        '<a class="clink" onclick="app.closeModal();app.detaljKvara(\''+izvorK.id+'\')">'+
+        esc((machineById(izvorK.m)||{name:'—'}).name)+' — '+esc(izvorK.opis)+'</a></div>' : '') +
+      (kontaktZ ? '<div class="row-sub" style="margin-top:4px"><b style="color:var(--text)">Kontakt:</b> '+esc(kontaktZ.naziv)+
+        (kontaktZ.tel ? ' &middot; <a class="clink" href="tel:'+esc(String(kontaktZ.tel).replace(/[\s\/]/g,''))+'">'+esc(kontaktZ.tel)+'</a>' : '')+
+        '</div>' : '') +
       red('Privremeni popravak', k.privremeni
         ? ('da &middot; rok trajne sanacije: '+(k.rok_sanacije
             ? (k.rok_sanacije < todayISO() && k.status!=='rijesen'
@@ -2961,6 +2979,13 @@ var app = {
         (k.ceka_dio ? '✓ Čeka dio — makni oznaku' : 'Čeka dio (naručeno, popravak stoji)')+'</button>';
     if(k.status!=='otkazan')
       akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.urediKvar(\''+kId+'\')">Uredi</button>';
+    if(!zadatak && k.status!=='otkazan')
+      /* najčešći zadatak iz kvara je narudžba dijela ("naruči ležaj za P2") — veza se upiše sama, ne bira se */
+      akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.noviZadatak(null,\''+kId+'\')">+ Zadatak iz ovog kvara</button>';
+    var zadaciUzKvarHtml = zadaciUzKvar.length
+      ? '<h2 style="margin-top:16px">Zadaci uz ovaj kvar ('+zadaciUzKvar.length+')</h2><div class="card">'+
+        zadaciUzKvar.map(zadatakRedak).join('')+'</div>'
+      : '';
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>'+esc(m.name)+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
@@ -2972,6 +2997,7 @@ var app = {
       /* radnje odmah ispod podataka — majstor ne smije morati proskrolati komentare
          da dođe do "Preuzimam" / "Riješi kvar" */
       akcije+
+      zadaciUzKvarHtml+
       '<h2 style="margin-top:16px">Komentari ('+kom.length+')</h2>'+
       '<div class="card">'+komHtml+'</div>'+
       '<form class="role-write" onsubmit="app.dodajKomentar(event,\''+kId+'\',\'detalj\')">'+
@@ -3106,17 +3132,30 @@ var app = {
   },
   anaPeriod: function(v){ ANA_DANA = parseInt(v,10)||0; renderAnalitika(); },
   /* ---- zadaci: organizacija, ne kvarovi — žive na Rasporedu ---- */
-  noviZadatak: function(rok){
+  noviZadatak: function(rok, izvorKvar){
+    var kvar = izvorKvar ? DATA.kvarovi.filter(function(x){ return x.id===izvorKvar; })[0] : null;
+    if(izvorKvar){
+      if(jeTempId(izvorKvar)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
+      if(!kvar) return;
+    }
+    var km = kvar ? (machineById(kvar.m) || {name:''}) : null;
+    var kontOpts = '<option value="">—</option>'+DATA.partneri.map(function(p){
+      return '<option value="'+p.id+'">'+esc(p.naziv)+'</option>'; }).join('');
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
-      '<div class="modal-head"><h3>Novi zadatak</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<div class="row-sub" style="margin-bottom:2px">Kupiti, dogovoriti, pripremiti — ono što nije kvar, a mora se obaviti.</div>'+
+      '<div class="modal-head"><h3>'+(kvar?'Zadatak iz kvara':'Novi zadatak')+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      (kvar
+        ? '<div class="row-sub" style="margin-bottom:2px">Vezano uz: '+esc(km.name)+' — '+esc(kvar.opis)+'</div>'
+        : '<div class="row-sub" style="margin-bottom:2px">Kupiti, dogovoriti, pripremiti — ono što nije kvar, a mora se obaviti.</div>')+
       '<form onsubmit="app.saveZadatak(event)">'+
-        '<label>Što treba obaviti</label><textarea name="opis" rows="2" required placeholder="npr. dogovoriti termin servisa s MB Frigo"></textarea>'+
+        (kvar ? '<input type="hidden" name="izvor_kvar" value="'+esc(kvar.id)+'"><input type="hidden" name="m" value="'+esc(kvar.m||'')+'">' : '')+
+        '<label>Što treba obaviti</label><textarea name="opis" rows="2" required placeholder="'+
+          (kvar?'npr. naruči ležaj 6208':'npr. dogovoriti termin servisa s MB Frigo')+'"></textarea>'+
         /* "+ Na ovaj dan" s kalendara (K3) predispuni rok — dva dodira do gotovog obrasca */
         '<label>Rok (prazno = bez roka)</label><input type="date" name="rok" min="'+todayISO()+'"'+
           (rok ? ' value="'+esc(rok)+'"' : '')+'>'+
-        '<label>Tko</label><select name="dodijeljen"><option value="">—</option>'+majstorOpts('')+'</select>'+
+        '<label>Tko</label><select name="dodijeljen"><option value="">—</option>'+osobaOpts('')+'</select>'+
+        '<label>Kontakt (izborno)</label><select name="kontakt_id">'+kontOpts+'</select>'+
         '<button class="btn primary block" type="submit">Spremi zadatak</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
@@ -3125,20 +3164,21 @@ var app = {
     e.preventDefault();
     var f = new FormData(e.target);
     var z = {
-      id:'kv'+Date.now(), m:null, date:todayISO(),
+      id:'kv'+Date.now(), m:f.get('m') || null, date:todayISO(),
       opis:String(f.get('opis')||'').trim(), sati:0,
       status:'otvoren', upoz:false, tko:null, zam:null, foto:null,
       dodijeljen:f.get('dodijeljen') || null, prioritet:'normalno', smjena:null,
       ceka_dio:false, sudjelovali:null, tip:'zadatak', rok:f.get('rok') || null,
       kategorija:'Ostalo', otpusteno:false, privremeni:false, rok_sanacije:null,
+      izvor_kvar:f.get('izvor_kvar') || null, kontakt_id:f.get('kontakt_id') || null,
       created_at:new Date().toISOString()
     };
     DATA.kvarovi.push(z);
     app.closeModal(); showScreen('raspored');
     var spremljen = REMOTE
-      ? await apiInsert('kvarovi', { m:null, date:z.date, opis:z.opis, sati:0, status:'otvoren',
+      ? await apiInsert('kvarovi', { m:z.m, date:z.date, opis:z.opis, sati:0, status:'otvoren',
           upoz:false, dodijeljen:z.dodijeljen, prioritet:'normalno', tip:'zadatak', rok:z.rok,
-          kategorija:'Ostalo' }, z)
+          kategorija:'Ostalo', izvor_kvar:z.izvor_kvar, kontakt_id:z.kontakt_id }, z)
       : (save(), true);
     if(spremljen){
       if(REMOTE) zapamtiMojUnos(z.id);
@@ -4249,6 +4289,11 @@ function majstorOpts(sel){
   var imena = MAJSTORI.slice();
   if(SESSION.ime && SESSION.ime !== 'Demo' && imena.indexOf(SESSION.ime) === -1) imena.push(SESSION.ime);
   return imena.map(function(t){
+    return '<option'+(sel===t?' selected':'')+'>'+esc(t)+'</option>';
+  }).join('');
+}
+function osobaOpts(sel){
+  return OSOBE.map(function(t){
     return '<option'+(sel===t?' selected':'')+'>'+esc(t)+'</option>';
   }).join('');
 }
