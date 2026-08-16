@@ -1704,6 +1704,229 @@ async function testovi(W, D){
   jednako('vraćanje na zadano nakon testa vraća ugrađeni popis maziva', W.MAZIVA[0].naziv, W.MAZIVA_ZADANO[0].naziv);
   app.go('pregled');
 
+  grupa('AUDIT-FIX visoko — pauzirana baza, nova verzija dostupna');
+  /* mozdaBazaSpava: razlikuje "nema mreže" od "internet radi, baza možda spava" */
+  var stariNaMrezi = W.naMrezi;
+  W.naMrezi = function(){ return true; };
+  ok('mozdaBazaSpava prepoznaje fetch grešku dok je internet naizgled OK',
+     W.mozdaBazaSpava(new Error('Failed to fetch')));
+  W.naMrezi = function(){ return false; };
+  ok('mozdaBazaSpava se ne javlja kad uređaj stvarno nema mrežu',
+     !W.mozdaBazaSpava(new Error('Failed to fetch')));
+  W.naMrezi = stariNaMrezi;
+
+  /* prijava: poruka razlikuje bazu-u-mirovanju od stvarne nestašice mreže */
+  D.getElementById('screen-login').classList.add('show');
+  app.odaberiKorisnika('Voditelj');
+  D.querySelector('#pin').value = '12345678';
+  var stariSb = W.sb, stariNaMrezi2 = W.naMrezi;
+  W.naMrezi = function(){ return true; };
+  W.sb = { auth: { signInWithPassword: function(){ return Promise.reject(new TypeError('Failed to fetch')); } } };
+  await app.prijava(); await cekaj(100);
+  ok('prijava javlja "možda u mirovanju" kad internet radi ali baza ne odgovara',
+     D.querySelector('#login-err').textContent.indexOf('mirovanju') > -1);
+  W.sb = stariSb; W.naMrezi = stariNaMrezi2;
+  D.querySelector('#login-err').textContent = '';
+  D.querySelector('#pin').value = '';
+  D.getElementById('screen-login').classList.remove('show');
+
+  /* controllerchange (sw.js skipWaiting+clients.claim) — otvoren tab dobiva vidljivu traku, ne ostaje tiho na staroj verziji.
+     Traka se resetira eksplicitno prije provjere — stvaran service worker u ovom testnom okruženju
+     (radi preko http, ne file://) povremeno legitimno prođe kroz vlastiti lifecycle usred testa. */
+  var vt = D.getElementById('verzija-traka');
+  vt.style.display = 'none'; vt.innerHTML = '';
+  jednako('traka nove verzije je sakrivena prije okidanja', vt.style.display, 'none');
+  W.prikaziNovuVerziju();
+  ok('prikaziNovuVerziju pokazuje traku s poveznicom za osvježavanje',
+     vt.style.display !== 'none' && vt.innerHTML.indexOf('osvježi') > -1);
+  vt.style.display = 'none'; vt.innerHTML = '';
+
+  grupa('AUDIT-FIX visoko — offline red, sinkronizacija, utrka pri prijavi');
+  /* apiInsert/apiUpdate offline grana — dosad se testovi uvijek vrtjeli u demo modu (REMOTE=false),
+     pa se ova grana (REMOTE=true, bez mreže) nikad nije stvarno izvršila */
+  var stariRemote1 = W.REMOTE, stariNM1 = W.naMrezi, redPrije1 = W.RED.length;
+  W.REMOTE = true; W.naMrezi = function(){ return false; };
+  var lokalniIns = { id:'tmpOffline1', opis:'TEST offline insert' };
+  var vracenoIns = await W.apiInsert('kvarovi', {opis:'TEST offline insert'}, lokalniIns);
+  ok('apiInsert bez mreže stavlja zapis u red umjesto mrežnog poziva',
+     W.RED.length === redPrije1+1 && vracenoIns === null);
+  jednako('red pamti tablicu zapisa', W.RED[W.RED.length-1].table, 'kvarovi');
+  W.RED.pop(); W.redSpremi();
+  var redPrije2 = W.RED.length;
+  await W.apiUpdate('kvarovi', 'tmpOffline1', {opis:'TEST offline update'});
+  ok('apiUpdate bez mreže stavlja izmjenu u red umjesto mrežnog poziva', W.RED.length === redPrije2+1);
+  W.RED.pop(); W.redSpremi();
+  W.REMOTE = stariRemote1; W.naMrezi = stariNM1;
+
+  /* sinkroniziraj(): glavna sync petlja se dosad nikad stvarno nije izvršila u testovima.
+     Tri stavke: uspjeh, trajna greška (npr. RLS), i "0 pogođenih redaka bez greške"
+     (zapis u međuvremenu obrisan/nedostupan) — potonje se dosad tiho tretiralo kao uspjeh. */
+  var stariSb4 = W.sb, stariRemote2 = W.REMOTE, stariNM2 = W.naMrezi;
+  W.REMOTE = true; W.naMrezi = function(){ return true; };
+  W.RED.length = 0;
+  W.RED.push({ qid:'qA', table:'kvarovi', op:'insert', row:{opis:'TEST sync ok'}, tempId:'tmpSyncA' });
+  W.RED.push({ qid:'qB', table:'kvarovi', op:'update', row:{opis:'TEST sync fail'}, tempId:'tmpSyncB' });
+  W.RED.push({ qid:'qC', table:'kvarovi', op:'update', row:{opis:'TEST sync nestao'}, tempId:'tmpSyncC' });
+  var sinkGreskeSve = [];
+  var updatePoNizu = ['fail', 'nestao'];
+  W.sb = {
+    from: function(table){
+      return {
+        insert: function(row){
+          if(table==='greske') sinkGreskeSve.push(row);
+          var res = table==='greske' ? {data:null,error:null} : {data:{id:'sync-real-A'}, error:null};
+          return { select:function(){ return this; }, single:function(){ return Promise.resolve(res); },
+                    then:function(onF,onR){ return Promise.resolve(res).then(onF,onR); } };
+        },
+        update: function(){
+          var koji = updatePoNizu.shift();
+          var res = koji==='fail' ? {error:{code:'23505', message:'TEST duplicate'}}
+                                   : {error:null, data:[]};   /* "nestao": 0 redaka, bez greške */
+          return { eq:function(){ return { select:function(){ return Promise.resolve(res); } }; } };
+        }
+      };
+    }
+  };
+  await W.sinkroniziraj(true); await cekaj(150);
+  jednako('sinkroniziraj isprazni red (uspjeh + trajna greška + nestali zapis, sve troje uklonjeno)', W.RED.length, 0);
+  ok('nestali zapis (0 redaka, bez greške) se bilježi kao greška, ne kao tihi uspjeh',
+     sinkGreskeSve.some(function(g){ return g.poruka.indexOf('preskočena') > -1; }));
+  W.sb = stariSb4; W.REMOTE = stariRemote2; W.naMrezi = stariNM2;
+
+  /* apiUpdate() online: ista provjera na izravnom putu (ne kroz red) */
+  var stariSb6 = W.sb, stariRemote3 = W.REMOTE, stariNM3 = W.naMrezi, stariAlert = W.alert;
+  W.REMOTE = true; W.naMrezi = function(){ return true; };
+  var alertPoruka = '';
+  W.alert = function(m){ alertPoruka = m; };
+  W.sb = { from: function(){ return { update: function(){ return { eq:function(){ return { select:function(){
+    return Promise.resolve({error:null, data:[]}); } }; } }; } }; } };
+  await W.apiUpdate('kvarovi', 'ne-postoji-vise', {opis:'x'});
+  ok('apiUpdate ne javlja "Spremljeno" kad je 0 redaka pogođeno bez greške',
+     alertPoruka.indexOf('ne postoji') > -1);
+  W.sb = stariSb6; W.REMOTE = stariRemote3; W.naMrezi = stariNM3; W.alert = stariAlert;
+
+  /* postLogin(): zastarjeli poziv ne smije prepisati SESSION/DATA ako korisnik u međuvremenu uđe u demo */
+  var stariSb5 = W.sb;
+  W.sb = {
+    auth: { getUser: function(){
+      return new Promise(function(res){ setTimeout(function(){ res({data:{user:{id:'race-uuid'}}}); }, 200); });
+    } },
+    from: function(){
+      return { select:function(){ return this; }, eq:function(){ return this; },
+        single:function(){ return Promise.resolve({data:{ime:'TUDJINAC', role:'voditelj'}, error:null}); } };
+    }
+  };
+  var postLoginP = W.postLogin();
+  await cekaj(30);            /* dok je getUser() još u letu */
+  app.demoUlaz();              /* korisnik u međuvremenu ušao u demo (SESIJA_GEN++) */
+  await postLoginP;
+  ok('zastarjeli postLogin ne prepisuje SESSION nakon ulaska u demo', W.SESSION.ime === 'Voditelj');
+  ok('zastarjeli postLogin ne prepisuje ulogu', W.SESSION.role === 'voditelj');
+  W.sb = stariSb5;
+  await cekaj(100);
+
+  grupa('AUDIT-FIX srednje — šifra dijela, edge funkcija korisnici');
+  /* dijelovi.sku je postojao u bazi bez ijedne forme koja bi ga upisala — sad ima */
+  app.go('dijelovi'); await cekaj(100);
+  var dioZaSku = W.DATA.dijelovi[0];
+  app.urediDio(dioZaSku.id); await cekaj(100);
+  var fSku = D.querySelector('#modal-root form');
+  ok('obrazac uređivanja dijela ima polje šifre', !!fSku.elements.sku);
+  fSku.elements.sku.value = 'TEST-SKU-042';
+  posalji(fSku); await cekaj(120);
+  jednako('šifra dijela je spremljena', dioZaSku.sku, 'TEST-SKU-042');
+  app.naruciDio(dioZaSku.id); await cekaj(100);
+  ok('šifra se vidi u obrascu narudžbe', D.querySelector('#modal-root').textContent.indexOf('TEST-SKU-042') > -1);
+  app.closeModal();
+  dioZaSku.sku = null;
+
+  /* Sustav → Korisnici: redak je za čitanje (miran ekran), tri radnje idu u detalj na dodir */
+  W.SUS_KORISNICI = [{ id:'suUX1', ime:'TEST UX Korisnik', role:'majstor', email:'test-ux@x.local', aktivan:true }];
+  app.go('sustav'); await cekaj(100);
+  var korRedak = D.querySelector('#screen-sustav .row');
+  ok('redak korisnika nema stalne gumbe u retku', !korRedak.querySelector('button'));
+  korRedak.click(); await cekaj(100);
+  var korModal = D.querySelector('#modal-root');
+  ok('dodir na redak otvara detalj s tri radnje (uloga/PIN/aktivan)',
+     korModal.textContent.indexOf('Promijeni ulogu') > -1 &&
+     korModal.textContent.indexOf('Novi PIN') > -1 &&
+     korModal.textContent.indexOf('Deaktiviraj') > -1);
+  app.closeModal();
+
+  /* chat "↓ Nove poruke" gumb — dodirna površina min. 40px, ne prelagan za rukavice.
+     Gumb se prikazuje samo uvjetno (nije na dnu + stigla nova poruka), pa se CSS pravilo
+     provjerava izravno na privremenom elementu, bez oslanjanja na taj uvjet. */
+  var probniDolje = D.createElement('button');
+  probniDolje.className = 'chat-dolje';
+  D.body.appendChild(probniDolje);
+  ok('gumb "↓ Nove poruke" ima dodirnu površinu min. 40px',
+     parseInt(W.getComputedStyle(probniDolje).minHeight, 10) >= 40);
+  probniDolje.remove();
+
+  grupa('AUDIT-FIX srednje — Z2 negativni testovi (maziva/foto)');
+  /* foto_rijeseno: detalj NE smije reklamirati "Fotografija popravka" kad ga nema */
+  app.detaljKvara(novi.id); await cekaj(100);
+  ok('detalj NE prikazuje "Fotografija popravka" kad foto_rijeseno nije postavljen',
+     !novi.foto_rijeseno && D.querySelector('#modal-root').textContent.indexOf('Fotografija popravka') === -1);
+  app.closeModal();
+
+  /* maziva/mjerna oprema: prazan unos se tiho NE sprema (zadržava zadano/prethodno stanje) */
+  var mazivaPrijeTest = W.TVRTKA.maziva;
+  app.urediTvrtku(); await cekaj(100);
+  var fPrazno = D.querySelector('#modal-root form');
+  fPrazno.elements.maziva.value = '';
+  fPrazno.elements.mjerna_oprema.value = '';
+  posalji(fPrazno); await cekaj(120);
+  jednako('prazan unos maziva ne mijenja postojeću postavku', W.TVRTKA.maziva, mazivaPrijeTest);
+  jednako('prazan unos mjerne opreme ne mijenja postojeću postavku', W.TVRTKA.mjerna_oprema, null);
+
+  /* malformiran redak (nema dovoljno "|") se tiho preskoči, ne ruši spremanje */
+  app.urediTvrtku(); await cekaj(100);
+  var fLose = D.querySelector('#modal-root form');
+  fLose.elements.maziva.value = 'redak bez dovoljno separatora';
+  var stariAlert2 = W.alert; var alertZvan = false; W.alert = function(){ alertZvan = true; };
+  posalji(fLose); await cekaj(120);
+  W.alert = stariAlert2;
+  ok('malformiran redak maziva se tiho preskoči, ne ruši spremanje (nema alert/pad)',
+     !alertZvan && W.TVRTKA.maziva === mazivaPrijeTest);
+
+  /* poznata granica: edge funkcije (supabase/functions/*) i sw.js nisu pokriveni ovim
+     testovima — tests.html je klijentski test u iframeu, ne dotiče Deno server ni
+     Service Worker lifecycle. Ako se tamo nešto pokvari, ovaj file to neće uhvatiti. */
+
+  grupa('AUDIT-FIX srednje — offline/PWA: istekla sesija, dupli tap');
+  /* sinkroniziraj(): istekla sesija (PGRST301) dobiva jasnu poruku, ne beskonačan tihi retry */
+  var stariSb7 = W.sb, stariRemote4 = W.REMOTE, stariNM4 = W.naMrezi, stariToast = W.toast;
+  W.REMOTE = true; W.naMrezi = function(){ return true; };
+  W.RED.length = 0;
+  W.RED.push({ qid:'qSes', table:'kvarovi', op:'update', row:{opis:'TEST istekla sesija'}, tempId:'tmpSes1' });
+  var zadnjiToast = '';
+  W.toast = function(m){ zadnjiToast = m; };
+  W.sb = { from: function(){ return { update: function(){ return { eq:function(){ return { select:function(){
+    return Promise.resolve({error:{code:'PGRST301', message:'JWT expired'}}); } }; } }; } }; } };
+  await W.sinkroniziraj(true); await cekaj(150);
+  ok('istekla sesija javlja jasnu poruku umjesto tihog pokušavanja', zadnjiToast.indexOf('Sesija je istekla') > -1);
+  jednako('zapis ostaje u redu (šalje se nakon ponovne prijave, ne gubi se)', W.RED.length, 1);
+  W.RED.length = 0; W.redSpremi();
+  W.sb = stariSb7; W.REMOTE = stariRemote4; W.naMrezi = stariNM4; W.toast = stariToast;
+
+  /* dupli tap: gumb ostaje zaključan dok stvaran poziv (PENDING_OPS) traje, ne po fiksnom vremenu */
+  var probniForm = D.createElement('form');
+  probniForm.addEventListener('submit', function(e){ e.preventDefault(); });
+  var probniBtn = D.createElement('button'); probniBtn.type = 'submit'; probniBtn.textContent = 'Spremi';
+  probniForm.appendChild(probniBtn); D.body.appendChild(probniForm);
+  var pendingPrije = W.PENDING_OPS;
+  W.PENDING_OPS = pendingPrije + 1;   /* simuliraj mrežni poziv u tijeku */
+  probniForm.dispatchEvent(new W.Event('submit', {cancelable:true, bubbles:true}));
+  await cekaj(50);
+  ok('gumb je odmah onemogućen nakon submita', probniBtn.disabled);
+  await cekaj(400);
+  ok('gumb ostaje zaključan dok stvaran poziv traje (ne otključa se po fiksnom vremenu)', probniBtn.disabled);
+  W.PENDING_OPS = pendingPrije;
+  await cekaj(300);
+  ok('gumb se otključa čim se stvaran poziv završi', !probniBtn.disabled);
+  probniForm.remove();
+
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
                        sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});

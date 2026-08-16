@@ -231,9 +231,9 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .msg-form{position:sticky;bottom:calc(78px + env(safe-area-inset-bottom));
   background:var(--bg);padding-top:8px;margin-top:12px;z-index:5}
 .chat-dolje{position:fixed;left:50%;transform:translateX(-50%);
-  bottom:calc(148px + env(safe-area-inset-bottom));z-index:6;
+  bottom:calc(148px + env(safe-area-inset-bottom));z-index:6;min-height:40px;
   background:var(--accent);color:#fff;border:none;border-radius:20px;
-  padding:7px 16px;font-size:12.5px;font-weight:700;box-shadow:0 2px 8px rgba(16,24,40,.2);cursor:pointer}
+  padding:9px 18px;font-size:12.5px;font-weight:700;box-shadow:0 2px 8px rgba(16,24,40,.2);cursor:pointer}
 body[data-role="majstor"] .btn-audit{display:none}
 
 /* ---------- oznaka boje tvrtke ---------- */
@@ -338,7 +338,7 @@ body:not([data-role="voditelj"]) .role-voditelj{display:none !important}
 .print-head{display:none}
 @media print{
   @page{margin:16mm 14mm}
-  header,#tabbar,#demo-banner,#loader,#toast,#offline-traka,.noprint{display:none !important}
+  header,#tabbar,#demo-banner,#loader,#toast,#offline-traka,#verzija-traka,.noprint{display:none !important}
   /* ispis naljepnica: prikazuje se samo QR ekran */
   main:has(#screen-qr:not(.hidden)){display:block !important}
   main:has(#screen-qr:not(.hidden)) .screen:not(#screen-qr){display:none !important}
@@ -516,6 +516,7 @@ form .btn{margin-top:20px}
 
 <div id="demo-banner" class="demo-banner" style="display:none">DEMO NAČIN — podaci se spremaju samo na ovom uređaju (vidi README za uključenje baze)</div>
 <div id="offline-traka" class="off-traka" style="display:none"></div>
+<div id="verzija-traka" class="off-traka" style="display:none"></div>
 
 <div id="screen-login"><div class="login-box">
   <img class="login-logo" id="login-logo" alt="Clarum">
@@ -1120,12 +1121,25 @@ function toast(msg){
   clearTimeout(TOAST_T);
   TOAST_T = setTimeout(function(){ t.classList.remove('show'); }, 1600);
 }
-/* zaštita od dvostrukog tapa na "Spremi" — vrijedi za sve forme */
+/* Zaštita od dvostrukog tapa na "Spremi" — vrijedi za sve forme.
+   AUDIT-FIX: fiksnih 1600ms je otključavalo gumb NEOVISNO o tome je li stvarni mrežni
+   poziv (apiInsert/apiUpdate) završio — na sporoj/isprekidanoj hali-mreži drugi tap
+   prije nego prvi stvarno završi mogao je stvoriti dupli zapis. Umjesto toga prati se
+   PENDING_OPS (brojač koji apiInsert/apiUpdate sami vode) uz vremensko ograničenje kao
+   sigurnosni ventil da gumb ne ostane zauvijek zaključan ako nešto ne završi kako treba. */
 document.addEventListener('submit', function(ev){
   var b = ev.target.querySelector('button[type="submit"]');
   if(b && !b.disabled){
     b.disabled = true; b.dataset.txt = b.textContent; b.textContent = 'Sprema se…';
-    setTimeout(function(){ b.disabled = false; b.textContent = b.dataset.txt || 'Spremi'; }, 1600);
+    var krajZa = Date.now() + 8000;
+    var provjeriZavrsetak = function(){
+      if(Date.now() > krajZa || (typeof PENDING_OPS !== 'undefined' && PENDING_OPS <= 0)){
+        b.disabled = false; b.textContent = b.dataset.txt || 'Spremi';
+      } else {
+        setTimeout(provjeriZavrsetak, 200);
+      }
+    };
+    setTimeout(provjeriZavrsetak, 200);  /* prva provjera tek kad je stvarni handler stigao krenuti */
   }
 }, true);
 function jeTempId(id){ return REMOTE && /^(kv|pr|d|pt|ko|po)\d+$/.test(String(id)); }
@@ -1210,20 +1224,33 @@ async function sinkroniziraj(rucno){
   if(!REMOTE || SYNC_U_TIJEKU || !RED.length) { if(rucno) toast('Sve je sinkronizirano ✓'); return; }
   if(!naMrezi()){ if(rucno) toast('Nema mreže — pokušat ću sam kad se vrati'); return; }
   SYNC_U_TIJEKU = true;
-  var poslano = 0, zapelo = false;
+  var poslano = 0, zapelo = false, preskoceno = 0, sesijaIstekla = false;
   try{
     while(RED.length){
       var z = RED[0];
       var res = z.op === 'insert'
         ? await sb.from(z.table).insert(z.row).select().single()
-        : await sb.from(z.table).update(z.row).eq('id', z.tempId);
+        : await sb.from(z.table).update(z.row).eq('id', z.tempId).select('id');
       if(res.error){
-        /* trajna greška (npr. RLS) — makni iz reda da ne blokira ostalo, zabilježi */
-        if(res.error.code && res.error.code !== 'PGRST301' && naMrezi()){
+        if(res.error.code === 'PGRST301'){
+          /* AUDIT-FIX: istekla sesija — retry sa starim tokenom NIKAD neće uspjeti,
+             pa se ovo dosad tiho pokušavalo iznova svakih 30s zauvijek. Zapis ostaje
+             u redu (poslat će se nakon ponovne prijave), ali korisnik mora znati zašto. */
+          sesijaIstekla = true; zapelo = true; break;
+        }
+        if(res.error.code && naMrezi()){
+          /* trajna greška (npr. RLS) — makni iz reda da ne blokira ostalo, zabilježi i javi korisniku */
           zapisiGresku('Sinkronizacija odbijena ('+z.table+')', res.error.message);
-          RED.shift(); redSpremi(); continue;
+          RED.shift(); redSpremi(); preskoceno++; continue;
         }
         zapelo = true; break;   /* mreža — probaj kasnije */
+      }
+      /* AUDIT-FIX: update().eq() na obrisan/nepostojeći redak vraća 0 pogođenih
+         redaka BEZ greške — dosad se tiho tretiralo kao uspjeh, a promjena nikad
+         nije primijenjena (npr. netko drugi je u međuvremenu obrisao/promijenio kvar). */
+      if(z.op === 'update' && (!res.data || !res.data.length)){
+        zapisiGresku('Sinkronizacija preskočena ('+z.table+')', 'zapis '+z.tempId+' više ne postoji ili nije dostupan za izmjenu');
+        RED.shift(); redSpremi(); preskoceno++; continue;
       }
       if(z.op === 'insert' && res.data && res.data.id) zamijeniIdURedu(z.tempId, res.data.id);
       RED.shift(); redSpremi(); poslano++;
@@ -1231,9 +1258,17 @@ async function sinkroniziraj(rucno){
   }catch(e){ zapelo = true; }
   SYNC_U_TIJEKU = false;
   osvjeziOfflineTraku();
-  if(poslano){
-    toast('Sinkronizirano: '+poslano+' zapisa ✓');
-    try{ await load(true); rerender(); }catch(e){}
+  /* AUDIT-FIX: prije je korisnik koji je unos napravio ostajao bez ikakve povratne
+     informacije kad bi red trajno odbacio njegov zapis — javljalo se samo u admin
+     dnevniku grešaka koji obični korisnik ne vidi. Sad se to vidi u traci na dnu ekrana. */
+  if(sesijaIstekla){
+    toast('Sesija je istekla — ponovno se prijavi da nastaviš slanje');
+  } else if(poslano || preskoceno){
+    var dio = [];
+    if(poslano) dio.push(poslano+' poslano');
+    if(preskoceno) dio.push(preskoceno+(preskoceno===1?' zapis odbačen':' zapisa odbačeno'));
+    toast('Sinkronizacija: '+dio.join(', ')+(poslano?' ✓':' ⚠'));
+    if(poslano){ try{ await load(true); rerender(); }catch(e){} }
   } else if(rucno && zapelo){ toast('Mreža još nije dostupna'); }
 }
 function osvjeziOfflineTraku(){
@@ -1294,8 +1329,12 @@ async function apiUpdate(table, id, patch){
   if(!naMrezi()){ uRed(table, 'update', patch, {id:id}); toast('Spremljeno lokalno — čeka mrežu'); cacheSpremi(); return; }
   PENDING_OPS++;
   try{
-    var res = await sb.from(table).update(patch).eq('id', id);
+    var res = await sb.from(table).update(patch).eq('id', id).select('id');
     if(res.error) throw res.error;
+    /* AUDIT-FIX: 0 pogođenih redaka (zapis obrisan/nedostupan u međuvremenu) nije
+       greška po Supabase-u, ali ni uspjeh — bez ove provjere korisnik vidi "Spremljeno ✓"
+       dok promjena stvarno nije nigdje upisana. */
+    if(!res.data || !res.data.length) throw new Error('Zapis više ne postoji u bazi (možda ga je netko obrisao ili promijenio).');
     toast('Spremljeno ✓');
     cacheSpremi();
   }catch(err){
@@ -1316,6 +1355,15 @@ function mreznaGreska(err){
   var m = ((err && (err.message || err.msg)) || String(err)).toLowerCase();
   return m.indexOf('fetch') > -1 || m.indexOf('network') > -1 || m.indexOf('timeout') > -1 ||
          m.indexOf('failed to') > -1 || m.indexOf('load failed') > -1;
+}
+/* AUDIT-FIX §5: "Failed to fetch" prema pauziranom Supabase projektu (besplatni plan,
+   7 dana neaktivnosti) izgleda identično kao obična nestašica WiFi-ja — jedina razlika
+   je da uređaj SAM sebe smatra online. Ne možemo biti sigurni, ali možemo barem ponuditi
+   ispravnu sumnju umjesto da uvijek tvrdimo "nema mreže" kad internet zapravo radi. */
+function mozdaBazaSpava(err){
+  if(!naMrezi()) return false;
+  var m = ((err && (err.message || err.msg)) || String(err)).toLowerCase();
+  return m.indexOf('fetch') > -1 || m.indexOf('failed to') > -1 || m.indexOf('load failed') > -1;
 }
 
 /* =====================================================================
@@ -2595,16 +2643,12 @@ var SUS_KORISNICI = null, SUS_GRESKE = null;
 function renderSustav(){
   var korHtml = SUS_KORISNICI
     ? (SUS_KORISNICI.length ? SUS_KORISNICI.map(function(k){
-        return '<div class="row"><div class="grow">'+
+        /* AUDIT-FIX (miran ekran): redak je za čitanje, tri radnje idu u detalj na dodir */
+        return '<div class="row" onclick="app.detaljKorisnika(\''+k.id+'\')"><div class="grow">'+
           '<div class="row-title" style="font-size:13.5px">'+esc(k.ime)+
             (k.aktivan ? '' : ' <span class="chip rijesen">Neaktivan</span>')+'</div>'+
           '<div class="row-sub">'+esc(k.role)+' &middot; '+esc(k.email)+'</div>'+
-          '<div style="margin-top:5px">'+
-            '<button class="btn-mini" onclick="app.korisnikUloga(\''+k.id+'\')">Uloga</button> '+
-            '<button class="btn-mini" onclick="app.korisnikPin(\''+k.id+'\')">Novi PIN</button> '+
-            '<button class="btn-mini" onclick="app.korisnikAktivan(\''+k.id+'\','+(!k.aktivan)+')">'+
-              (k.aktivan?'Deaktiviraj':'Aktiviraj')+'</button>'+
-          '</div></div></div>';
+          '</div></div>';
       }).join('') : '<div class="empty">Nema korisnika.</div>')
     : '<div class="empty">Učitavanje…</div>';
 
@@ -2867,7 +2911,9 @@ var app = {
       $('#pin').value = '';
       await postLogin();
     }catch(ex){
-      err.textContent = 'Greška u vezi s bazom — provjeri internet pa pokušaj ponovno.';
+      err.textContent = mozdaBazaSpava(ex)
+        ? 'Greška u vezi s bazom. Internet izgleda uredu — baza je možda u mirovanju (dulje bez korištenja). Javi administratoru da je probudi, pa pokušaj za par minuta.'
+        : 'Greška u vezi s bazom — provjeri internet pa pokušaj ponovno.';
     }finally{ LOGIN_BUSY = false; }
   },
   sinkroniziraj: function(){ sinkroniziraj(true); },
@@ -2959,6 +3005,20 @@ var app = {
     var sakriven = inp.type === 'password';
     inp.type = sakriven ? 'text' : 'password';
     if(btn){ btn.textContent = sakriven ? '🙈' : '👁'; btn.setAttribute('aria-label', sakriven ? 'Sakrij PIN' : 'Prikaži PIN'); }
+  },
+  detaljKorisnika: function(id){
+    var k = (SUS_KORISNICI||[]).filter(function(x){ return x.id===id; })[0];
+    if(!k) return;
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
+      '<div class="modal-head"><h3>'+esc(k.ime)+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<div class="row-sub" style="margin-bottom:12px">'+esc(k.role)+' &middot; '+esc(k.email)+
+        (k.aktivan ? '' : ' &middot; <b style="color:var(--red)">neaktivan</b>')+'</div>'+
+      '<button class="btn sec block" onclick="app.korisnikUloga(\''+k.id+'\')">Promijeni ulogu</button>'+
+      '<button class="btn sec block" style="margin-top:8px" onclick="app.korisnikPin(\''+k.id+'\')">Novi PIN</button>'+
+      '<button class="btn sec block" style="margin-top:8px" onclick="app.closeModal();app.korisnikAktivan(\''+k.id+'\','+(!k.aktivan)+')">'+
+        (k.aktivan?'Deaktiviraj':'Aktiviraj')+'</button>'+
+      '</div></div>';
   },
   korisnikUloga: function(id){
     var k = (SUS_KORISNICI||[]).filter(function(x){ return x.id===id; })[0];
@@ -3774,6 +3834,7 @@ var app = {
         '<label>Za koje strojeve</label>'+strojeviCheckbox(p.strojevi)+
         '<label style="margin-top:10px">Opis mjesta ugradnje (ako treba)</label><input name="stroj" value="'+esc(p.stroj)+'">'+
         '<label>Lokacija na skladištu (neobavezno)</label><input name="lokacija" value="'+esc(p.lokacija||'')+'" placeholder="npr. polica B2, ormar alata">'+
+        '<label>Šifra dijela (neobavezno)</label><input name="sku" value="'+esc(p.sku||'')+'" placeholder="npr. interna šifra ili šifra dobavljača">'+
         '<label>Stanje</label><input type="number" name="stanje" min="0" step="1" value="'+p.stanje+'" required>'+
         '<label>Minimum</label><input type="number" name="min" min="0" step="1" value="'+p.min+'" required>'+
         '<label>Dobavljač</label><select name="dob">'+dobOpts+'</select>'+
@@ -3792,6 +3853,7 @@ var app = {
     p.naziv = String(f.get('naziv')||'').trim() || p.naziv;
     p.stroj = String(f.get('stroj')||'').trim() || strojeviNazivi(p.strojevi);
     p.lokacija = String(f.get('lokacija')||'').trim() || null;
+    p.sku = String(f.get('sku')||'').trim() || null;
     p.stanje = Math.max(0, parseInt(f.get('stanje'),10)||0);
     p.min = Math.max(0, parseInt(f.get('min'),10)||0);
     p.dob = f.get('dob');
@@ -3800,7 +3862,7 @@ var app = {
     var pt = DATA.partneri.filter(function(x){ return x.naziv===p.dob; })[0];
     p.partner_id = pt ? pt.id : null;
     app.closeModal(); showScreen('dijelovi');
-    await apiUpdate('dijelovi', id, { naziv:p.naziv, stroj:p.stroj, lokacija:p.lokacija, stanje:p.stanje,
+    await apiUpdate('dijelovi', id, { naziv:p.naziv, stroj:p.stroj, lokacija:p.lokacija, sku:p.sku, stanje:p.stanje,
       min:p.min, dob:p.dob, kategorija:p.kategorija, cijena:p.cijena,
       strojevi:p.strojevi, partner_id:p.partner_id });
   },
@@ -4069,6 +4131,7 @@ var app = {
         '<label>Za koje strojeve</label>'+strojeviCheckbox([])+
         '<label style="margin-top:10px">Opis mjesta ugradnje (neobavezno)</label><input name="stroj" placeholder="npr. pogon puža">'+
         '<label>Lokacija na skladištu (neobavezno)</label><input name="lokacija" placeholder="npr. polica B2, ormar alata">'+
+        '<label>Šifra dijela (neobavezno)</label><input name="sku" placeholder="npr. interna šifra ili šifra dobavljača">'+
         '<label>Stanje na skladištu</label><input type="number" name="stanje" min="0" step="1" value="1" required>'+
         '<label>Minimum</label><input type="number" name="min" min="0" step="1" value="1" required>'+
         '<label>Dobavljač</label><select name="dob">'+dobOpts+'</select>'+
@@ -4087,6 +4150,7 @@ var app = {
       id:'d'+Date.now(), naziv:String(f.get('naziv')||'').trim(),
       stroj:String(f.get('stroj')||'').trim() || strojeviNazivi(odabraniStrojevi),
       lokacija:String(f.get('lokacija')||'').trim() || null,
+      sku:String(f.get('sku')||'').trim() || null,
       stanje:Math.max(0, parseInt(f.get('stanje'),10)||0), min:Math.max(0, parseInt(f.get('min'),10)||0),
       dob:f.get('dob'), cijena:Math.max(0, parseFloat(f.get('cijena'))||0),
       kategorija:f.get('kat')||'Ostalo',
@@ -4094,7 +4158,7 @@ var app = {
     };
     DATA.dijelovi.push(dio);
     app.closeModal(); showScreen('dijelovi');
-    await apiInsert('dijelovi', { naziv:dio.naziv, stroj:dio.stroj, lokacija:dio.lokacija, stanje:dio.stanje,
+    await apiInsert('dijelovi', { naziv:dio.naziv, stroj:dio.stroj, lokacija:dio.lokacija, sku:dio.sku, stanje:dio.stanje,
       min:dio.min, dob:dio.dob, cijena:dio.cijena, kategorija:dio.kategorija,
       strojevi:dio.strojevi, partner_id:dio.partner_id }, dio);
   },
@@ -5092,7 +5156,9 @@ async function start(){
   }catch(ex){
     if(SESIJA_GEN !== gen0) return;   /* greška iz zastarjelog pokušaja ne ruši demo */
     $('#screen-login').classList.add('show');
-    $('#login-err').textContent = 'Greška u vezi s bazom — provjeri internet pa osvježi stranicu.';
+    $('#login-err').textContent = mozdaBazaSpava(ex)
+      ? 'Greška u vezi s bazom. Internet izgleda uredu — baza je možda u mirovanju (dulje bez korištenja). Javi administratoru da je probudi, pa pokušaj za par minuta.'
+      : 'Greška u vezi s bazom — provjeri internet pa osvježi stranicu.';
   }
 }
 start();
@@ -5134,6 +5200,23 @@ if(REMOTE){
 /* PWA servisni radnik (samo preko http/https, ne za file://) */
 if('serviceWorker' in navigator && location.protocol.indexOf('http') === 0){
   navigator.serviceWorker.register('sw.js').catch(function(){});
+  /* AUDIT-FIX §4: sw.js zove skipWaiting()+clients.claim() pri objavi nove verzije,
+     ali bez ovog listenera otvoren tab ostaje zauvijek na starom JS-u dok se ručno
+     ne zatvori — čest slučaj kad netko ostavi app otvoren na hali danima.
+     "vecKontroliran" razlikuje PRVU instalaciju (nema što osvježiti) od stvarne
+     nove verzije koja preuzima kontrolu nad već otvorenom stranicom. */
+  var vecKontroliran = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if(!vecKontroliran){ vecKontroliran = true; return; }
+    prikaziNovuVerziju();
+  });
+}
+function prikaziNovuVerziju(){
+  var el = document.getElementById('verzija-traka');
+  if(!el) return;
+  el.style.display = '';
+  el.className = 'off-traka ceka';
+  el.innerHTML = '⬆️ Dostupna je nova verzija — <a onclick="location.reload()">osvježi</a>';
 }
 </script>
 </body>
