@@ -299,11 +299,15 @@ async function testovi(W, D){
   ok('majstor ne vidi eure na pregledu', D.querySelector('#screen-pregled').innerHTML.indexOf('€') === -1);
   ok('majstor ne vidi IFS gumb', W.getComputedStyle(D.querySelector('.btn-audit')).display === 'none');
   ok('majstor vidi svoje zadatke', D.querySelector('#screen-pregled').innerHTML.indexOf('Moji zadaci') > -1);
+  W.showScreen('dijelovi');
+  ok('majstor ne vidi vrijednost skladišta', D.querySelector('#screen-dijelovi').innerHTML.indexOf('Vrijednost skladišta') === -1);
   W.SESSION = { ime:'Direktor', role:'readonly' };
   D.body.dataset.role = 'readonly';
   W.showScreen('kvarovi');
   var pisi = D.querySelector('#screen-kvarovi .role-write');
   ok('direktor ne vidi gumbe za pisanje', !pisi || W.getComputedStyle(pisi).display === 'none');
+  W.showScreen('dijelovi');
+  ok('direktor vidi vrijednost skladišta', D.querySelector('#screen-dijelovi').innerHTML.indexOf('Vrijednost skladišta') > -1);
   W.SESSION = { ime:'Voditelj', role:'voditelj' };
   D.body.dataset.role = 'voditelj';
 
@@ -2207,6 +2211,22 @@ async function testovi(W, D){
      D.querySelector('#screen-sustav').textContent.indexOf('Učitavanje') === -1);
   W.SUS_KORISNICI = susPrije;
   app.go('pregled'); await cekaj(80);
+
+  grupa('Demo prekidač uloga (banner) — vlasnik pregledava druge uloge bez odjave');
+  var demoSelect = D.getElementById('demo-uloga-select');
+  ok('select u demo traci postoji i nudi svih 6 demo osoba', !!demoSelect && demoSelect.options.length === 6);
+  jednako('zadano odabrano je "Voditelj"', demoSelect.value, 'Voditelj');
+  app.demoUloga('Majstor 1'); await cekaj(100);
+  jednako('prebacivanje na Majstor 1 postavlja ulogu "majstor"', W.SESSION.role, 'majstor');
+  jednako('body dataset.role prati promjenu (CSS role-write/role-voditelj)', D.body.dataset.role, 'majstor');
+  jednako('prebacivanje uloge vodi na Pregled', W.CURRENT_SCREEN, 'pregled');
+  app.demoUloga('Proizvodnja'); await cekaj(100);
+  jednako('Proizvodnja dobiva ulogu "readonly"', W.SESSION.role, 'readonly');
+  app.demoUloga('Direktor'); await cekaj(100);
+  jednako('Direktor dobiva ulogu "readonly"', W.SESSION.role, 'readonly');
+  app.demoUloga('Voditelj'); await cekaj(100);
+  jednako('vraćanje na Voditelj radi', W.SESSION.role, 'voditelj');
+  D.body.dataset.role = 'voditelj';
 
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',

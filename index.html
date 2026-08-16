@@ -336,7 +336,11 @@ body[data-role="majstor"] .btn-audit{display:none}
 
 /* ---------- demo banner ---------- */
 .demo-banner{background:var(--yellow-bg);color:var(--yellow);border-bottom:1px solid var(--yellow-border);
-  font-size:11.5px;font-weight:600;text-align:center;padding:5px 10px}
+  font-size:11.5px;font-weight:600;padding:5px 10px;display:flex;align-items:center;
+  justify-content:space-between;gap:8px;flex-wrap:wrap}
+.demo-uloga{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.demo-uloga select{font:inherit;font-weight:700;padding:4px 6px;border-radius:6px;min-height:28px;
+  border:1px solid var(--yellow-border);background:#fff;color:var(--text)}
 
 /* ---------- offline traka ---------- */
 .off-traka{position:sticky;top:0;z-index:29;background:#3d4452;color:#fff;font-size:12px;font-weight:600;
@@ -534,7 +538,12 @@ form .btn{margin-top:20px}
   </div>
 </header>
 
-<div id="demo-banner" class="demo-banner" style="display:none">DEMO NAČIN — podaci se spremaju samo na ovom uređaju (vidi README za uključenje baze)</div>
+<div id="demo-banner" class="demo-banner" style="display:none">
+  <span>DEMO NAČIN — podaci se spremaju samo na ovom uređaju</span>
+  <label class="demo-uloga">Gledaj kao
+    <select id="demo-uloga-select" onchange="app.demoUloga(this.value)" aria-label="Pogledaj demo kao drugu osobu/ulogu"></select>
+  </label>
+</div>
 <div id="offline-traka" class="off-traka" style="display:none"></div>
 <div id="verzija-traka" class="off-traka" style="display:none"></div>
 
@@ -646,6 +655,10 @@ var KORISNICI_DEMO = [
   { naziv:'Direktor',    email:'direktor@odrzavanje.local' }
 ];
 var KORISNICI = KORISNICI_DEMO.slice();
+/* uloga svake demo-osobe — koristi je demo prekidač uloga (Sustav → banner) da vlasnik
+   može pregledati alat "očima" majstora/proizvodnje bez ponovne prijave */
+var DEMO_ULOGE = { 'Majstor 1':'majstor', 'Majstor 2':'majstor', 'Majstor 3':'majstor',
+  'Voditelj':'voditelj', 'Proizvodnja':'readonly', 'Direktor':'readonly' };
 /* netaknuta kopija demo identiteta — demo mora stajati sam za sebe i kad je
    spojena baza već prepisala TVRTKA (isto pravilo kao KORISNICI_DEMO) */
 var TVRTKA_DEMO = JSON.parse(JSON.stringify(TVRTKA));
@@ -2270,8 +2283,9 @@ function renderDijelovi(){
     '</div>'+
     '<input type="search" placeholder="Pretraži skladište (naziv, stroj, dobavljač…)" value="'+esc(PART_Q)+'"'+
       ' oninput="app.traziDio(this.value)" style="margin-bottom:4px">'+
-    '<div class="row-sub" style="margin-top:8px">Vrijednost skladišta: <b style="color:var(--text)">'+EUR(vrijednost)+'</b>'+
-      ' &middot; ispod minimuma: <b style="color:'+(ispodMin?'var(--red)':'var(--green)')+'">'+ispodMin+'</b></div>'+
+    '<div class="row-sub" style="margin-top:8px">'+
+      (vidiFinancije() ? 'Vrijednost skladišta: <b style="color:var(--text)">'+EUR(vrijednost)+'</b> &middot; ' : '')+
+      'ispod minimuma: <b style="color:'+(ispodMin?'var(--red)':'var(--green)')+'">'+ispodMin+'</b></div>'+
     '<div id="parts-list">'+partsListHtml()+'</div>';
 }
 var KONT_Q = '';
@@ -3405,10 +3419,21 @@ var app = {
     SESSION = { ime:'Voditelj', role:'voditelj' };
     document.body.dataset.role = 'voditelj';
     $('#demo-banner').style.display = '';
+    renderDemoUlogaSelect();
     $('#screen-login').classList.remove('show');
     localLoad();
     if(!initHash()) showScreen(zadnjiEkran() || 'pregled');
     dobrodoslica();
+  },
+  /* Demo prekidač uloga — vlasnik alat pokazuje na razgovoru/probi i mora moći sam
+     provjeriti "što vidi majstor / proizvodnja" bez izmišljanja PIN-ova ili odjave. */
+  demoUloga: function(ime){
+    if(REMOTE) return;
+    var uloga = DEMO_ULOGE[ime] || 'majstor';
+    SESSION = { ime: ime, role: uloga };
+    document.body.dataset.role = uloga;
+    showScreen('pregled');
+    toast('Gledaš kao: '+ime);
   },
   detaljKvara: function(kId){
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
@@ -5135,6 +5160,13 @@ function renderLoginTiles(){
   var el = $('#user-tiles');
   if(el) el.innerHTML = KORISNICI.map(function(k){
     return '<div class="user-tile'+(LOGIN_SEL===k.naziv?' sel':'')+'" onclick="app.odaberiKorisnika(\''+esc(k.naziv)+'\')">'+esc(k.naziv)+'</div>';
+  }).join('');
+}
+function renderDemoUlogaSelect(){
+  var el = $('#demo-uloga-select');
+  if(!el) return;
+  el.innerHTML = KORISNICI_DEMO.map(function(k){
+    return '<option value="'+esc(k.naziv)+'"'+(SESSION.ime===k.naziv?' selected':'')+'>'+esc(k.naziv)+'</option>';
   }).join('');
 }
 function korisnikEmail(naziv){
