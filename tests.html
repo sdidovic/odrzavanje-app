@@ -368,16 +368,17 @@ async function testovi(W, D){
   var svih = W.DATA.poruke.length;
   ok('kanal prikazuje poruke', D.querySelectorAll('#screen-poruke .msg').length > 0);
   ok('poruke su grupirane po danu', D.querySelectorAll('#screen-poruke .msg-dan').length >= 1);
-  app.porukeFilter('ljudi'); await cekaj(200);
-  ok('filter "samo ljudi" skriva sistemske',
-     Array.prototype.every.call(D.querySelectorAll('#screen-poruke .msg'), function(el){
-       return !el.classList.contains('sustav'); }));
-  app.porukeFilter('sustav'); await cekaj(200);
-  ok('filter "samo sustav" prikazuje samo sistemske',
-     D.querySelectorAll('#screen-poruke .msg').length > 0 &&
-     Array.prototype.every.call(D.querySelectorAll('#screen-poruke .msg'), function(el){
-       return el.classList.contains('sustav'); }));
-  app.porukeFilter('sve'); await cekaj(200);
+  /* filtar Sve/Ljudi/Sustav je izbačen (NASTAVAK §11.4) — jedan kanal, bez filtriranja */
+  ok('filtar poruka je izbačen', typeof app.porukeFilter === 'undefined');
+  ok('kanal prikazuje i sistemske i ljudske poruke bez filtera',
+     D.querySelectorAll('#screen-poruke .msg.sustav').length > 0 &&
+     D.querySelectorAll('#screen-poruke .msg:not(.sustav)').length > 0);
+  ok('segment Poruke│Kontakti postoji na oba ekrana', (function(){
+    var naPorukama = D.querySelectorAll('#screen-poruke button[onclick*="go(\'kontakti\')"]').length === 1;
+    app.go('kontakti'); var naKontaktima = D.querySelectorAll('#screen-kontakti button[onclick*="go(\'poruke\')"]').length === 1;
+    app.go('poruke');
+    return naPorukama && naKontaktima;
+  })());
   var forma = D.querySelector('#screen-poruke form');
   forma.elements.tekst.value = 'TEST poruka iz testa';
   posalji(forma); await cekaj(250);
@@ -893,6 +894,77 @@ async function testovi(W, D){
     var ima = D.querySelector('#modal-root').textContent.indexOf('početni zaslon') > -1;
     app.closeModal(); return ima;
   })());
+
+  grupa('Tri smjene');
+  var smjenePrije = W.TVRTKA.smjene.slice(), smjeneOdPrije = W.TVRTKA.smjene_od;
+  /* dvije smjene bez postavljenih granica — mora čuvati stari raspored 6-14 / 14-6 */
+  W.TVRTKA.smjene = ['1. smjena','2. smjena']; W.TVRTKA.smjene_od = null;
+  jednako('02:00 pripada 2. smjeni (stari raspored)', W.autoSmjena(new Date(2026,0,1,2)), '2. smjena');
+  jednako('08:00 pripada 1. smjeni', W.autoSmjena(new Date(2026,0,1,8)), '1. smjena');
+  jednako('20:00 pripada 2. smjeni', W.autoSmjena(new Date(2026,0,1,20)), '2. smjena');
+  /* tri smjene bez postavljenih granica — uobičajeni Clarumov raspored 6/14/22 */
+  W.TVRTKA.smjene = ['1. smjena','2. smjena','3. smjena']; W.TVRTKA.smjene_od = null;
+  jednako('05:00 pripada 3. smjeni (prelazi ponoć)', W.autoSmjena(new Date(2026,0,1,5)), '3. smjena');
+  jednako('09:00 pripada 1. smjeni', W.autoSmjena(new Date(2026,0,1,9)), '1. smjena');
+  jednako('15:00 pripada 2. smjeni', W.autoSmjena(new Date(2026,0,1,15)), '2. smjena');
+  jednako('23:00 pripada 3. smjeni', W.autoSmjena(new Date(2026,0,1,23)), '3. smjena');
+  /* tri smjene s ručno upisanim granicama iz postavke */
+  W.TVRTKA.smjene_od = [7, 15, 23];
+  jednako('06:00 s pomaknutim granicama pripada 3. (noćnoj) smjeni', W.autoSmjena(new Date(2026,0,1,6)), '3. smjena');
+  jednako('07:00 s pomaknutim granicama pripada 1. smjeni', W.autoSmjena(new Date(2026,0,1,7)), '1. smjena');
+  /* brza prijava stvarno upisuje smjenu iz autoSmjena(), ne fiksnu vrijednost */
+  W.TVRTKA.smjene = smjenePrije; W.TVRTKA.smjene_od = smjeneOdPrije;
+  app.brzaPrijava();
+  var sf = D.querySelector('#modal-root form');
+  sf.elements.m.value = 'e1'; sf.elements.opis.value = 'TEST smjena iz prijave';
+  posalji(sf); await cekaj(250);
+  var kSmjena = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST smjena iz prijave'; })[0];
+  jednako('brza prijava upisuje trenutnu smjenu', kSmjena.smjena, W.autoSmjena());
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k !== kSmjena; });
+  /* postavke: čuva postojeći unos, odbacuje neispravan (broj smjena se ne poklapa) */
+  app.urediTvrtku();
+  var tf = D.querySelector('#modal-root form');
+  ok('obrazac postavki ima polje za početak smjena', !!tf.elements.smjene_od);
+  tf.elements.smjene.value = '1. smjena\n2. smjena\n3. smjena';
+  tf.elements.smjene_od.value = '6\n14\n22';
+  posalji(tf); await cekaj(150);
+  ok('ispravan unos triju granica je prihvaćen',
+     Array.isArray(W.TVRTKA.smjene_od) && W.TVRTKA.smjene_od.join(',') === '6,14,22');
+  app.urediTvrtku();
+  tf = D.querySelector('#modal-root form');
+  tf.elements.smjene_od.value = '6\n14';   /* dvije granice za tri smjene — ne poklapa se */
+  posalji(tf); await cekaj(150);
+  ok('neispravan broj granica se odbacuje (pada natrag na automatski raspored)', W.TVRTKA.smjene_od === null);
+  W.TVRTKA.smjene = smjenePrije; W.TVRTKA.smjene_od = smjeneOdPrije;
+
+  grupa('Nova navigacija: Raspored kartica, spojeni Poruke/Kontakti, deep-linkovi');
+  ok('kartica Raspored postoji u dnu', D.querySelector('.tab[data-tab="raspored"]') !== null);
+  ok('Kontakti nemaju vlastitu karticu (spojeni s Porukama)', D.querySelector('.tab[data-tab="kontakti"]') === null);
+  jednako('šest kartica u dnu', D.querySelectorAll('#tabbar .tab').length, 6);
+  W.showScreen('raspored'); await cekaj(120);
+  ok('kartica Raspored se osvijetli kad je Raspored otvoren',
+     D.querySelector('.tab[data-tab="raspored"]').classList.contains('active'));
+  W.showScreen('kontakti'); await cekaj(120);
+  ok('kartica Poruke se osvijetli kad su Kontakti otvoreni (pod-ekran iste kartice)',
+     D.querySelector('.tab[data-tab="poruke"]').classList.contains('active'));
+  /* deep-linkovi: push obavijesti šalju #kvarovi/#raspored/#poruke — dosad su tiho padale na Pregled */
+  ['kvarovi','raspored','poruke','dijelovi','nabava'].forEach(function(ime){
+    W.location.hash = '#'+ime;
+    var otislo = W.initHash();
+    ok('#'+ime+' otvara taj ekran', otislo && W.CURRENT_SCREEN === ime);
+  });
+  W.location.hash = '';
+  W.showScreen('pregled');
+
+  grupa('Lijep gumb umjesto native file inputa');
+  app.brzaPrijava();
+  var bf2 = D.querySelector('#modal-root form');
+  ok('input je sakriven, label vidljiv kao gumb', (function(){
+    var inp = bf2.querySelector('#foto-input');
+    var lbl = bf2.querySelector('label[for="foto-input"]');
+    return !!inp && !!lbl && lbl.classList.contains('btn') && getComputedStyle(inp).position === 'absolute';
+  })());
+  app.closeModal();
 
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',

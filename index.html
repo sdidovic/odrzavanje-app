@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Clarum — Održavanje</title>
 <meta name="theme-color" content="#3a3285">
+<meta name="color-scheme" content="light"><!-- OS-ov tamni način inače izvrne native kontrole (select, input) -->
 <meta name="robots" content="noindex, nofollow">
 <link rel="manifest" href="manifest.json">
 <!-- supabase-js drzimo lokalno: pogon ne smije ovisiti o vanjskom CDN-u -->
@@ -55,9 +56,9 @@ h1{font-size:17px;font-weight:700;letter-spacing:-.2px;line-height:1.15}
 .hdr-sub{font-size:11px;opacity:.7;margin-top:2px;letter-spacing:.3px;text-transform:uppercase;font-weight:600}
 .hdr-akcije{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .btn-audit{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.32);color:#fff;
-  font-size:12px;font-weight:600;line-height:1.25;padding:9px 12px;border-radius:var(--radius-xs);
+  font-size:12px;font-weight:600;line-height:1.25;padding:12px;border-radius:var(--radius-xs);
   text-align:center;cursor:pointer;flex-shrink:0;white-space:nowrap;backdrop-filter:blur(2px);
-  transition:background .14s ease}
+  transition:background .14s ease}   /* dodirna meta ≥44px — hala, rukavice */
 .btn-audit:active{background:rgba(255,255,255,.24)}
 
 /* ---------- layout ---------- */
@@ -113,12 +114,15 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
   border:1px solid var(--border);background:var(--card);box-shadow:var(--sjena-1);
   transition:transform .12s ease, box-shadow .12s ease}
 .stat:active{transform:scale(.97)}
+.stat.static{cursor:default}
+.stat.static:active{transform:none}   /* KPI kartice na Analitici ne rade ništa na dodir — ne smiju izgledati klikabilno */
 .stat-num{display:block;font-size:26px;font-weight:800;line-height:1.1;letter-spacing:-.7px;
   font-variant-numeric:tabular-nums}
 .stat-label{display:block;font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.3;
   font-weight:600;letter-spacing:.1px}
-/* 4 KPI broja na Analitici — ista veličina, jer su jednako važni */
-.stat-num.kpi{font-size:17px;letter-spacing:-.3px;overflow-wrap:anywhere}
+/* 4 KPI broja na Analitici — ista veličina, jer su jednako važni. 2×2 mreža daje dovoljno
+   prostora da broj stane u jedan red — overflow-wrap:anywhere je prije lomio brojku usred znamenke */
+.stat-num.kpi{font-size:17px;letter-spacing:-.3px;white-space:nowrap}
 .stat.red{background:var(--red-bg);border-color:var(--red-border)}   .stat.red .stat-num{color:var(--red)}
 .stat.yellow{background:var(--yellow-bg);border-color:var(--yellow-border)} .stat.yellow .stat-num{color:var(--yellow)}
 .stat.green{background:var(--green-bg);border-color:var(--green-border)} .stat.green .stat-num{color:var(--green)}
@@ -223,9 +227,9 @@ body[data-role="majstor"] .btn-audit{display:none}
 .okbtn{width:44px;height:44px;border-radius:8px;border:1px solid var(--green-border);background:var(--green-bg);
   color:var(--green);font-size:16px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1}
 .okbtn:active{background:#d6ecdd}
-.btn-mini{border:1px solid #cdc9ec;background:#fff;color:var(--accent);border-radius:7px;
-  padding:7px 11px;min-height:34px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;
-  transition:background .12s ease}
+.btn-mini{border:1px solid var(--accent-rub);background:#fff;color:var(--accent);border-radius:7px;
+  padding:10px 13px;min-height:42px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;
+  transition:background .12s ease}   /* dodirna meta ≥42px; rub prati boju tvrtke, ne fiksnu Clarum ljubičastu */
 .btn-mini:active{background:var(--accent-soft)}
 .btn-mini.opasno{color:var(--red);border-color:var(--red-border)}
 .btn-mini.opasno:active{background:var(--red-bg)}
@@ -261,8 +265,11 @@ body[data-role="majstor"] .btn-audit{display:none}
 .user-tile.sel{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);
   box-shadow:0 0 0 3px var(--accent-soft)}
 .pin-input{text-align:center;font-size:24px;letter-spacing:10px;font-weight:700;padding:14px 12px}
+.pin-input::placeholder{letter-spacing:normal}
 .login-err{color:var(--red);font-size:13px;margin-top:var(--r3);min-height:18px;font-weight:600}
-.login-noga{margin-top:var(--r5);font-size:11px;color:var(--muted);letter-spacing:.3px}
+.login-noga{margin-top:var(--r5);font-size:12.5px;color:var(--muted);letter-spacing:.3px;line-height:1.8}
+.login-noga a{color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline;
+  display:inline-block;padding:4px 2px}   /* demo nije ravnopravan "Prijavi se" — tekstualni link, ne gumb */
 
 /* ---------- demo banner ---------- */
 .demo-banner{background:var(--yellow-bg);color:var(--yellow);border-bottom:1px solid var(--yellow-border);
@@ -325,8 +332,8 @@ body:not([data-role="voditelj"]) .role-voditelj{display:none !important}
 .kvar-meta b{color:var(--text)}
 /* brze radnje na kartici: dodjela i "čeka dio" bez otvaranja punog obrasca */
 .kvar-brzo{display:flex;gap:7px;align-items:center;margin-top:8px}
-.kvar-brzo select{width:auto;flex:1;min-width:0;font-size:13px;padding:7px 26px 7px 9px;
-  min-height:34px;border-radius:7px;background-position:right 8px center}
+.kvar-brzo select{width:auto;flex:1;min-width:0;font-size:14px;padding:10px 26px 10px 9px;
+  min-height:42px;border-radius:7px;background-position:right 8px center}
 .kvar-brzo .btn-mini{flex-shrink:0}
 .kvar-brzo .btn-mini.aktivan{background:var(--yellow-bg);color:var(--yellow);border-color:var(--yellow-border)}
 
@@ -382,6 +389,12 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;
 .dio-qty{margin-left:auto;display:flex;gap:7px}
 .chev{transition:transform .12s ease}
 
+/* ---------- lijep gumb umjesto native "Choose file / No file chosen" ---------- */
+/* clip, ne display:none — input ostaje fokusabilan i dostupan čitačima ekrana */
+.file-input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.file-label{text-align:center}
+
 /* ---------- modal ---------- */
 .overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:50;
   display:flex;align-items:flex-end;justify-content:center}
@@ -394,7 +407,7 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;
 @media(min-width:640px){.overlay{align-items:center;padding:24px}.modal{border-radius:14px}}
 .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .modal-head h3{font-size:17px;font-weight:700}
-.x{background:#e3e6eb;border:none;width:42px;height:42px;border-radius:50%;font-size:19px;
+.x{background:#e3e6eb;border:none;width:44px;height:44px;border-radius:50%;font-size:19px;
   color:var(--muted);cursor:pointer;line-height:1}
 form label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin:14px 0 5px;
   text-transform:uppercase;letter-spacing:.5px}
@@ -436,7 +449,10 @@ form .btn{margin-top:20px}
   <div class="hdr-inner">
     <div class="hdr-brand">
       <img class="hdr-logo" src="data:image/png;base64,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" alt="Clarum">
-      <h1>Održavanje</h1>
+      <div style="min-width:0">
+        <h1>Održavanje</h1>
+        <div class="hdr-sub"></div>
+      </div>
     </div>
     <div class="hdr-akcije">
       <button class="btn-audit" onclick="app.audit()">IFS izvještaj</button>
@@ -455,9 +471,9 @@ form .btn{margin-top:20px}
   <input class="pin-input" id="pin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN"
     onkeydown="if(event.key==='Enter')app.prijava()">
   <button class="btn primary block" style="margin-top:12px" onclick="app.prijava()">Prijavi se</button>
-  <button class="btn sec block" style="margin-top:10px" onclick="app.demoUlaz()">Demo pregled (probni podaci)</button>
   <div class="login-err" id="login-err"></div>
-  <div class="login-noga">Sustav za upravljanje održavanjem</div>
+  <div class="login-noga">Sustav za upravljanje održavanjem<br>
+    <a onclick="app.demoUlaz()">Pogledaj demo s probnim podacima</a></div>
 </div></div>
 
 <main>
@@ -479,18 +495,18 @@ form .btn{margin-top:20px}
   <button class="tab" data-tab="pregled" onclick="app.go('pregled')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="9" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="1.5"/><rect x="13.5" y="12" width="7.5" height="9" rx="1.5"/><rect x="3" y="15.5" width="7.5" height="5.5" rx="1.5"/></svg>
     Pregled</button>
-  <button class="tab" data-tab="strojevi" onclick="app.go('strojevi')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.08A1.7 1.7 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.08A1.7 1.7 0 0 0 20.91 10H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg>
-    Strojevi</button>
   <button class="tab" data-tab="kvarovi" onclick="app.go('kvarovi')">
     <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.9 18a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13.5"/><circle cx="12" cy="17" r=".4" fill="currentColor"/></svg><span class="badge" id="badge-kvarovi" style="display:none"></span></span>
     Kvarovi</button>
+  <button class="tab" data-tab="raspored" onclick="app.go('raspored')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="7.5" y1="2.5" x2="7.5" y2="6.5"/><line x1="16.5" y1="2.5" x2="16.5" y2="6.5"/><circle cx="8" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="8" cy="17.5" r="1.1" fill="currentColor" stroke="none"/></svg>
+    Raspored</button>
+  <button class="tab" data-tab="strojevi" onclick="app.go('strojevi')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.08A1.7 1.7 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.08A1.7 1.7 0 0 0 20.91 10H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg>
+    Strojevi</button>
   <button class="tab" data-tab="dijelovi" onclick="app.go('dijelovi')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8.6 12 3 3 8.6v6.8L12 21l9-5.6z"/><path d="M3 8.6l9 5.4 9-5.4"/><line x1="12" y1="14" x2="12" y2="21"/></svg>
-    Dijelovi</button>
-  <button class="tab" data-tab="kontakti" onclick="app.go('kontakti')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.9.5 2.8.6a2 2 0 0 1 1.8 2.1z"/></svg>
-    Kontakti</button>
+    Skladište</button>
   <button class="tab" data-tab="poruke" onclick="app.go('poruke')">
     <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="badge" id="badge-poruke" style="display:none"></span></span>
     Poruke</button>
@@ -530,6 +546,7 @@ var TVRTKA = {
   boja_akcent: '#ffd749',
   programi: ['Suhi program','Svježi program','Zamrznuti program'],
   smjene: ['1. smjena','2. smjena'],
+  smjene_od: null,   /* početak svake smjene (sat); null = izvedi iz broja smjena */
   kategorije_kvara: ['Mehanički','Električni','Pneumatika i rashlada','Ostalo'],
   kategorije_dijelova: ['Remeni i prijenos','Ležajevi','Brtve i maziva','Senzori i elektrika',
                         'Grijači','Folije i ambalaža','Rashladna tehnika','Alati i matrice','Ostalo'],
@@ -1535,7 +1552,9 @@ function eventRow(k){
     : (jeOtvoren(k)
       ? (k.upoz ? '<span class="chip upoz">Upozorenje</span>' : '<span class="chip kvar">Otvoren</span>')
       : '<span class="chip rijesen">Riješen</span>');
-  return '<div class="row click" onclick="app.openStroj(\''+m.id+'\')">'+
+  /* isto oblikovana kartica kvara svugdje drugdje otvara detalj kvara — isti izgled
+     mora značiti isto ponašanje (prije je otvarala stroj) */
+  return '<div class="row click" onclick="app.detaljKvara(\''+k.id+'\')">'+
     '<div class="grow"><div class="row-title">'+esc(m.name)+'</div>'+
     '<div class="row-sub">'+fmtDate(k.date)+' &middot; '+esc(k.opis)+'</div></div>'+
     '<div class="row-right">'+chip+'</div></div>';
@@ -1888,7 +1907,7 @@ function renderNabava(){
   var vrijednostNarudzbi = otv.reduce(function(s,n){ return s + (n.cijena||0)*n.kolicina; }, 0);
 
   $('#screen-nabava').innerHTML =
-    '<button class="back" onclick="app.go(\'dijelovi\')">‹ Dijelovi</button>'+
+    '<button class="back" onclick="app.go(\'dijelovi\')">‹ Skladište</button>'+
     '<h2>Za naručiti ('+zaNar.length+')</h2>'+
     '<div class="card">'+ (zaNar.length ? zaNar.map(function(p){
       return '<div class="row"><div class="grow">'+
@@ -1976,8 +1995,18 @@ function kontaktiListHtml(){
     return '<h2>'+esc(NASLOVI[t]||t)+'</h2><div class="card">'+grupe[t].map(partnerRow).join('')+'</div>';
   }).join('') || '<div class="card"><div class="empty">Nema kontakata.</div></div>';
 }
+/* Poruke i Kontakti dijele jednu karticu u dnu — ovaj segment je jedini način da se
+   prebaci između njih (tab traka ostaje na 6 kartica). */
+function segmentPorukeKontakti(aktivni){
+  /* nepročitano se već vidi kao brojka na kartici u dnu — ne duplicira se ovdje */
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'+
+    '<button class="btn '+(aktivni==='poruke'?'primary':'sec')+'" onclick="app.go(\'poruke\')">Poruke</button>'+
+    '<button class="btn '+(aktivni==='kontakti'?'primary':'sec')+'" onclick="app.go(\'kontakti\')">Kontakti</button>'+
+  '</div>';
+}
 function renderKontakti(){
   $('#screen-kontakti').innerHTML =
+    segmentPorukeKontakti('kontakti')+
     '<input type="search" placeholder="Pretraži kontakte (naziv, usluga, mjesto…)" value="'+esc(KONT_Q)+'"'+
       ' oninput="app.traziKontakt(this.value)" style="margin-bottom:4px">'+
     '<div id="kontakti-list">'+kontaktiListHtml()+'</div>'+
@@ -2090,15 +2119,17 @@ function renderAnalitika(){
     '<div class="filters" style="grid-template-columns:1fr">'+
       '<select onchange="app.anaPeriod(this.value)">'+perOpts+'</select>'+
     '</div>'+
-    '<div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">'+
+    /* 2×2, ne 4 u redu — na 360px ekranu je 4-u-redu davalo ~80px po kartici i lomilo
+       brojku usred znamenke; static jer dodir na ove kartice ne radi ništa */
+    '<div class="stat-grid" style="grid-template-columns:repeat(2,1fr)">'+
       /* sva četiri broja na isti font — različite veličine su sugerirale različitu važnost */
-      '<div class="stat"><span class="stat-num kpi">'+uk.n+'</span><span class="stat-label">kvarova</span>'+deltaChip(uk.n, prethodno?prethodno.n:null, true)+'</div>'+
-      '<div class="stat"><span class="stat-num kpi">'+H(uk.sati)+'</span><span class="stat-label">zastoja</span>'+deltaChip(uk.sati, prethodno?prethodno.sati:null, true)+'</div>'+
+      '<div class="stat static"><span class="stat-num kpi">'+uk.n+'</span><span class="stat-label">kvarova</span>'+deltaChip(uk.n, prethodno?prethodno.n:null, true)+'</div>'+
+      '<div class="stat static"><span class="stat-num kpi">'+H(uk.sati)+'</span><span class="stat-label">zastoja</span>'+deltaChip(uk.sati, prethodno?prethodno.sati:null, true)+'</div>'+
       /* to nije ukupan trošak održavanja — dijelovi i vanjski servis nisu u njemu */
-      '<div class="stat"><span class="stat-num kpi">'+EUR(uk.cost)+'</span><span class="stat-label">trošak zastoja</span>'+deltaChip(uk.cost, prethodno?prethodno.cost:null, true)+'</div>'+
+      '<div class="stat static"><span class="stat-num kpi">'+EUR(uk.cost)+'</span><span class="stat-label">trošak zastoja</span>'+deltaChip(uk.cost, prethodno?prethodno.cost:null, true)+'</div>'+
       /* MTTR ne dijeli s istim brojem kao ostala tri broja — dijeli samo s riješenima.
          Broj uzoraka mora pisati, inače mjesec s jednim brzim popravkom izgleda kao rekord. */
-      '<div class="stat"><span class="stat-num kpi">'+(mttr?H(mttr):'—')+'</span>'+
+      '<div class="stat static"><span class="stat-num kpi">'+(mttr?H(mttr):'—')+'</span>'+
         '<span class="stat-label">prosj. popravak'+(rijeseni.length ? ' ('+rijeseni.length+')' : '')+'</span>'+
         deltaChip(mttr, prethodno?prethodno.mttr:null, true)+'</div>'+
     '</div>'+
@@ -2189,7 +2220,7 @@ function renderRaspored(){
   var bezRoka = zadaci.filter(function(z){ return !z.rok; });
 
   $('#screen-raspored').innerHTML =
-    '<button class="back" onclick="app.go(\'pregled\')">‹ Pregled</button>'+
+    /* Raspored je vlastita kartica u dnu — više nije pod-ekran Pregleda, pa nema "‹ Pregled" */
     '<button class="btn primary block role-write" style="margin-bottom:4px" onclick="app.noviZadatak()">+ Novi zadatak</button>'+
     (brojKasnih
       ? '<h2 style="color:var(--red)">Kasni ('+brojKasnih+')</h2><div class="card" style="border-color:var(--red-border)">'+kasniHtml+'</div>'
@@ -2333,17 +2364,13 @@ function oznaciProcitano(){
   var zadnja = (DATA.poruke||[]).reduce(function(m,p){ return String(p.created_at) > m ? String(p.created_at) : m; }, '');
   try{ if(zadnja) localStorage.setItem('porukeSeen', zadnja); }catch(e){}
 }
-var PORUKE_FILTER = 'sve';   /* sve | ljudi | sustav */
 async function renderPoruke(){
   var seenPrije = '';
   try{ seenPrije = localStorage.getItem('porukeSeen') || ''; }catch(e){}
-  var sve = (DATA.poruke||[]).slice().sort(function(a,b){
+  /* Filtar Sve/Ljudi/Sustav je izbačen (NASTAVAK §11.4) — 4 čovjeka je jedan kanal,
+     pregledan bez filtriranja; sistemske poruke se ionako vizualno razlikuju (.msg.sustav). */
+  var lista = (DATA.poruke||[]).slice().sort(function(a,b){
     return String(a.created_at).localeCompare(String(b.created_at));
-  });
-  var lista = sve.filter(function(p){
-    if(PORUKE_FILTER === 'ljudi')  return p.tko !== 'Sustav';
-    if(PORUKE_FILTER === 'sustav') return p.tko === 'Sustav';
-    return true;
   });
   var zadnjiDan = '', crtaPostavljena = false;
   var html = lista.length ? lista.map(function(p){
@@ -2387,12 +2414,7 @@ async function renderPoruke(){
   }
 
   $('#screen-poruke').innerHTML =
-    '<div class="filters" style="grid-template-columns:repeat(3,1fr)">'+
-      ['sve','ljudi','sustav'].map(function(f){
-        var nazivi = {sve:'Sve', ljudi:'Samo ljudi', sustav:'Samo sustav'};
-        return '<button class="btn '+(PORUKE_FILTER===f?'primary':'sec')+' sm" onclick="app.porukeFilter(\''+f+'\')">'+nazivi[f]+'</button>';
-      }).join('')+
-    '</div>'+
+    segmentPorukeKontakti('poruke')+
     '<div class="card">'+pushRed+'</div>'+
     '<h2>Zajednički kanal — vide ga svi</h2>'+
     '<div class="card" style="padding:5px 0">'+html+'</div>'+
@@ -2422,10 +2444,13 @@ function showScreen(name){
   });
   REPS = repCounts();
   RENDERERS[name]();
-  /* pod-ekrani osvjetljavaju karticu iz koje su otvoreni (QR je pod Strojevima) */
+  /* pod-ekrani osvjetljavaju karticu iz koje su otvoreni (QR je pod Strojevima).
+     Raspored je od sada VLASTITA kartica, ne pod-ekran Pregleda; Kontakti dijele
+     karticu s Porukama (segment na vrhu ekrana). */
   var tabName = (name==='stroj'||name==='qr') ? 'strojevi'
-    : ((name==='analitika'||name==='raspored'||name==='sustav') ? 'pregled'
-       : (name==='nabava' ? 'dijelovi' : name));
+    : ((name==='analitika'||name==='sustav') ? 'pregled'
+       : (name==='nabava' ? 'dijelovi'
+          : (name==='kontakti' ? 'poruke' : name)));
   document.querySelectorAll('.tab').forEach(function(t){
     t.classList.toggle('active', t.getAttribute('data-tab')===tabName);
   });
@@ -2580,7 +2605,8 @@ var app = {
         '<label>Naziv (kratki, u zaglavlju)</label><input name="naziv" required value="'+esc(t.naziv)+'">'+
         '<label>Puni naziv (na izvještajima)</label><input name="puni_naziv" value="'+esc(t.puni_naziv||'')+'">'+
         '<label>Logo</label>'+
-        '<input type="file" accept="image/*" onchange="app.logoOdabran(event)">'+
+        '<input type="file" id="logo-input" class="file-input" accept="image/*" onchange="app.logoOdabran(event)">'+
+        '<label for="logo-input" class="btn sec block file-label" id="logo-label">Odaberi logo</label>'+
         '<img id="logo-prev" class="foto-prev" alt="pregled loga"'+
           (t.logo ? ' src="'+t.logo+'" style="display:block;max-height:70px"' : '')+'>'+
         '<label>Osnovna boja</label><input type="color" name="boja" value="'+esc(t.boja)+'" style="height:48px;padding:4px">'+
@@ -2589,6 +2615,8 @@ var app = {
         '<textarea name="programi" rows="3">'+esc((t.programi||[]).join('\n'))+'</textarea>'+
         '<label>Smjene (jedna po retku)</label>'+
         '<textarea name="smjene" rows="2">'+esc((t.smjene||[]).join('\n'))+'</textarea>'+
+        '<label>Početak svake smjene (sat 0–23, isti redoslijed kao gore; prazno = uobičajeno za broj smjena)</label>'+
+        '<textarea name="smjene_od" rows="2" placeholder="6&#10;14&#10;22">'+esc((t.smjene_od||[]).join('\n'))+'</textarea>'+
         '<label>Kategorije kvarova (jedna po retku)</label>'+
         '<textarea name="kategorije_kvara" rows="4">'+esc((t.kategorije_kvara||[]).join('\n'))+'</textarea>'+
         '<label>Kategorije dijelova (jedna po retku)</label>'+
@@ -2613,6 +2641,8 @@ var app = {
         PENDING_LOGO = c.toDataURL('image/png');
         var pr = document.getElementById('logo-prev');
         if(pr){ pr.src = PENDING_LOGO; pr.style.display = 'block'; pr.style.maxHeight = '70px'; }
+        var lbl = document.getElementById('logo-label');
+        if(lbl) lbl.textContent = '✓ '+dat.name;
       };
       img.src = ev.target.result;
     };
@@ -2630,6 +2660,11 @@ var app = {
     ['programi','smjene','kategorije_kvara','kategorije_dijelova'].forEach(function(k){
       var l = uListu(f.get(k)); if(l.length) TVRTKA[k] = l;
     });
+    /* početak smjena: brojevi 0-23, mora ih biti isto koliko i smjena — inače je
+       auto-dodjela nepouzdana (tipfeler u satu bi tiho krivo dodjeljivao smjenu) */
+    var satiOd = uListu(f.get('smjene_od')).map(function(x){ return parseInt(x,10); })
+      .filter(function(n){ return !isNaN(n) && n>=0 && n<24; });
+    TVRTKA.smjene_od = (satiOd.length === TVRTKA.smjene.length) ? satiOd : null;
     if(PENDING_LOGO){ TVRTKA.logo = PENDING_LOGO; PENDING_LOGO = ''; }
     primijeniIdentitet();
     app.closeModal();
@@ -2638,7 +2673,7 @@ var app = {
       await apiUpdate('tvrtka', 1, {
         naziv:TVRTKA.naziv, puni_naziv:TVRTKA.puni_naziv, logo:TVRTKA.logo,
         boja:TVRTKA.boja, boja_akcent:TVRTKA.boja_akcent, programi:TVRTKA.programi,
-        smjene:TVRTKA.smjene, kategorije_kvara:TVRTKA.kategorije_kvara,
+        smjene:TVRTKA.smjene, smjene_od:TVRTKA.smjene_od, kategorije_kvara:TVRTKA.kategorije_kvara,
         kategorije_dijelova:TVRTKA.kategorije_dijelova, audit_norma:TVRTKA.audit_norma,
         updated_at: new Date().toISOString()
       });
@@ -2669,7 +2704,7 @@ var app = {
       '<div class="modal-head"><h3>Uvoz iz CSV-a</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<form onsubmit="app.saveUvoz(event)">'+
         '<label>Što uvoziš</label><select name="vrsta" onchange="document.getElementById(\'uvoz-pomoc\').textContent=this.value===\'machines\'?\'šifra;naziv;program;cijena sata\':\'naziv;za koji stroj;stanje;minimum;dobavljač;cijena;kategorija\'">'+
-          '<option value="machines">Strojevi</option><option value="dijelovi">Dijelovi</option></select>'+
+          '<option value="machines">Strojevi</option><option value="dijelovi">Skladište</option></select>'+
         '<label>Redoslijed stupaca</label>'+
         '<div class="row-sub" id="uvoz-pomoc" style="margin-bottom:6px">šifra;naziv;program;cijena sata</div>'+
         '<label>Zalijepi podatke (jedan redak = jedna stavka, odvojeno s ; ili tab)</label>'+
@@ -2792,6 +2827,9 @@ var app = {
       info+
       (k.foto ? '<img src="'+k.foto+'" alt="fotografija kvara" onclick="app.viewFoto(\''+kId+'\')" '+
         'style="margin-top:10px;max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--border);cursor:pointer;display:block">' : '')+
+      /* radnje odmah ispod podataka — majstor ne smije morati proskrolati komentare
+         da dođe do "Preuzimam" / "Riješi kvar" */
+      akcije+
       '<h2 style="margin-top:16px">Komentari ('+kom.length+')</h2>'+
       '<div class="card">'+komHtml+'</div>'+
       '<form class="role-write" onsubmit="app.dodajKomentar(event,\''+kId+'\',\'detalj\')">'+
@@ -2799,7 +2837,6 @@ var app = {
         '<textarea name="tekst" rows="2" required placeholder="što je napravljeno, što čeka, kome je predano…"></textarea>'+
         '<button class="btn sec block" type="submit" style="margin-top:8px">Dodaj komentar</button>'+
       '</form>'+
-      akcije+
       '</div></div>';
   },
   komentariKvara: function(kId){
@@ -2840,7 +2877,8 @@ var app = {
       '<form onsubmit="app.saveBrza(event)">'+
         '<label>Stroj</label><select name="m" required>'+opts+'</select>'+
         '<label>Fotografija</label>'+
-        '<input type="file" accept="image/*" capture="environment" onchange="app.fotoOdabrana(event)">'+
+        '<input type="file" id="foto-input" class="file-input" accept="image/*" capture="environment" onchange="app.fotoOdabrana(event)">'+
+        '<label for="foto-input" class="btn sec block file-label" id="foto-label">📷 Slikaj ili odaberi fotografiju</label>'+
         '<img id="foto-prev" class="foto-prev" alt="pregled fotografije">'+
         '<label>Što se dogodilo</label><textarea name="opis" rows="2" required placeholder="kratko — npr. puca remen, stroj stoji"></textarea>'+
         /* jedini prekidač u brzoj prijavi: hitan kvar se prijavljuje baš ovim obrascem */
@@ -2859,8 +2897,7 @@ var app = {
       status:'otvoren', upoz:false, tko:null, zam:null,
       foto:PENDING_FOTO || null, dodijeljen:null,
       prioritet: hitno ? 'hitno' : 'normalno',
-      smjena:(function(){ var sm=TVRTKA.smjene||['1. smjena','2. smjena']; var h=new Date().getHours();
-                          return (h>=6&&h<14)?sm[0]:(sm[1]||sm[0]); })(),
+      smjena: autoSmjena(),
       ceka_dio:false, sudjelovali:null, tip:'kvar', rok:null,
       kategorija:autoKat(f.get('opis')),
       otpusteno:false, privremeni:false, rok_sanacije:null,
@@ -2887,7 +2924,6 @@ var app = {
       sysPoruka((hitno?'🔴 HITNO — ':'⚠ ')+'Prijavljen kvar: '+bm.name+' — '+kvar.opis+' ('+(SESSION.ime||'')+')', kvar.id);
     }
   },
-  porukeFilter: function(f){ PORUKE_FILTER = f; renderPoruke(); },
   izPoruke: function(kvarId){
     var k = DATA.kvarovi.filter(function(x){ return x.id===kvarId; })[0];
     if(!k){ toast('Kvar nije u učitanom razdoblju'); return; }
@@ -3380,7 +3416,8 @@ var app = {
         /* zadaci imaju svoj obrazac na Rasporedu — ovdje se prijavljuje samo kvar */
         '<label>Stroj</label><select name="m" required>'+opts+'</select>'+
         '<label>Fotografija (kamera ili galerija)</label>'+
-        '<input type="file" accept="image/*" capture="environment" onchange="app.fotoOdabrana(event)">'+
+        '<input type="file" id="foto-input" class="file-input" accept="image/*" capture="environment" onchange="app.fotoOdabrana(event)">'+
+        '<label for="foto-input" class="btn sec block file-label" id="foto-label">📷 Slikaj ili odaberi fotografiju</label>'+
         '<img id="foto-prev" class="foto-prev" alt="pregled fotografije">'+
         '<label>Opis</label><textarea name="opis" rows="2" required placeholder="npr. puknuti remen na pogonu"></textarea>'+
         '<label>Prioritet</label><select name="prioritet">'+
@@ -3738,6 +3775,8 @@ var app = {
         PENDING_FOTO = c.toDataURL('image/jpeg', 0.72);
         var prev = document.getElementById('foto-prev');
         if(prev){ prev.src = PENDING_FOTO; prev.style.display = 'block'; }
+        var lbl = document.getElementById('foto-label');
+        if(lbl) lbl.textContent = '✓ '+file.name;
       };
       img.src = ev.target.result;
     };
@@ -4038,17 +4077,46 @@ function sysPoruka(tekst, kvarId){
   else save();
   updateBadge();
 }
-function smjenaOpts(){
-  var h = new Date().getHours();
+/* Uobičajene granice kad postavka smjene_od nije upisana — čuva stari raspored za
+   2 smjene (6-14 / 14-6) i dodaje Clarumov stvarni raspored za 3 (6-14 / 14-22 / 22-6). */
+function zadaneGraniceSmjena(n){
+  if(n === 2) return [6,14];
+  if(n === 3) return [6,14,22];
+  var korak = Math.floor(24/n) || 8, niz = [];
+  for(var i=0;i<n;i++) niz.push((6+i*korak)%24);
+  return niz;
+}
+/* Koja smjena radi u zadanom trenutku — radi za bilo koji broj smjena, ne samo dvije.
+   Zadnja smjena u nizu prelazi preko ponoći (npr. 22-6), pa je ujedno i zadana kad je
+   sat prije prve granice. */
+function autoSmjena(kad){
   var sm = TVRTKA.smjene && TVRTKA.smjene.length ? TVRTKA.smjene : ['1. smjena','2. smjena'];
-  var def = (h >= 6 && h < 14) ? sm[0] : (sm[1] || sm[0]);
+  var od = (TVRTKA.smjene_od && TVRTKA.smjene_od.length === sm.length)
+    ? TVRTKA.smjene_od : zadaneGraniceSmjena(sm.length);
+  /* duck-typing umjesto instanceof Date: testovi zovu ovu funkciju iz iframe-a s Date
+     objektom napravljenim u roditeljskom prozoru — instanceof tada tiho pada jer su
+     to dvije različite Date klase, pa bi se svaki poziv vratio na "sada" */
+  var h = (kad && typeof kad.getHours === 'function' ? kad : new Date()).getHours();
+  var idx = sm.length - 1;   /* zadano: zadnja smjena (pokriva sate prije prve granice) */
+  for(var i=0;i<od.length;i++){ if(h >= od[i]) idx = i; }
+  return sm[idx] || sm[0];
+}
+function smjenaOpts(){
+  var sm = TVRTKA.smjene && TVRTKA.smjene.length ? TVRTKA.smjene : ['1. smjena','2. smjena'];
+  var def = autoSmjena();
   return sm.map(function(s){
     return '<option'+(s===def?' selected':'')+'>'+s+'</option>';
   }).join('');
 }
+/* Push obavijesti šalju #kvarovi / #raspored / #poruke — dosad su sve, uz #stroj=,
+   tiho padale na Pregled jer je initHash prepoznavao samo strojeve. Klik na "Novi kvar"
+   mora otvoriti Kvarove, ne opći Pregled iz kojeg se opet traži isti dodir. */
+var HASH_EKRANI = ['pregled','kvarovi','raspored','strojevi','dijelovi','kontakti','poruke','nabava'];
 function initHash(){
-  var h = /#stroj=([\w-]+)/.exec(location.hash || '');
-  if(h && machineById(h[1])){ app.openStroj(h[1]); return true; }
+  var stroj = /#stroj=([\w-]+)/.exec(location.hash || '');
+  if(stroj && machineById(stroj[1])){ app.openStroj(stroj[1]); return true; }
+  var ime = String(location.hash || '').replace('#','');
+  if(HASH_EKRANI.indexOf(ime) > -1){ showScreen(ime); return true; }
   return false;
 }
 
