@@ -205,6 +205,15 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .rasp-premjesti{padding:11px 13px;border:1.5px solid var(--accent);background:var(--accent-soft);
   border-radius:var(--radius-s);margin-bottom:10px}
 .rasp-premjesti .row-sub:first-child{color:var(--accent);font-weight:700}
+/* detalj odabranog dana — širi se unutar kalendara, odmah ispod retka tjedna (kao
+   TickTick/Todoist), ne kao zaseban panel negdje dolje koji korisnik mora tražiti */
+.rasp-dan-detalj{grid-column:1/-1;background:var(--bg);border:1.5px solid var(--accent-rub);
+  border-radius:10px;padding:10px 12px;margin:2px 0 4px}
+.rasp-dan-detalj h3{font-size:13.5px;font-weight:700;margin:0 0 6px;color:var(--text)}
+.rasp-dan-detalj .row{background:var(--card);border:1px solid var(--border);border-radius:9px;
+  margin-bottom:6px;padding:9px 11px}
+.rasp-dan-detalj .row:last-of-type{margin-bottom:0}
+.rasp-dan-detalj .empty{padding:10px 4px;text-align:left}
 
 /* ---------- statusna točka stroja ---------- */
 .sdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:0}
@@ -226,11 +235,17 @@ h2:after{content:'';flex:1;height:1px;background:var(--border)}
 .msg.sustav .msg-txt{background:none;border:none;font-size:12px;color:var(--muted);padding:2px 0;max-width:100%}
 .msg.sustav .msg-meta{display:none}
 /* S9: chat-layout — tanka traka umjesto kartice, unos zalijepljen za dno */
-.chat-traka{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
-  padding:var(--r3) 2px 10px;margin-bottom:6px;border-bottom:1px solid var(--border);
-  font-size:12px;color:var(--muted)}
+.chat-traka{display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:2px 2px 8px;font-size:12px;color:var(--muted)}
 .chat-traka a{color:var(--accent);font-weight:600;cursor:pointer}
-.chat-seg{font-weight:700;color:var(--text)}
+/* segmented control Poruke│Kontakti — aktivna pilula izdignuta na kartici (iOS uzorak) */
+.seg{display:flex;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;
+  padding:3px;gap:3px;margin:var(--r3) 0 10px}
+.seg button{flex:1;border:1px solid transparent;border-radius:9px;min-height:40px;padding:8px 0;
+  font-size:13.5px;font-weight:700;background:transparent;color:var(--muted);cursor:pointer;
+  transition:background .12s ease,color .12s ease}
+.seg button.aktivan{background:var(--card);color:var(--accent);border-color:var(--accent-rub);
+  box-shadow:0 1px 3px rgba(16,24,40,.10)}
 .msg-form{position:sticky;bottom:calc(78px + env(safe-area-inset-bottom));
   background:var(--bg);padding-top:8px;margin-top:12px;z-index:5}
 .chat-dolje{position:fixed;left:50%;transform:translateX(-50%);
@@ -346,8 +361,9 @@ body:not([data-role="voditelj"]) .role-voditelj{display:none !important}
   main:has(#screen-qr:not(.hidden)){display:block !important}
   main:has(#screen-qr:not(.hidden)) .screen:not(#screen-qr){display:none !important}
   main:not(:has(#screen-qr:not(.hidden))){display:none !important}
-  .qr-list{grid-template-columns:repeat(3,1fr) !important;gap:8mm !important}
-  .qr-kart{border:1.5px solid #999 !important}
+  /* raspored naljepnica na arku definira dinamički #qr-print-stil (ovisi o odabranom
+     formatu arka) — ovdje samo osiguranje da se kartica ne lomi preko stranice */
+  .qr-kart{break-inside:avoid;page-break-inside:avoid}
   body{background:#fff;color:#000;font-size:11pt;line-height:1.5}
   .overlay{position:static;background:none;display:block;padding:0}
   .modal{max-height:none;overflow:visible;border-radius:0;width:100%;max-width:none;box-shadow:none;animation:none;padding:0}
@@ -375,8 +391,8 @@ body:not([data-role="voditelj"]) .role-voditelj{display:none !important}
 .kvar-item.click{cursor:pointer}
 .kvar-item.click:active{background:#f7f8fa}
 .kvar-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:12px;color:var(--muted)}
-.kvar-opis{font-size:14px;font-weight:600;margin-top:3px}
-.kvar-meta{font-size:12px;color:var(--muted);margin-top:3px}
+.kvar-opis{font-size:14.5px;font-weight:650;margin-top:4px;line-height:1.35}   /* opis je glavna stvar na kartici — sve ostalo je prigušeno */
+.kvar-meta{font-size:12px;color:var(--muted);margin-top:4px}
 .kvar-meta b{color:var(--text)}
 /* brze radnje na kartici: dodjela i "čeka dio" bez otvaranja punog obrasca */
 .kvar-brzo{display:flex;gap:7px;align-items:center;margin-top:8px}
@@ -498,6 +514,7 @@ form .btn{margin-top:20px}
 .badge{position:absolute;top:-5px;right:-10px;background:var(--red);color:#fff;font-size:10.5px;
   font-weight:700;min-width:17px;height:17px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px}
 </style>
+<style id="qr-print-stil"></style><!-- dinamički raspored naljepnica na A4 arku; puni ga renderQR, prazni showScreen -->
 </head>
 <body>
 
@@ -528,7 +545,7 @@ form .btn{margin-top:20px}
   <div class="pin-wrap">
     <input class="pin-input" id="pin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN"
       onkeydown="if(event.key==='Enter')app.prijava()">
-    <button type="button" class="pin-oko" onclick="app.pinOko('pin',this)" aria-label="Prikaži PIN">👁</button>
+    <button type="button" class="pin-oko" onclick="app.pinOko('pin',this)" aria-label="Prikaži PIN"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
   </div>
   <button class="btn primary block" style="margin-top:12px" onclick="app.prijava()">Prijavi se</button>
   <div class="login-err" id="login-err"></div>
@@ -916,6 +933,14 @@ function esc(s){
   return String(s==null?'':s).replace(/[&<>"']/g,function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
   });
+}
+/* SVG ikona oka za prikaz/skrivanje PIN-a — ne emoji (profesionalan izgled prijave).
+   sakrij=true vraća prekriženo oko ("PIN je vidljiv, dodir ga skriva"). */
+function ikonaOko(sakrij){
+  var a = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+  return sakrij
+    ? a+'<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12A3 3 0 1 1 9.88 9.88"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+    : a+'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 }
 var MJESECI = ['siječanj','veljača','ožujak','travanj','svibanj','lipanj','srpanj','kolovoz','rujan','listopad','studeni','prosinac'];
 /* genitiv — „prvih 14 dana srpnja", ne „…srpanj" */
@@ -1770,8 +1795,11 @@ function strojeviListaHtml(){
 }
 function renderStrojevi(){
   $('#screen-strojevi').innerHTML =
-    '<div class="role-voditelj" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'+
+    /* "gdje dodajem sektore?" (korisnikov feedback) — sektori se uređuju u postavkama
+       tvrtke, ali put do njih mora biti vidljiv baš ovdje gdje se sektori i koriste */
+    '<div class="role-voditelj" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">'+
     '<button class="btn sec" onclick="app.noviStroj()">+ Novi stroj</button>'+
+    '<button class="btn sec" onclick="app.urediTvrtku()">Sektori</button>'+
     '<button class="btn sec" onclick="app.go(\'qr\')">QR naljepnice</button></div>'+
     '<input type="search" placeholder="Pretraži strojeve (naziv, sektor…)" value="'+esc(STROJ_Q)+'"'+
       ' oninput="app.traziStroj(this.value)" style="margin-bottom:4px">'+
@@ -1895,30 +1923,24 @@ function renderStroj(){
 function kvarItem(k, showMachine){
   var zadatak = (k.tip||'kvar') === 'zadatak';
   var m = machineById(k.m) || {id:'', name: zadatak ? 'Opći zadatak' : 'Nepoznat stroj'};
-  var chip;
+  /* ČIŠĆENJE (korisnikov feedback: "natrpano, ništa ne dolazi do izražaja"):
+     riješen kvar je NORMALNO stanje popisa — chip "Riješen" na većini kartica bio je
+     čisti šum. Chip nose samo stanja koja traže pažnju: otvoren/u radu/upozorenje,
+     hitno/visok/čeka dio, otkazan, zadatak. Kategorija i "Riješio" žive u detalju. */
+  var chip = '';
   if(k.status==='otkazan') chip = '<span class="chip otkazan">Otkazan</span>';
   else if(k.status==='u_radu') chip = '<span class="chip rad">U radu</span>';
   else if(k.status==='otvoren') chip = k.upoz ? '<span class="chip upoz">Upozorenje</span>' : '<span class="chip kvar">Otvoren</span>';
-  else chip = '<span class="chip rijesen">Riješen</span>';
   var meta;
   if(zadatak){
     meta = k.rok ? ('Rok: '+(k.rok < todayISO() && jeOtvoren(k) ? '<b style="color:var(--red)">'+fmtDate(k.rok)+'</b>' : fmtDate(k.rok))) : 'Bez roka';
   } else if(jeOtvoren(k)){
-    /* dok linija stoji, "Zastoj 0h" je suprotno od istine — pokazujemo koliko već traje.
-       Procijenjene sate NE stavljamo uz to: dva trajanja jedno do drugog samo zbunjuju,
-       a broj je ionako u detalju kvara. */
+    /* dok linija stoji, "Zastoj 0h" je suprotno od istine — pokazujemo koliko već traje */
     meta = trajanjeKvara(k) || 'u tijeku';
-    if(k.kategorija && k.kategorija!=='Ostalo') meta += ' &middot; '+esc(k.kategorija);
+    if(k.dodijeljen) meta += ' &middot; <b>'+esc(k.dodijeljen)+'</b>';
   } else {
     meta = 'Zastoj '+H(k.sati)+(vidiFinancije() ? ' &middot; <b>'+EUR(kvarCost(k))+'</b>' : '');
-    if(k.kategorija && k.kategorija!=='Ostalo') meta += ' &middot; '+esc(k.kategorija);
   }
-  /* kartica ostaje na najviše 3 segmenta (zastoj/€, kategorija, dodijeljeno-ili-riješio) —
-     smjena, sudjelovali, zamijenjeno i razlog storna već su potpuno vidljivi u detalju
-     koji se otvara dodirom na karticu; tri retka sitnog teksta na svakoj kartici je šum */
-  if(jeOtvoren(k) && k.dodijeljen) meta += ' &middot; Dodijeljeno: <b>'+esc(k.dodijeljen)+'</b>';
-  else if(k.tko) meta += ' &middot; Riješio: '+esc(k.tko);
-  var brKom = (DATA.komentari||[]).filter(function(c){ return c.kvar_id===k.id; }).length;
   var pChip = '';
   if(zadatak) pChip += '<span class="chip zadatak">Zadatak</span> ';
   if(jeOtvoren(k)){
@@ -1928,14 +1950,9 @@ function kvarItem(k, showMachine){
   }
   var sig = zadatak ? null : kvarSig(k);
   var rep = (sig && REPS[sig] >= 2) ? ' <span class="rep">'+REPS[sig]+'× u 3 mj.</span>' : '';
-  /* kompaktna kartica — klik otvara fokusirani prozor kvara */
-  var ind = [];
-  if(brKom) ind.push('💬 '+brKom);
-  if(k.foto) ind.push('📷');
   /* Kartica je za čitanje — na njoj stoji SAMO radnja koja nedostaje: dodjela
      nedodijeljenog kvara. Sve ostalo ("Čeka dio", rješavanje, uređivanje) je u
-     detalju koji se ionako otvara dodirom na karticu. Deset kartica s gumbima
-     nije brzina nego šum. */
+     detalju koji se ionako otvara dodirom na karticu. */
   var brzeAkcije = '';
   if(jeOtvoren(k) && !k.dodijeljen){
     brzeAkcije = '<div class="kvar-brzo role-write" onclick="event.stopPropagation()">'+
@@ -1945,9 +1962,8 @@ function kvarItem(k, showMachine){
   }
   return '<div class="kvar-item click"'+(k.status==='otkazan'?' style="opacity:.55"':'')+
     ' onclick="app.detaljKvara(\''+k.id+'\')">'+
-    '<div class="kvar-top"><span>'+(showMachine?'<b style="color:var(--text)">'+esc(m.name)+'</b> &middot; ':'')+fmtDate(k.date)+
-      (ind.length ? ' &middot; '+ind.join(' ') : '')+'</span>'+
-    '<span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">'+pChip+chip+'</span></div>'+
+    '<div class="kvar-top"><span>'+(showMachine?'<b style="color:var(--text)">'+esc(m.name)+'</b> &middot; ':'')+fmtDate(k.date)+'</span>'+
+    ((pChip||chip) ? '<span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">'+pChip+chip+'</span>' : '')+'</div>'+
     '<div class="kvar-opis">'+esc(k.opis)+rep+'</div>'+
     '<div class="kvar-meta">'+meta+'</div>'+brzeAkcije+'</div>';
 }
@@ -2301,12 +2317,14 @@ function kontaktiListHtml(){
   }).join('') || '<div class="card"><div class="empty">Nema kontakata.</div></div>';
 }
 /* Poruke i Kontakti dijele jednu karticu u dnu — ovaj segment je jedini način da se
-   prebaci između njih (tab traka ostaje na 6 kartica). */
+   prebaci između njih (tab traka ostaje na 6 kartica). Pravi segmented control (iOS
+   uzorak: aktivna pilula izdignuta na kartici), isti na OBA ekrana — tanka tekstualna
+   traka s linkom izgledala je golo i neprofesionalno (korisnikov feedback). */
 function segmentPorukeKontakti(aktivni){
   /* nepročitano se već vidi kao brojka na kartici u dnu — ne duplicira se ovdje */
-  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'+
-    '<button class="btn '+(aktivni==='poruke'?'primary':'sec')+'" onclick="app.go(\'poruke\')">Poruke</button>'+
-    '<button class="btn '+(aktivni==='kontakti'?'primary':'sec')+'" onclick="app.go(\'kontakti\')">Kontakti</button>'+
+  return '<div class="seg">'+
+    '<button class="'+(aktivni==='poruke'?'aktivan':'')+'" onclick="app.go(\'poruke\')">Poruke</button>'+
+    '<button class="'+(aktivni==='kontakti'?'aktivan':'')+'" onclick="app.go(\'kontakti\')">Kontakti</button>'+
   '</div>';
 }
 function renderKontakti(){
@@ -2566,19 +2584,48 @@ function rasporedCelija(iso, danas){
   return '<div class="'+klase+'" onclick="app.rasporedDan(\''+iso+'\')">'+
     '<span>'+parseInt(iso.slice(8,10),10)+'</span>'+brojHtml+'</div>';
 }
+function rasporedRaspon(){
+  /* mjesec u punim tjednima: od ponedjeljka tjedna s 1. do nedjelje tjedna sa zadnjim danom */
+  var p = RASP_MJESEC.split('-');
+  var start = ponedjeljakTjedna(RASP_MJESEC+'-01');
+  var zadnjiDan = new Date(parseInt(p[0],10), parseInt(p[1],10), 0).getDate();
+  return { start: start, kraj: addDaysISO(ponedjeljakTjedna(RASP_MJESEC+'-'+pad2(zadnjiDan)), 6) };
+}
+/* detalj odabranog dana — umeće se u mrežu ODMAH ispod retka tjedna tog dana */
+function rasporedDanDetalj(iso){
+  var st = stavkeZaDan(iso);
+  var ukupno = st.prev.length + st.zad.length + st.san.length;
+  var danas = todayISO();
+  var naslov = (iso===danas ? 'Danas' : (iso===isoShift(1) ? 'Sutra' : fmtDate(iso)))+' — '+danUTjednu(iso);
+  return '<div class="rasp-dan-detalj">'+
+    '<h3>'+naslov+'</h3>'+
+    (ukupno
+      ? st.prev.map(prevRedak).join('')+st.zad.map(zadatakRedak).join('')+st.san.map(sanacijaRedak).join('')
+      : '<div class="empty">Slobodan dan — ništa nije planirano.</div>')+
+    (iso >= danas
+      ? '<button class="btn sec sm block role-write" style="margin-top:8px" onclick="app.noviZadatak(\''+iso+'\')">+ Na ovaj dan</button>'
+      : '')+
+  '</div>';
+}
 function renderKalendarskaMreza(){
   var danas = todayISO();
   if(!RASP_MJESEC) RASP_MJESEC = danas.slice(0,7);
   var p = RASP_MJESEC.split('-');
-  /* mjesec u punim tjednima: od ponedjeljka tjedna s 1. do nedjelje tjedna sa zadnjim danom */
-  var start = ponedjeljakTjedna(RASP_MJESEC+'-01');
-  var zadnjiDan = new Date(parseInt(p[0],10), parseInt(p[1],10), 0).getDate();
-  var kraj = addDaysISO(ponedjeljakTjedna(RASP_MJESEC+'-'+pad2(zadnjiDan)), 6);
-  var celije = '';
+  var raspon = rasporedRaspon();
+  var zaglavlje = '';
   DANI_TJEDNA.slice(1).concat([DANI_TJEDNA[0]]).forEach(function(dn){   /* P U S Č P S N */
-    celije += '<div class="rasp-h">'+dn.slice(0,1).toUpperCase()+'</div>';
+    zaglavlje += '<div class="rasp-h">'+dn.slice(0,1).toUpperCase()+'</div>';
   });
-  for(var iso = start; iso <= kraj; iso = addDaysISO(iso, 1)) celije += rasporedCelija(iso, danas);
+  /* tjedan po tjedan: odabrani dan širi svoj tjedan detaljem (TickTick/Todoist uzorak) —
+     sadržaj dana je odmah ispod prsta, ne u zasebnom panelu negdje niže */
+  var tjedni = '';
+  for(var pon = raspon.start; pon <= raspon.kraj; pon = addDaysISO(pon, 7)){
+    var celije = '';
+    for(var d = 0; d < 7; d++) celije += rasporedCelija(addDaysISO(pon, d), danas);
+    tjedni += celije;
+    if(RASP_ODABRAN && RASP_ODABRAN >= pon && RASP_ODABRAN <= addDaysISO(pon, 6))
+      tjedni += rasporedDanDetalj(RASP_ODABRAN);
+  }
   var pomaknuto = RASP_MJESEC !== danas.slice(0,7);
   var odabranDrugi = RASP_ODABRAN && RASP_ODABRAN !== danas;
   var naslov = MJESECI[parseInt(p[1],10)-1]+' '+p[0]+'.';
@@ -2589,7 +2636,7 @@ function renderKalendarskaMreza(){
       (pomaknuto||odabranDrugi ? '<button class="btn-mini" onclick="app.rasporedDanas()">Danas</button>' : '<span style="width:34px"></span>')+
       '<button class="qbtn" onclick="app.rasporedMjesec(1)" aria-label="Sljedeći mjesec">›</button>'+
     '</div>'+
-    '<div class="rasp-grid">'+celije+'</div>'+
+    '<div class="rasp-grid">'+zaglavlje+tjedni+'</div>'+
   '</div>';
 }
 
@@ -2600,22 +2647,6 @@ function brziPremjestaj(tip, id){
     '<button class="btn sec" style="flex:1" onclick="app.premjestiNa(\''+tip+'\',\''+id+'\',\''+isoShift(1)+'\')">Sutra</button>'+
     '<button class="btn sec" style="flex:1" onclick="app.premjestiNa(\''+tip+'\',\''+id+'\',\''+isoShift(7)+'\')">+7 dana</button>'+
   '</div>';
-}
-
-/* ---------- panel odabranog dana (K3) — zamjenjuje agendu dok je dan odabran ---------- */
-function panelDana(iso){
-  var st = stavkeZaDan(iso);
-  var ukupno = st.prev.length + st.zad.length + st.san.length;
-  var danas = todayISO();
-  var naslov = (iso===danas ? 'Danas' : (iso===isoShift(1) ? 'Sutra' : fmtDate(iso)))+' — '+danUTjednu(iso);
-  var html = '<h2>'+naslov+'</h2>';
-  html += ukupno
-    ? '<div class="card">'+st.prev.map(prevRedak).join('')+st.zad.map(zadatakRedak).join('')+st.san.map(sanacijaRedak).join('')+'</div>'
-    : '<div class="card"><div class="empty">Slobodan dan — ništa nije planirano.</div></div>';
-  if(iso >= danas)
-    html += '<button class="btn sec sm block role-write" style="margin-top:8px" onclick="app.noviZadatak(\''+iso+'\')">+ Na ovaj dan</button>';
-  html += '<button class="btn-mini" style="margin-top:8px" onclick="app.rasporedDan(\''+iso+'\')">‹ Cijeli raspored</button>';
-  return html;
 }
 
 function renderRaspored(){
@@ -2650,39 +2681,35 @@ function renderRaspored(){
 
   var mrezaHtml = renderKalendarskaMreza();
 
-  /* Zadano (nijedan dan odabran): puna agenda, identična dosadašnjoj. Kalendar ništa ne
-     duplicira (mreža=brojke, agenda=tekst) — dodir na dan zamijeni agendu panelom (K3). */
-  var donjiDioHtml;
-  if(RASP_ODABRAN){
-    donjiDioHtml = panelDana(RASP_ODABRAN);
-  } else {
-    var danHtml = '';
-    for(var d=0; d<14; d++){
-      var iso = isoShift(d);
-      var ps = DATA.preventiva.filter(function(p){ return p.next===iso; });
-      var zs = zadaci.filter(function(z){ return z.rok===iso; });
-      var sn = sanacije.filter(function(k){ return k.rok_sanacije===iso; });
-      if(!ps.length && !zs.length && !sn.length) continue;
-      var naslov = (d===0 ? 'Danas' : (d===1 ? 'Sutra' : fmtDate(iso)))+' — '+danUTjednu(iso);
-      danHtml += '<h2>'+naslov+'</h2><div class="card">'+
-        ps.map(prevRedak).join('')+zs.map(zadatakRedak).join('')+sn.map(sanacijaRedak).join('')+'</div>';
-    }
-    if(!danHtml) danHtml = '<div class="card"><div class="empty">Sljedeća dva tjedna su prazna — '+
-      'ni preventive ni zadaci nemaju termin u ovom razdoblju.</div></div>';
-
-    /* dalje od 14 dana: samo najbliže, bez pretrpavanja */
-    var kasnije = DATA.preventiva.filter(function(p){ return p.next > isoShift(14); })
-      .sort(function(a,b){ return a.next < b.next ? -1 : 1; }).slice(0,6);
-    var bezRoka = zadaci.filter(function(z){ return !z.rok; });
-
-    donjiDioHtml = danHtml+
-      (kasnije.length
-        ? '<h2>Kasnije</h2><div class="card">'+kasnije.map(prevRedak).join('')+'</div>' : '')+
-      (bezRoka.length
-        ? '<h2>Zadaci bez roka ('+bezRoka.length+')</h2><div class="card">'+
-          bezRoka.map(function(z){ return zadatakRedak(z, true); }).join('')+'</div>'
-        : '');
+  /* Puna agenda dolje UVIJEK ostaje — detalj odabranog dana više nije zaseban panel
+     koji ju zamjenjuje, nego se širi unutar samog kalendara ispod retka tjedna
+     (rasporedDanDetalj u renderKalendarskaMreza) — TickTick/Todoist uzorak. */
+  var danHtml = '';
+  for(var d=0; d<14; d++){
+    var iso = isoShift(d);
+    var ps = DATA.preventiva.filter(function(p){ return p.next===iso; });
+    var zs = zadaci.filter(function(z){ return z.rok===iso; });
+    var sn = sanacije.filter(function(k){ return k.rok_sanacije===iso; });
+    if(!ps.length && !zs.length && !sn.length) continue;
+    var naslov = (d===0 ? 'Danas' : (d===1 ? 'Sutra' : fmtDate(iso)))+' — '+danUTjednu(iso);
+    danHtml += '<h2>'+naslov+'</h2><div class="card">'+
+      ps.map(prevRedak).join('')+zs.map(zadatakRedak).join('')+sn.map(sanacijaRedak).join('')+'</div>';
   }
+  if(!danHtml) danHtml = '<div class="card"><div class="empty">Sljedeća dva tjedna su prazna — '+
+    'ni preventive ni zadaci nemaju termin u ovom razdoblju.</div></div>';
+
+  /* dalje od 14 dana: samo najbliže, bez pretrpavanja */
+  var kasnije = DATA.preventiva.filter(function(p){ return p.next > isoShift(14); })
+    .sort(function(a,b){ return a.next < b.next ? -1 : 1; }).slice(0,6);
+  var bezRoka = zadaci.filter(function(z){ return !z.rok; });
+
+  var donjiDioHtml = danHtml+
+    (kasnije.length
+      ? '<h2>Kasnije</h2><div class="card">'+kasnije.map(prevRedak).join('')+'</div>' : '')+
+    (bezRoka.length
+      ? '<h2>Zadaci bez roka ('+bezRoka.length+')</h2><div class="card">'+
+        bezRoka.map(function(z){ return zadatakRedak(z, true); }).join('')+'</div>'
+      : '');
 
   $('#screen-raspored').innerHTML =
     /* Kalendar prvo — to je orijentir na koji se sve ostalo nadovezuje (korisnikov
@@ -2709,7 +2736,10 @@ function renderSustav(){
           '<div class="row-sub">'+esc(k.role)+' &middot; '+esc(k.email)+'</div>'+
           '</div></div>';
       }).join('') : '<div class="empty">Nema korisnika.</div>')
-    : '<div class="empty">Učitavanje…</div>';
+    /* u demo načinu nema pravih korisnika za učitati — "Učitavanje…" koje nikad ne
+       završi izgledalo je kao kvar (korisnikov feedback) */
+    : (REMOTE ? '<div class="empty">Učitavanje…</div>'
+              : '<div class="empty">Popis korisnika radi sa spojenom bazom — u demo načinu nema stvarnih korisničkih računa.</div>');
 
   var greskeHtml = SUS_GRESKE
     ? (SUS_GRESKE.length ? SUS_GRESKE.map(function(g){
@@ -2765,6 +2795,37 @@ function renderSustav(){
 function appBaseUrl(){
   return location.origin + location.pathname.replace(/[^/]*$/, 'index.html');
 }
+function qrPrintCss(){
+  /* Standardni samoljepivi A4 arci (Herma/Avery raster, bez bočnih margina):
+     f8 = 2×4 naljepnice 105×74 mm · f12 = 2×6 od 105×48 mm · f24 = 3×8 od 70×36 mm.
+     @page je globalan pa se ubacuje dinamički samo dok je QR ekran otvoren. */
+  var F = {
+    f8:  { pageTop:'0.5mm', cols:'repeat(2,105mm)', row:'74mm', qr:'42mm', okomito:true,  naziv:'13pt', upute:'9pt',   logo:'8mm', pad:'4mm'  },
+    f12: { pageTop:'4.5mm', cols:'repeat(2,105mm)', row:'48mm', qr:'33mm', okomito:false, naziv:'12pt', upute:'8pt',   logo:'7mm', pad:'3mm'  },
+    f24: { pageTop:'4.5mm', cols:'repeat(3,70mm)',  row:'36mm', qr:'24mm', okomito:false, naziv:'9pt',  upute:'6.5pt', logo:'0',   pad:'2mm'  }
+  };
+  var f = F[QR_FORMAT] || F.f8;
+  return '@media print{'+
+    '@page{size:A4 portrait;margin:0}'+
+    '.qr-list{display:grid !important;grid-template-columns:'+f.cols+' !important;'+
+      'grid-auto-rows:'+f.row+' !important;gap:0 !important;margin:0 !important;padding:'+f.pageTop+' 0 0 !important;justify-content:center}'+
+    '.qr-kart{box-sizing:border-box;width:100%;height:100%;margin:0 !important;border-radius:0 !important;'+
+      'border:0.2mm dashed #ccc !important;padding:'+f.pad+' !important;overflow:hidden;'+
+      (f.okomito
+        ? 'display:flex;flex-direction:column;align-items:center;justify-content:center'
+        : 'display:grid;grid-template-columns:'+f.qr+' 1fr;grid-template-rows:auto auto auto;align-items:center;column-gap:'+f.pad+';text-align:left')+'}'+
+    (f.okomito ? '' :
+      '.qr-kart .qr-slika{grid-column:1;grid-row:1/4}'+
+      '.qr-kart .qr-logo{grid-column:2;grid-row:1}'+
+      '.qr-kart .qr-naziv{grid-column:2;grid-row:2;margin:1mm 0 !important}'+
+      '.qr-kart .qr-upute{grid-column:2;grid-row:3}')+
+    '.qr-slika img,.qr-slika canvas{width:'+f.qr+' !important;height:'+f.qr+' !important}'+
+    '.qr-naziv{font-size:'+f.naziv+' !important;line-height:1.15 !important}'+
+    '.qr-upute{font-size:'+f.upute+' !important;line-height:1.25 !important}'+
+    (f.logo==='0' ? '.qr-logo{display:none !important}' : '.qr-logo img{height:'+f.logo+' !important}')+
+  '}';
+}
+var QR_FORMAT = 'f8';
 function renderQR(){
   $('#screen-qr').innerHTML =
     '<button class="back noprint" onclick="app.go(\'strojevi\')">‹ Strojevi</button>'+
@@ -2772,9 +2833,19 @@ function renderQR(){
       '<div class="card"><div style="padding:11px 13px">'+
         '<div class="row-sub">Ispiši, plastificiraj i zalijepi na stroj. Majstor skenira mobitelom i '+
         'aplikacija se otvara točno na tom stroju — bez traženja i bez pogrešnog unosa.</div>'+
+        '<label style="margin-top:10px">Format arka za ispis</label>'+
+        '<select onchange="app.qrFormat(this.value)">'+
+          '<option value="f8"'+(QR_FORMAT==='f8'?' selected':'')+'>A4 arak — 8 naljepnica (105 × 74 mm)</option>'+
+          '<option value="f12"'+(QR_FORMAT==='f12'?' selected':'')+'>A4 arak — 12 naljepnica (105 × 48 mm)</option>'+
+          '<option value="f24"'+(QR_FORMAT==='f24'?' selected':'')+'>A4 arak — 24 naljepnice (70 × 36 mm)</option>'+
+        '</select>'+
+        '<div class="row-sub" style="margin-top:6px">Standardni samoljepivi A4 arci (Herma/Avery raster). '+
+          'Na običnom papiru isprekidana linija služi kao vodilja za rezanje.</div>'+
         '<button class="btn primary block" style="margin-top:10px" onclick="window.print()">Ispiši naljepnice</button>'+
       '</div></div></div>'+
     '<div class="qr-list" id="qr-list"></div>';
+  var stil = document.getElementById('qr-print-stil');
+  if(stil) stil.textContent = qrPrintCss();
   var cilj = $('#qr-list');
   DATA.machines.forEach(function(m){
     var kart = document.createElement('div');
@@ -2873,10 +2944,10 @@ async function renderPoruke(){
     : stanjePusha==='iskljuceno' ? '<a onclick="app.pushUkljuci()">🔔 uključi obavijesti</a>'
     : stanjePusha==='blokirano' ? '🔕 obavijesti blokirane'
     : '';
-  var trakaHtml = '<div class="chat-traka">'+
-    '<span class="chat-seg">Poruke &middot; <a onclick="app.go(\'kontakti\')">Kontakti</a></span>'+
-    (pushMini ? '<span>'+pushMini+'</span>' : '')+
-  '</div>';
+  /* segmented control kao na Kontaktima (isti izgled na oba ekrana); push-status u
+     vlastitoj maloj traci samo kad postoji — prazna traka se ne prikazuje */
+  var trakaHtml = segmentPorukeKontakti('poruke')+
+    (pushMini ? '<div class="chat-traka"><span>'+pushMini+'</span></div>' : '');
 
   /* prikazi "↓ nove poruke" samo kad ekran vec gleda netko tko NIJE na dnu (uzivo-dojava) —
      na tek otvorenom ekranu ili nakon vlastite poruke odmah skacemo na dno, gumb je suvisan.
@@ -2914,6 +2985,12 @@ function showScreen(name){
   PRIJASNJI_EKRAN = CURRENT_SCREEN;
   CURRENT_SCREEN = name;
   zapamtiEkran(name);
+  /* dinamički print-stil naljepnica vrijedi SAMO dok je QR ekran otvoren — inače bi
+     @page{margin:0} pokvario ispis IFS izvještaja i analitike */
+  if(name !== 'qr'){
+    var qps = document.getElementById('qr-print-stil');
+    if(qps && qps.textContent) qps.textContent = '';
+  }
   ['pregled','strojevi','kvarovi','dijelovi','kontakti','poruke','analitika','raspored','sustav','qr','nabava','stroj'].forEach(function(s){
     $('#screen-'+s).classList.toggle('hidden', s!==name);
   });
@@ -2953,6 +3030,7 @@ function updateBadge(){
 /* =====================  akcije  ===================== */
 var app = {
   go: function(name){ showScreen(name); },
+  qrFormat: function(v){ QR_FORMAT = v; renderQR(); },
   odaberiKorisnika: function(ime){ LOGIN_SEL = ime; renderLoginTiles(); $('#pin').focus(); },
   prijava: async function(){
     if(LOGIN_BUSY) return;
@@ -3039,7 +3117,7 @@ var app = {
         '<div class="row-sub" style="margin-top:3px">Prijava će biti: <b>ime</b>@odrzavanje.local</div>'+
         '<label>PIN (najmanje 8 znamenki)</label>'+
         '<div class="pin-wrap"><input name="pin" type="password" required inputmode="numeric" minlength="8" id="nk-pin" style="text-align:left;font-size:16px;letter-spacing:normal;font-weight:400;padding:12px">'+
-        '<button type="button" class="pin-oko" onclick="app.pinOko(\'nk-pin\',this)" aria-label="Prikaži PIN">👁</button></div>'+
+        '<button type="button" class="pin-oko" onclick="app.pinOko(\'nk-pin\',this)" aria-label="Prikaži PIN">'+ikonaOko(false)+'</button></div>'+
         '<label>Uloga</label><select name="role">'+
           '<option value="majstor">Majstor</option><option value="voditelj">Voditelj</option>'+
           '<option value="readonly">Samo čitanje (direktor, proizvodnja)</option></select>'+
@@ -3064,7 +3142,8 @@ var app = {
     if(!inp) return;
     var sakriven = inp.type === 'password';
     inp.type = sakriven ? 'text' : 'password';
-    if(btn){ btn.textContent = sakriven ? '🙈' : '👁'; btn.setAttribute('aria-label', sakriven ? 'Sakrij PIN' : 'Prikaži PIN'); }
+    /* SVG ikona, ne emoji — ekran prijave je prvo što kupac vidi, mora djelovati profesionalno */
+    if(btn){ btn.innerHTML = ikonaOko(sakriven); btn.setAttribute('aria-label', sakriven ? 'Sakrij PIN' : 'Prikaži PIN'); }
   },
   detaljKorisnika: function(id){
     var k = (SUS_KORISNICI||[]).filter(function(x){ return x.id===id; })[0];
@@ -3112,7 +3191,7 @@ var app = {
         '<label>PIN (najmanje 8 znamenki)</label>'+
         '<div class="pin-wrap">'+
         '<input name="pin" type="password" required inputmode="numeric" minlength="8" id="np-pin" style="text-align:left;font-size:16px;letter-spacing:normal;font-weight:400;padding:12px">'+
-        '<button type="button" class="pin-oko" onclick="app.pinOko(\'np-pin\',this)" aria-label="Prikaži PIN">👁</button></div>'+
+        '<button type="button" class="pin-oko" onclick="app.pinOko(\'np-pin\',this)" aria-label="Prikaži PIN">'+ikonaOko(false)+'</button></div>'+
         '<button class="btn primary block" type="submit" style="margin-top:14px">Spremi</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
@@ -3700,6 +3779,13 @@ var app = {
   rasporedDan: function(iso){
     if(RASP_PREMJESTI){ app.izvrsiPremjestanje(iso); return; }
     RASP_ODABRAN = (RASP_ODABRAN===iso) ? null : iso;
+    /* detalj dana živi UNUTAR mreže — ako odabrani dan nije u prikazanom rasponu
+       (npr. programski skok na dan za 40 dana), mreža se prebaci na njegov mjesec */
+    if(RASP_ODABRAN){
+      if(!RASP_MJESEC) RASP_MJESEC = todayISO().slice(0,7);
+      var r = rasporedRaspon();
+      if(RASP_ODABRAN < r.start || RASP_ODABRAN > r.kraj) RASP_MJESEC = RASP_ODABRAN.slice(0,7);
+    }
     renderRaspored();
   },
   /* Dodir na redak u agendi (K4) — donji list radnji umjesto izravnog bijega na stroj/detalj */
