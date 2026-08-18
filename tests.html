@@ -115,7 +115,7 @@ async function testovi(W, D){
   grupa('Osnovni podaci i izračuni');
   ok('aplikacija se pokrenula u demo načinu', W.REMOTE === false);
   jednako('11 strojeva u šifrarniku', W.DATA.machines.length, 11);
-  ok('27 kvarova + 1 zadatak u seedu', W.DATA.kvarovi.length === 28, 'ima ' + W.DATA.kvarovi.length);
+  ok('27 kvarova + 3 zadatka u seedu', W.DATA.kvarovi.length === 30, 'ima ' + W.DATA.kvarovi.length);
   ok('svi kvarovi imaju stroj i opis', W.DATA.kvarovi.every(function(k){
      return (k.tip||'kvar')!=='kvar' || (k.m && k.opis); }));
   ok('svi kvarovi referenciraju postojeći stroj',
@@ -344,35 +344,107 @@ async function testovi(W, D){
   ok('analitika ima verziju za ispis', !!D.querySelector('#modal-root .print-head'));
   app.closeModal();
 
-  grupa('Raspored — agenda po hitnosti (redizajn 16.8. kasno: kalendar na dodir)');
+  grupa('Raspored v45 — "Dnevna ploča": trak, hero, tim, agenda (17.8.)');
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
   app.go('raspored'); await cekaj(150);
   ok('stara mjesečna mreža s točkicama u boji je izbačena (kritika §11.4)',
      D.querySelectorAll('.cal-d').length === 0 && D.querySelectorAll('.cal-t').length === 0);
-  ok('kalendar je sklopiv i ZATVOREN po defaultu — glavni prikaz je agenda, ne mreža',
+  ok('kalendar je sklopiv i ZATVOREN po defaultu — glavni prikaz je dnevna ploča, ne mreža',
      !W.RASP_KAL_OTVOREN && D.querySelector('#screen-raspored .rasp-grid') === null);
   ok('traka za otvaranje kalendara postoji', D.querySelector('#screen-raspored').textContent.indexOf('Kalendar') > -1);
-  ok('kasne preventive su na vrhu, crveno',
-     D.querySelector('#screen-raspored').textContent.indexOf('Kasni (') > -1);
-  ok('"Danas" grupa postoji uvijek (i prazna kaže da je učitano, ne da je pokvareno)',
-     D.querySelector('#screen-raspored').textContent.indexOf('Danas — ') > -1);
-  ok('dani nose ime dana u tjednu', (function(){
-     var t = D.querySelector('#screen-raspored').textContent;
-     return ['ponedjeljak','utorak','srijeda','četvrtak','petak','subota','nedjelja']
+  jednako('tjedni trak ima 7 pilula (pon–ned)', D.querySelectorAll('#screen-raspored .rasp-tj-d').length, 7);
+  ok('danas nosi zlatnu točku i odabran je pri ulasku', !!D.querySelector('#screen-raspored .rasp-tj-d.danas.odabran'));
+  ok('pilule trake nose mini-traku opterećenja (ne obojene točkice)',
+     D.querySelectorAll('#screen-raspored .rasp-tj-load i').length === 7 &&
+     D.querySelectorAll('#screen-raspored .rasp-tj-dani .rasp-tocka').length === 0);
+  ok('hero nosi datum dana i ime dana malim slovima', (function(){
+     var t = D.querySelector('#screen-raspored .rasp-hero').textContent;
+     return t.indexOf('danas · ') > -1 && ['ponedjeljak','utorak','srijeda','četvrtak','petak','subota','nedjelja']
        .some(function(d){ return t.indexOf(d) > -1; });
   })());
-  ok('postoji gumb za novi zadatak',
-     D.querySelector('#screen-raspored').innerHTML.indexOf('noviZadatak') > -1);
-  ok('preventiva se može potvrditi i iz agende',
-     D.querySelector('#screen-raspored .okbtn') !== null);
-  ok('svaka stavka postoji TOČNO JEDNOM na ekranu — nema više duplikata (korisnikov feedback 16.8.)', (function(){
+  ok('hero pokazuje smjenu i koliko je još ostalo', (function(){
+     var t = D.querySelector('#screen-raspored .rasp-hero').textContent;
+     return t.indexOf('smjena') > -1 && t.indexOf('još ') > -1;
+  })());
+  jednako('hero ima tri brojke (za odraditi / sati / kasni)', D.querySelectorAll('#screen-raspored .rasp-hero .stat-num').length, 3);
+  var szT = W.danSazetak(W.todayISO());
+  jednako('brojka "za odraditi" = kasni + danas + kvarovi u pogonu', D.querySelectorAll('#screen-raspored .rasp-hero .stat-num')[0].textContent, String(szT.n));
+  ok('sati su zbroj procjena preventiva + kvarova u radu i pišu u heroju', szT.sati > 0 && D.querySelector('#screen-raspored .rasp-hero').textContent.indexOf(W.H(szT.sati)) > -1);
+  ok('brojka Kasni je crvena samo kad je > 0', (szT.kasni>0) === !!D.querySelector('#screen-raspored .rasp-hero .stat-num.crv'));
+  ok('segmentna traka napretka ima segment po stavci', D.querySelectorAll('#screen-raspored .rasp-prog i').length >= 1);
+  ok('pilule tima za svakog majstora + Voditelj (ima stavku) + "Tko?" (ima nedodijeljenih)', (function(){
+     var os = D.querySelectorAll('#screen-raspored .rasp-os');
+     var t = D.querySelector('#screen-raspored .rasp-tim').textContent;
+     return os.length >= W.MAJSTORI.length && t.indexOf('Tko?') > -1;
+  })());
+  ok('pilula osobe pokazuje sate iz danSazetak (M1 > 4 h)', (function(){
+     var po = szT.poOsobi['Majstor 1']; return po && po.h > 4 && D.querySelector('#screen-raspored .rasp-tim').textContent.indexOf(W.H(po.h)) > -1;
+  })());
+  ok('kasne stavke su na vrhu, crveni naslov + "Sve na danas"',
+     D.querySelector('#screen-raspored').textContent.indexOf('Kasni (') > -1 &&
+     D.querySelector('#screen-raspored').textContent.indexOf('Sve na danas') > -1);
+  ok('"Danas —" grupa (Plan dana) postoji uvijek',
+     D.querySelector('#screen-raspored').textContent.indexOf('Danas — ') > -1);
+  ok('voditelj vidi "Planiraj dan" kad ima nedodijeljenih/neprocijenjenih',
+     D.querySelector('#screen-raspored').textContent.indexOf('Planiraj dan') > -1);
+  ok('redak agende nosi avatar osobe (inicijali) ili isprekidani "+" za nedodijeljeno',
+     D.querySelectorAll('#screen-raspored .rasp-st .av').length > 0 &&
+     D.querySelectorAll('#screen-raspored .rasp-st .av.prazan').length > 0);
+  ok('redak nosi tip riječju, ne chipom (nema .chip.zadatak u rasporedu)',
+     D.querySelector('#screen-raspored').textContent.indexOf('Preventiva') > -1 &&
+     D.querySelectorAll('#screen-raspored .chip.zadatak').length === 0);
+  ok('preventiva nosi chip trajanja (≈ h) ili isprekidani "≈ ? h" kad nema procjene',
+     D.querySelectorAll('#screen-raspored .rasp-traj').length > 0);
+  ok('nijedan redak nema dva elementa u desnoj zoni (✓ ILI chip, ne oboje)', (function(){
+     return Array.prototype.every.call(D.querySelectorAll('#screen-raspored .rasp-st'), function(r){
+       var ok1 = r.querySelector(':scope > .okbtn') ? 1 : 0;
+       var ch = r.querySelector(':scope > .chip') ? 1 : 0;
+       return ok1 + ch <= 1;
+     });
+  })());
+  ok('FAB "+" za novi zadatak postoji (zamjena širokog gumba)',
+     !!D.querySelector('#screen-raspored .rasp-fab') && D.querySelector('#screen-raspored').innerHTML.indexOf('noviZadatak') > -1);
+  ok('preventiva se može potvrditi i iz agende (✓)', D.querySelector('#screen-raspored .okbtn') !== null);
+  ok('svaka stavka postoji TOČNO JEDNOM na ekranu — nema duplikata (korisnikov feedback 16.8.)', (function(){
      var prevKasniStavka = W.DATA.preventiva.filter(function(p){ return p.next < W.todayISO(); })[0];
      if(!prevKasniStavka) return true;
      var html = D.querySelector('#screen-raspored').innerHTML;
      var re = new RegExp(prevKasniStavka.opis.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'g');
      return (html.match(re)||[]).length === 1;
   })());
-  ok('"Kasnije" i "Bez roka" su sklopive i zatvorene po defaultu (Kasni/Danas/Ovaj tjedan nisu)',
+  ok('nema emojija u HTML-u Rasporeda (profesionalan izgled)',
+     !/[\u{1F300}-\u{1FAFF}]/u.test(D.querySelector('#screen-raspored').innerHTML));
+  ok('"Kasnije" i "Bez roka" su sklopive i zatvorene po defaultu (Kasni/Danas nisu)',
      !W.RASP_OTVORENE_GRUPE.kasnije && !W.RASP_OTVORENE_GRUPE.bezRoka);
+
+  grupa('Sada u pogonu — kvarovi kao stvarnost dana');
+  ok('kartica "Sada u pogonu" postoji s pulsom i satom',
+     !!D.querySelector('#screen-raspored .rasp-sada') && !!D.querySelector('#screen-raspored h2 .puls'));
+  ok('kvar u radu ima puls, avatar i traku smjene', (function(){
+     var r = D.querySelector('#screen-raspored .rasp-sada .st-urad');
+     return !!r && !!r.querySelector('.puls') && !!r.querySelector('.av') && !!r.querySelector('.rasp-smj-traka .fill');
+  })());
+  ok('kvar u radu koji čeka dio nosi chip "Čeka dio"',
+     D.querySelector('#screen-raspored .rasp-sada .st-urad').textContent.indexOf('Čeka dio') > -1);
+  ok('opis kvara u radu postoji točno jednom na ekranu', (function(){
+     var kv1 = W.DATA.kvarovi.filter(function(k){ return k.status==='u_radu'; })[0];
+     if(!kv1) return true;
+     var html = D.querySelector('#screen-raspored').innerHTML;
+     var re = new RegExp(kv1.opis.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'g');
+     return (html.match(re)||[]).length === 1;
+  })());
+  ok('dodijeljen-a-nepreuzet kvar nema puls', (function(){
+     var redci = D.querySelectorAll('#screen-raspored .rasp-sada .rasp-st:not(.st-urad)');
+     return redci.length > 0 && Array.prototype.every.call(redci, function(r){ return !r.querySelector('.puls'); });
+  })());
+  jednako('smjenaTrajanje() iz demo postavki je 8 h', W.smjenaTrajanje(), 8);
+  ok('satiKvara(kv1) iz procjene 06:55→10:00 je ~3 h', (function(){
+     var kv1 = W.DATA.kvarovi.filter(function(k){ return k.status==='u_radu'; })[0];
+     var s = W.satiKvara(kv1); return s >= 2.5 && s <= 3.5;
+  })());
+  jednako('inicijali("Majstor 2") = M2', W.inicijali('Majstor 2'), 'M2');
+  jednako('inicijali("Voditelj") = V', W.inicijali('Voditelj'), 'V');
+  jednako('inicijali("Ivan Horvat") = IH', W.inicijali('Ivan Horvat'), 'IH');
 
   grupa('Kalendar na dodir — sklopiv ulaz za grubo planiranje (K1/K2 nasljeđe)');
   app.rasporedKalToggle(); await cekaj(100);
@@ -404,19 +476,23 @@ async function testovi(W, D){
   app.rasporedDanas(); await cekaj(100);
   jednako('"Danas" vraća mrežu na tekući mjesec', W.RASP_MJESEC, mjesecPrije);
 
-  grupa('Dodir na dan fokusira agendu — nikad ne umeće blok (K3/K4 nasljeđe)');
-  ok('mreža je geometrijski cijela — nema umetnutog .rasp-dan-detalj u njoj',
+  grupa('Dodir na dan prikazuje TAJ dan (hero + agenda) — mreža se nikad ne cijepa');
+  ok('mreža je geometrijski cijela — nema umetnutog bloka u njoj',
      D.querySelectorAll('#screen-raspored .rasp-grid .rasp-dan-detalj').length === 0);
   var prevKasni = W.DATA.preventiva.filter(function(p){ return p.next < W.todayISO(); })[0];
   app.rasporedDan(prevKasni.next); await cekaj(150);
   ok('mreža i dalje nikad ne umeće blok, ni nakon dodira na dan',
      D.querySelectorAll('#screen-raspored .rasp-grid .rasp-dan-detalj').length === 0);
-  ok('dodirnuti dan je označen u mreži', D.querySelector('#screen-raspored .rasp-d.odabran') !== null);
-  ok('taj dan i dalje postoji TOČNO JEDNOM u agendi (dodir fokusira, ne dodaje)', (function(){
+  ok('dodirnuti dan je označen u mreži i u traci',
+     D.querySelector('#screen-raspored .rasp-d.odabran') !== null && D.querySelector('#screen-raspored .rasp-tj-d.odabran') !== null);
+  ok('hero se prebacio na taj dan i nudi "Danas ›" za povratak',
+     !!D.querySelector('#screen-raspored .rasp-skok') && D.querySelector('#screen-raspored .rasp-hero').textContent.indexOf('danas · ') === -1);
+  ok('taj dan i dalje postoji TOČNO JEDNOM na ekranu (prošli dan → u Planu tog dana kao kasni)', (function(){
      var html = D.querySelector('#screen-raspored').innerHTML;
      var re = new RegExp(prevKasni.opis.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'g');
-     return (html.match(re)||[]).length === 1;
+     return (html.match(re)||[]).length === 1 && !!D.querySelector('#screen-raspored .rasp-st.st-kasni');
   })());
+  ok('"Sada u pogonu" se prikazuje samo za danas', D.querySelector('#screen-raspored .rasp-sada') === null);
   /* prazan dan — traži unaprijed dok stvarno ne nađe dan bez ijedne stavke (seed se mijenja) */
   var prazanDan = null;
   for(var pd=25; pd<60 && !prazanDan; pd++){
@@ -428,18 +504,28 @@ async function testovi(W, D){
   app.rasporedDan(prazanDan); await cekaj(150);
   jednako('odabir dana izvan prikazanog mjeseca prebacuje mrežu na taj mjesec',
      W.RASP_MJESEC, prazanDan.slice(0,7));
-  ok('dan bez ijedne stavke dobiva privremeni redak "Slobodan dan"',
-     D.querySelector('#screen-raspored .rasp-dan-detalj') !== null &&
-     D.querySelector('#screen-raspored .rasp-dan-detalj').textContent.indexOf('Slobodan dan') > -1);
-  ok('"+ Na ovaj dan" postoji za budući prazan dan',
-     D.querySelector('#screen-raspored .rasp-dan-detalj').innerHTML.indexOf("noviZadatak('"+prazanDan+"')") > -1);
+  ok('dan bez ijedne stavke pokazuje mirno prazno stanje "Ništa planirano" + što je sljedeće (bez opisa stavke)', (function(){
+     var pr = D.querySelector('#screen-raspored .rasp-prazno');
+     if(!pr || pr.textContent.indexOf('Ništa planirano') === -1) return false;
+     var t = pr.textContent;
+     return !W.DATA.preventiva.some(function(p){ return t.indexOf(p.opis) > -1; });
+  })());
+  ok('"Dodaj zadatak" u praznom stanju predispunjava taj dan',
+     D.querySelector('#screen-raspored .rasp-prazno').innerHTML.indexOf("noviZadatak('"+prazanDan+"')") > -1);
   app.noviZadatak(prazanDan); await cekaj(120);
   jednako('obrazac zadatka predispuni rok s odabranog dana',
      D.querySelector('#modal-root form').elements.rok.value, prazanDan);
   app.closeModal();
   app.rasporedDan(W.todayISO()); await cekaj(150);
-  ok('privremeni redak "Slobodan dan" nestane čim se dotakne drugi dan',
-     D.querySelector('#screen-raspored .rasp-dan-detalj') === null);
+  ok('povratak na danas: prazno stanje nestane (danas ima stavki), hero opet "danas ·"',
+     D.querySelector('#screen-raspored .rasp-prazno') === null &&
+     D.querySelector('#screen-raspored .rasp-hero').textContent.indexOf('danas · ') > -1);
+  var tjPrije = W.RASP_TJEDAN;
+  app.rasporedTjedan(1); await cekaj(100);
+  jednako('› u traci pomiče tjedan za 7 dana', W.RASP_TJEDAN, W.addDaysISO(tjPrije, 7));
+  ok('odabrani dan prati tjedan (isti dan u tjednu)', W.RASP_ODABRAN === W.addDaysISO(W.todayISO(), 7));
+  app.rasporedTjedan(-1); await cekaj(100);
+  ok('‹ vraća tjedan i danas ponovno odabran', W.RASP_TJEDAN === tjPrije && W.RASP_ODABRAN === W.todayISO());
   app.rasporedDanas(); await cekaj(80);
   app.rasporedKalToggle(); await cekaj(80);   /* zatvori mrežu za sljedeću grupu */
 
@@ -602,7 +688,9 @@ async function testovi(W, D){
   ok('u listi se vidi oznaka "U radu"',
      D.querySelector('#screen-kvarovi').innerHTML.indexOf('U radu') > -1);
   app.setFilter('status','u_radu');
-  jednako('filter "u radu" nalazi kvar', D.querySelectorAll('#screen-kvarovi .kvar-item').length, 1);
+  /* Raspored v45: seed već ima kv1 u radu (M1) — filter ih broji sve, ne samo test-preuzeti */
+  jednako('filter "u radu" nalazi kvarove u radu', D.querySelectorAll('#screen-kvarovi .kvar-item').length,
+     W.DATA.kvarovi.filter(function(k){ return k.status==='u_radu' && (k.tip||'kvar')==='kvar'; }).length);
   app.resetFiltere();
 
   grupa('Usporedba razdoblja');
@@ -1539,9 +1627,8 @@ async function testovi(W, D){
      D.querySelector('#screen-nabava').innerHTML.indexOf('empty"><b>') === -1 &&
      D.querySelector('#screen-nabava').textContent.indexOf('Ništa ne treba naručiti') > -1);
   W.DATA.dijelovi.forEach(function(p,i){ p.stanje = stanjaPrije[i]; });
-  /* #13 → redizajn 16.8.: "Bez roka" je sad sklopiva grupa u agendi po hitnosti; chip
-     "Zadatak" sad UVIJEK stoji uz redak (nužan u miješanoj listi da razlikuje tip retka
-     na prvi pogled — svjesna odluka iz sinteze redizajna, ne šum) */
+  /* #13 → Raspored v45: "Bez roka" je sklopiva grupa; tip retka je RIJEČ u meta retku
+     ("Zadatak"), ne chip — chip za tip je "učenje boja" koje je vlasnik odbio */
   var bezRokaZad = W.DATA.kvarovi.filter(function(k){ return k.tip==='zadatak' && !k.rok && W.jeOtvoren(k); })[0];
   if(!bezRokaZad){
     W.DATA.kvarovi.push({id:'kvBezRokaTest', m:null, date:W.todayISO(), opis:'TEST zadatak bez roka za snop B',
@@ -1555,8 +1642,8 @@ async function testovi(W, D){
       function(h){ return h.textContent.indexOf('Bez roka') > -1; })[0];
     return h2 ? h2.nextElementSibling.innerHTML : '';
   })();
-  ok('"Bez roka" se otvara na dodir i redak nosi chip "Zadatak"',
-     bezRokaHtml.length > 0 && bezRokaHtml.indexOf('chip zadatak') > -1);
+  ok('"Bez roka" se otvara na dodir i redak nosi tip riječju "Zadatak" (ne chip)',
+     bezRokaHtml.length > 0 && bezRokaHtml.indexOf('Zadatak') > -1 && bezRokaHtml.indexOf('chip zadatak') === -1);
   app.rasporedGrupaToggle('bezRoka'); await cekaj(80);   /* zatvori za sljedeće testove */
   W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== 'kvBezRokaTest'; });
   /* #14: Kvarovi prazno stanje razlikuje "nema ničega" od "filter ne pogađa ništa" */
@@ -2331,6 +2418,110 @@ async function testovi(W, D){
   await cekaj(80);
   ok('drugi put se uvod više ne otvara sam', !D.querySelector('#modal-root .modal'));
   try{ W.localStorage.setItem(W.UVOD_VIDEN_KEY, '1'); }catch(e){}
+
+  grupa('Raspored v45 — filtar osobe i uloge (pilule tima)');
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  app.demoUloga('Majstor 1'); await cekaj(100);
+  app.go('raspored'); await cekaj(150);
+  jednako('majstor pri ulasku vidi svoj dan (filtar = svoje ime)', W.RASP_FILTER_OSOBA, 'Majstor 1');
+  ok('pilula majstora je aktivna i prva', (function(){
+     var os = D.querySelectorAll('#screen-raspored .rasp-os');
+     return os.length > 0 && os[0].classList.contains('aktivna') && os[0].textContent.indexOf('M1') > -1;
+  })());
+  ok('majstor u Planu dana ne vidi tuđe stavke, ali vidi nedodijeljene (kandidat je)', (function(){
+     var t = D.querySelector('#screen-raspored').textContent;
+     var tudja = W.DATA.kvarovi.filter(function(k){ return k.id==='kvz3'; })[0];   /* Majstor 3, danas */
+     var nitko = W.DATA.preventiva.filter(function(p){ return p.next===W.todayISO() && !p.dodijeljen; })[0];
+     return (!tudja || t.indexOf(tudja.opis) === -1) && (!nitko || t.indexOf(nitko.opis) > -1);
+  })());
+  ok('majstor nema "Planiraj dan"', D.querySelector('#screen-raspored').textContent.indexOf('Planiraj dan') === -1);
+  ok('"Sada u pogonu" majstor vidi cijelo (tim radi zajedno)', !!D.querySelector('#screen-raspored .rasp-sada'));
+  app.demoUloga('Direktor'); await cekaj(100);
+  app.go('raspored'); await cekaj(150);
+  ok('readonly: nema ✓ gumba (skriveni), avatari bez "+" za dodjelu, pilule postoje za čitanje', (function(){
+     var okb = D.querySelector('#screen-raspored .okbtn');
+     var plus = D.querySelector('#screen-raspored .av.prazan .role-write');
+     return (!okb || W.getComputedStyle(okb).display === 'none') &&
+            (!plus || W.getComputedStyle(plus).display === 'none') &&
+            D.querySelectorAll('#screen-raspored .rasp-os').length > 0;
+  })());
+  ok('readonly: FAB je skriven', (function(){ var f = D.querySelector('#screen-raspored .rasp-fab'); return !f || W.getComputedStyle(f).display === 'none'; })());
+  app.demoUloga('Voditelj'); await cekaj(100);
+  app.go('raspored'); await cekaj(150);
+  ok('voditelj: bez filtra, "Planiraj dan" vidljiv', W.RASP_FILTER_OSOBA === null && D.querySelector('#screen-raspored').textContent.indexOf('Planiraj dan') > -1);
+  app.rasporedFilterOsoba('__nitko'); await cekaj(100);
+  ok('filtar "Tko?" ostavlja samo nedodijeljene retke u agendi', (function(){
+     var redci = D.querySelectorAll('#screen-raspored .rasp-st:not(.st-urad):not(.st-hitno)');
+     var uAgendi = Array.prototype.filter.call(redci, function(r){ return !r.closest('.rasp-sada'); });
+     return uAgendi.length > 0 && uAgendi.every(function(r){ return !!r.querySelector('.av.prazan'); });
+  })());
+  app.rasporedFilterOsoba('__nitko'); await cekaj(80);   /* toggle natrag */
+  jednako('ponovni dodir na istu pilulu skida filtar', W.RASP_FILTER_OSOBA, null);
+  app.rasporedFilterOsoba('Majstor 2'); await cekaj(100);
+  ok('filtar osobe: hero lijevi tekst preuzima inicijale osobe',
+     D.querySelector('#screen-raspored .rasp-prog-txt').textContent.indexOf('M2:') > -1);
+  app.rasporedFilterOsoba(null); await cekaj(80);
+
+  grupa('Raspored v45 — planiranje u dva dodira (sheet Tko radi / Koliko traje)');
+  var pr4 = W.DATA.preventiva.filter(function(p){ return p.next===W.todayISO() && !p.dodijeljen; })[0];
+  ok('seed ima današnju nedodijeljenu preventivu za test', !!pr4);
+  app.sheetTko('preventiva', pr4.id); await cekaj(100);
+  ok('sheet "Tko radi?" nudi čip za svakog majstora s opterećenjem', (function(){
+     var cips = D.querySelectorAll('#modal-root .rasp-cip');
+     return cips.length >= W.MAJSTORI.length && D.querySelector('#modal-root').textContent.indexOf('Tko radi') > -1;
+  })());
+  await app.dodijeliIzSheeta('preventiva', pr4.id, 'Majstor 2'); await cekaj(150);
+  jednako('dodir na čip dodjeljuje osobu odmah', pr4.dodijeljen, 'Majstor 2');
+  ok('sheet se zatvorio', !D.querySelector('#modal-root .modal'));
+  ok('trag dodjele je u kanalu', W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('→ Majstor 2') > -1 && p.tekst.indexOf(pr4.opis) > -1; }));
+  ok('avatar retka više nije prazan', (function(){
+     var r = D.querySelector('#screen-raspored .rasp-st[data-id="'+pr4.id+'"]');
+     return !!r && !r.querySelector('.av.prazan') && r.querySelector('.av').textContent.indexOf('M2') > -1;
+  })());
+  var pr16 = W.DATA.preventiva.filter(function(p){ return p.trajanje_h==null; })[0];
+  if(pr16){
+    app.sheetSati(pr16.id); await cekaj(100);
+    ok('sheet "Koliko traje?" nudi čipove sati (0,5/1/2/4/8/smjena)', D.querySelectorAll('#modal-root .rasp-cip').length >= 5);
+    await app.brzaProcjenaPreventive(pr16.id, 2); app.sheetSatiGotovo(); await cekaj(120);
+    jednako('dodir na čip sata sprema trajanje_h', pr16.trajanje_h, 2);
+    pr16.trajanje_h = null; W.save();
+  }
+  app.akcijeStavke('preventiva', pr4.id); await cekaj(100);
+  ok('list radnji preventive nudi "Tko radi" i "Trajanje" uz stare radnje (Danas/Sutra/+7/Premjesti)', (function(){
+     var t = D.querySelector('#modal-root').textContent;
+     return t.indexOf('Tko radi') > -1 && t.indexOf('Trajanje') > -1 && t.indexOf('Sutra') > -1 && t.indexOf('Premjesti na drugi dan') > -1;
+  })());
+  app.closeModal();
+  W.SESSION = { ime:'Majstor 3', role:'majstor' }; D.body.dataset.role = 'majstor';
+  app.sheetTko('preventiva', pr4.id); await cekaj(100);
+  ok('majstor na tuđoj stavci vidi jedan čip "Preuzimam ja"',
+     D.querySelectorAll('#modal-root .rasp-cip').length === 1 && D.querySelector('#modal-root').textContent.indexOf('Preuzimam ja') > -1);
+  app.closeModal();
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  pr4.dodijeljen = null; W.save();   /* vrati seed stanje za sljedeće grupe */
+  app.go('raspored'); await cekaj(120);
+
+  grupa('Raspored v45 — "Sve na danas" i "Planiraj dan"');
+  var kasniPrije = W.klasifikacijaStavki().kasni.map(function(x){ return {tip:x.tip, id:x.item.id, datum:x.datum}; });
+  ok('seed ima kasnih stavki', kasniPrije.length > 0);
+  await app.kasniSveNaDanas(); await cekaj(200);
+  jednako('"Sve na danas" premješta sve kasne preventive/zadatke na danas', W.klasifikacijaStavki().kasni.filter(function(x){ return x.tip!=='san'; }).length, 0);
+  ok('trag premještanja u kanalu', W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Premješteno') > -1; }));
+  /* vrati datume */
+  kasniPrije.forEach(function(k){
+    if(k.tip==='prev'){ var p = W.DATA.preventiva.filter(function(x){ return x.id===k.id; })[0]; if(p) p.next = k.datum; }
+    else if(k.tip==='zad'){ var z = W.DATA.kvarovi.filter(function(x){ return x.id===k.id; })[0]; if(z) z.rok = k.datum; }
+  });
+  W.save(); app.go('raspored'); await cekaj(120);
+  var szPlan = W.danSazetak(W.todayISO());
+  var materijal = szPlan.stavke.filter(function(x){ return (x.tip==='prev'||x.tip==='zad') && (!x.osoba || (x.tip==='prev' && x.item.trajanje_h==null)); }).length;
+  ok('ima materijala za "Planiraj dan" (nedodijeljene/neprocijenjene danas)', materijal > 0);
+  app.planirajDan(); await cekaj(120);
+  ok('"Planiraj dan" otvara sheet s brojačem "1 od N"', !!W.RASP_PLAN && D.querySelector('#modal-root').textContent.indexOf('1 od '+materijal) > -1);
+  ok('sheet u plan-modu nudi "Preskoči ›"', D.querySelector('#modal-root').textContent.indexOf('Preskoči') > -1);
+  var brojKoraka = 0;
+  while(W.RASP_PLAN && brojKoraka < 20){ app.planDalje(); await cekaj(60); brojKoraka++; }
+  ok('sekvenca završava (RASP_PLAN null) bez modala', W.RASP_PLAN === null && !D.querySelector('#modal-root .modal'));
 
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
