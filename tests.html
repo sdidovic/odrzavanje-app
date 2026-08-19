@@ -960,6 +960,11 @@ async function testovi(W, D){
   W.posaljiObavijest = origObavijest;
   ok('primitak ciljano javlja majstoru vezanom na kvar preko narudžbe (K-3)',
      obavijesti.some(function(o){ return o.samoZa===kvarCekaDio.dodijeljen && o.naslov.indexOf('Stigao') > -1; }));
+  /* §16 P3 (rupa #1): kad narudžba koja zna za kvar stigne u cijelosti, "Čeka dio" se skida
+     sama — bez ovoga je Pregled/Raspored za proizvodnju i dalje govorio "stoji" nakon dolaska. */
+  ok('potpuni primitak narudžbe vezane na kvar skida "Čeka dio"', kvarCekaDio.ceka_dio === false);
+  ok('trag skidanja oznake je u kanalu',
+     W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('skinuto') > -1 && p.kvar_id===kvarCekaDio.id; }));
 
   grupa('§15 #5 — "Zovi servis": vanjski izvođač s kvara (zadatak s vezom + Čeka servis)');
   W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
@@ -984,6 +989,13 @@ async function testovi(W, D){
   jednako('zadatak je dodijeljen voditelju (on dogovara termin)', zadServis.dodijeljen, 'Voditelj');
   ok('opis zadatka imenuje servis i kvar', zadServis.opis.indexOf(servisP.naziv) > -1 && zadServis.opis.indexOf(kvarServis.opis) > -1);
   ok('trag poziva je u kanalu', W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Pozvan servis') > -1 && p.tekst.indexOf(servisP.naziv) > -1; }));
+  /* §16 P3 (rupa #2): odmah nakon poziva pita se "Kad dolazi?" — bez roka zadatak pada u
+     "Bez roka" gdje ga nitko ne vidi. */
+  ok('nakon poziva pita se "Kad dolazi?"', D.querySelector('#modal-root').textContent.indexOf('Kad dolazi') > -1);
+  jednako('zadatak servisa nema rok dok se ne odgovori', zadServis.rok, null);
+  await app.premjestiNa('zadatak', zadServis.id, W.isoShift(1)); await cekaj(150);
+  jednako('"Sutra" upisuje rok servisa', zadServis.rok, W.isoShift(1));
+  app.detaljKvara(kvarServis.id); await cekaj(100);
   ok('detalj kvara sad nosi chip "Čeka servis" i nudi micanje oznake', (function(){
      var m = D.querySelector('#modal-root'); return !!m && !!m.querySelector('.chip.servis') && m.textContent.indexOf('makni oznaku') > -1;
   })());
@@ -1298,8 +1310,8 @@ async function testovi(W, D){
   W.showScreen('kvarovi'); await cekaj(120);
   ok('nedodijeljen kvar nudi dodjelu na kartici',
      D.querySelector('#screen-kvarovi').innerHTML.indexOf('kvar-brzo') > -1);
-  ok('kartica NE nosi gumb "Čeka dio" — taj je u detalju',
-     D.querySelector('#screen-kvarovi .kvar-brzo .btn-mini') === null);
+  ok('kartica NE nosi gumb "Treba dio" — taj je u detalju',
+     D.querySelector('#screen-kvarovi').innerHTML.indexOf('Treba dio') === -1);
   await app.brzoDodijeli(zaBrzo.id, 'Voditelj'); await cekaj(150);
   jednako('dodjela s kartice je spremljena', zaBrzo.dodijeljen, 'Voditelj');
   /* "Čeka dio" se prebacuje iz detalja kvara */
@@ -1310,7 +1322,7 @@ async function testovi(W, D){
   await app.cekaDioIzDetalja(zaBrzo.id); await cekaj(150);
   jednako('"Čeka dio" se prebacuje iz detalja', !!zaBrzo.ceka_dio, !cekaPrije);
   ok('detalj nakon prebacivanja pokazuje novo stanje',
-     D.querySelector('#modal-root').textContent.indexOf(zaBrzo.ceka_dio ? 'makni oznaku' : 'naručeno, popravak stoji') > -1);
+     D.querySelector('#modal-root').textContent.indexOf(zaBrzo.ceka_dio ? 'makni oznaku' : 'javi voditelju') > -1);
   await app.cekaDioIzDetalja(zaBrzo.id); await cekaj(120);  /* vrati kako je bilo */
   app.closeModal();
   /* brza prijava: prekidač HITNO stvarno postavlja prioritet */
@@ -1418,8 +1430,10 @@ async function testovi(W, D){
   var stariAlert2 = W.alert; var alertTekst = ''; W.alert = function(t){ alertTekst = String(t||''); };
   app.rijesiKvar(dugi.id);
   var lf = D.querySelector('#modal-root form');
+  /* §14: kad sati nisu upisani, polje je ili prazno ili nosi POZITIVAN prijedlog iz uživo
+     trajanja (poceo_at→sada) — nikad nulu, jer bi nula ostala i ušla u trošak kao 0 h */
   ok('obrazac zatvaranja ne nudi nulu kad sati nisu procijenjeni',
-     dugi.sati > 0 || lf.elements.sati.value === '');
+     dugi.sati > 0 || lf.elements.sati.value === '' || parseFloat(lf.elements.sati.value) > 0);
   lf.elements.tko.value = 'Tehničar';
   lf.elements.sati.value = '104';          /* linija stajala preko vikenda */
   posalji(lf); await cekaj(250);
@@ -1509,7 +1523,8 @@ async function testovi(W, D){
   ok('nedodijeljen kvar nudi dodjelu na kartici', (function(){
     var el = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
       function(e){ return e.textContent.indexOf(nedod.opis) > -1; })[0];
-    return !!(el && el.querySelector('.kvar-brzo select'));
+    /* §16 P2: s jednim tehničarom je to čip (jedan dodir), ne select — oboje su valjana dodjela */
+    return !!(el && el.querySelector('.kvar-brzo select, .kvar-brzo .rasp-cip'));
   })());
   nedod.dodijeljen = 'Tehničar';
   W.showScreen('kvarovi'); await cekaj(150);
@@ -1576,6 +1591,12 @@ async function testovi(W, D){
     app.pomoc();
     var t = D.querySelector('#modal-root').textContent;
     var ima = t.indexOf('rezervni dijelovi') > -1;
+    app.closeModal(); return ima;
+  })());
+  /* §16 P4: "kako dodajem novi dio? wtf" — Pomoć sad kaže KOME se obratiti kad gumb nedostaje */
+  ok('Pomoć kaže tko dodaje strojeve/dijelove kad gumb nedostaje (§16 P4)', (function(){
+    app.pomoc();
+    var ima = D.querySelector('#modal-root').textContent.indexOf('voditelj održavanja') > -1;
     app.closeModal(); return ima;
   })());
 
@@ -1777,6 +1798,9 @@ async function testovi(W, D){
   var rijesenSaZam = W.DATA.kvarovi.filter(function(k){ return k.status==='rijesen' && k.zam; })[0];
   if(rijesenSaZam){
     app.go('kvarovi'); await cekaj(100);
+    /* §16 P2: riješeni su sklopljeni po defaultu ("samo aktualno") — rastvori da ih se vidi
+       (postavi izravno, ne toggle — ne znamo stanje s kojim smo ušli, i vraćamo ga poslije) */
+    W.KV_RIJESENI_OTVOREN = true; W.renderKvarovi(); await cekaj(80);
     var kartica = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
       function(el){ return el.textContent.indexOf(rijesenSaZam.opis) > -1; })[0];
     ok('kartica ne prikazuje "Zamijenjeno" (ostaje u detalju)',
@@ -1785,6 +1809,7 @@ async function testovi(W, D){
     ok('detalj I DALJE prikazuje "Zamijenjeno"',
        D.querySelector('#modal-root').textContent.indexOf('Zamijenjeno') > -1);
     app.closeModal();
+    W.KV_RIJESENI_OTVOREN = false;   /* vrati sklopljeno za sljedeće testove */
   }
 
   grupa('Z1 — dovršetak §11.5 (bez migracije)');
@@ -2419,12 +2444,15 @@ async function testovi(W, D){
 
   /* U2: riješen kvar je normalno stanje — kartica bez chipa, bez kategorije, bez "Riješio" */
   app.go('kvarovi'); await cekaj(120); app.resetFiltere(); await cekaj(80);
+  /* §16 P2: riješeni su sklopljeni po defaultu — rastvori da ih se vidi (izravno, ne toggle) */
+  W.KV_RIJESENI_OTVOREN = true; W.renderKvarovi(); await cekaj(80);
   var rijesenaKartica = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
     function(el){ return el.textContent.indexOf('Zastoj') > -1; })[0];
   ok('kartica riješenog kvara nema chip (riješeno je normalno stanje, ne alarm)',
      !!rijesenaKartica && rijesenaKartica.querySelector('.chip') === null);
   ok('kartica ne prikazuje "Riješio" (živi u detalju)',
      rijesenaKartica.textContent.indexOf('Riješio') === -1);
+  W.KV_RIJESENI_OTVOREN = false;   /* vrati sklopljeno za sljedeće testove */
   var otvorenaKartica = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
     function(el){ return el.querySelector('.chip.kvar, .chip.rad, .chip.upoz'); })[0];
   ok('otvoren/u radu kvar i dalje nosi status chip', !!otvorenaKartica);
@@ -2637,6 +2665,86 @@ async function testovi(W, D){
   var brojKoraka = 0;
   while(W.RASP_PLAN && brojKoraka < 20){ app.planDalje(); await cekaj(60); brojKoraka++; }
   ok('sekvenca završava (RASP_PLAN null) bez modala', W.RASP_PLAN === null && !D.querySelector('#modal-root .modal'));
+
+  grupa('§16 P1/P2 — kraći putovi i pločice po ulozi');
+  W.SESSION = { ime:'Tehničar', role:'majstor' }; D.body.dataset.role = 'majstor';
+  app.go('pregled'); await cekaj(100);
+  ok('tehničar vidi "Danas na Rasporedu" umjesto "Za naručiti"', (function(){
+     var labele = Array.prototype.map.call(D.querySelectorAll('#screen-pregled .stat-label'), function(e){ return e.textContent; });
+     return labele.indexOf('Danas na Rasporedu') > -1 && labele.indexOf('Za naručiti') === -1;
+  })());
+
+  W.SESSION = { ime:'Voditelj proizvodnje', role:'proizvodnja' }; D.body.dataset.role = 'proizvodnja';
+  app.go('pregled'); await cekaj(100);
+  ok('proizvodnja ne vidi "Za naručiti" na Pregledu',
+     D.querySelector('#screen-pregled').textContent.indexOf('Za naručiti') === -1);
+  ok('proizvodnja vidi status planiranog zastoja linije', (function(){
+     var t = D.querySelector('#screen-pregled').textContent;
+     return t.indexOf('dana do zastoja linije') > -1 || t.indexOf('Nema planiranih zastoja') > -1;
+  })());
+  var stojeTest = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && !k.upoz && k.m; });
+  var staroStanje = stojeTest.map(function(k){ return k.status; });
+  stojeTest.forEach(function(k){ k.status = 'rijesen'; });
+  app.go('pregled'); await cekaj(100);
+  ok('proizvodnja vidi "Sve linije rade" kad ništa ne stoji',
+     D.querySelector('#screen-pregled').textContent.indexOf('Sve linije rade') > -1);
+  stojeTest.forEach(function(k,i){ k.status = staroStanje[i]; });
+
+  W.SESSION = { ime:'Direktor', role:'readonly' }; D.body.dataset.role = 'readonly';
+  app.go('pregled'); await cekaj(100);
+  ok('direktor nema "Zadnji događaji" (bespredmetno bez financija/radnje)',
+     D.querySelector('#screen-pregled').textContent.indexOf('Zadnji događaji') === -1);
+  var mjesecKV = W.samoKvarovi().filter(function(k){ return k.date.slice(0,7)===W.todayISO().slice(0,7); });
+  if(mjesecKV.length){
+    ok('direktor vidi "Najveći zastoj" — put od trenda do krivca',
+       D.querySelector('#screen-pregled').textContent.indexOf('Najveći zastoj') > -1);
+  }
+  ok('NAZIV_ULOGE ima čitljive nazive za sve uloge (session-row)',
+     W.NAZIV_ULOGE.majstor==='Tehničar održavanja' && W.NAZIV_ULOGE.readonly.indexOf('Direktor')>-1 &&
+     W.NAZIV_ULOGE.proizvodnja==='Voditelj proizvodnje' && W.NAZIV_ULOGE.voditelj==='Voditelj održavanja');
+
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  app.go('kvarovi'); app.resetFiltere(); await cekaj(100);
+  var otvBroj16 = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; }).length;
+  jednako('zadano stanje: samo aktivni kvarovi odmah vidljivi (povijest sklopljena)',
+     D.querySelectorAll('#screen-kvarovi .kvar-item').length, otvBroj16);
+  var imaRijesenih16 = D.querySelector('#screen-kvarovi').textContent.indexOf('Riješeni — zadnjih 30 dana') > -1;
+  if(imaRijesenih16){
+    app.kvRijeseniToggle(); await cekaj(100);
+    ok('rastvaranje "Riješeni" dodaje kartice povijesti u DOM',
+       D.querySelectorAll('#screen-kvarovi .kvar-item').length > otvBroj16);
+    app.kvRijeseniToggle(); await cekaj(100);
+  }
+  app.setFilter('q','a'); await cekaj(100);
+  ok('pretraga vraća jednu ravnu listu, ne umjetnu podjelu',
+     D.querySelector('#screen-kvarovi').textContent.indexOf('Riješeni — zadnjih 30 dana') === -1);
+  app.resetFiltere(); await cekaj(80);
+
+  app.go('raspored'); await cekaj(150);
+  if(D.querySelector('#screen-raspored').textContent.indexOf('Sljedećih 7 dana') > -1){
+    ok('"Sljedećih 7 dana" je sklopljeno po defaultu (kao Kasnije/Bez roka)',
+       !W.RASP_OTVORENE_GRUPE.sedamDana);
+    app.rasporedGrupaToggle('sedamDana'); await cekaj(100);
+    ok('dodir rastvara "Sljedećih 7 dana"', W.RASP_OTVORENE_GRUPE.sedamDana === true);
+    app.rasporedGrupaToggle('sedamDana'); await cekaj(80);
+  }
+
+  var kvarZaRijesio16 = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && k.dodijeljen && k.m; })[0];
+  if(kvarZaRijesio16){
+    app.rijesiKvar(kvarZaRijesio16.id); await cekaj(100);
+    jednako('"Riješio" je predispunjen dodijeljenim tehničarom, ne prijavljenim voditeljem',
+       D.querySelector('#modal-root form').elements.tko.value, kvarZaRijesio16.dodijeljen);
+    app.closeModal();
+  }
+
+  /* bug nađen u obilasku: "ukupno zadnja 3 mj." je zbrajalo CIJELU povijest (uklj. otkazane) */
+  var strojTest16 = W.DATA.machines[0];
+  app.openStroj(strojTest16.id); await cekaj(100);
+  var t90test16 = W.isoShift(-92), ocekivano16 = 0;
+  W.samoKvarovi().forEach(function(k){ if(k.m===strojTest16.id && k.date>=t90test16) ocekivano16 += W.kvarCost(k); });
+  ok('"ukupno zadnja 3 mj." broji stvarno samo zadnja 3 mj. (bez otkazanih/zadataka)',
+     D.querySelector('#screen-stroj').textContent.indexOf(W.EUR(ocekivano16)) > -1);
+  app.go('strojevi');
 
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
