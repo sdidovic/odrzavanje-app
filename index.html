@@ -705,6 +705,17 @@ form .btn{margin-top:20px}
   border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom);
   box-shadow:0 -1px 3px rgba(16,24,40,.04)}
 .tab-inner{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr)}
+/* §16.5 #2: tehničar i proizvodnja imaju 4 relevantne kartice, ne 6 (§11.2 su bila 6 za svih
+   dok se nije zasebno provjerilo — sad je provjereno i vlasnik je potvrdio da se dira).
+   Tehničar: Raspored·Kvarovi·Skladište·Poruke (bez Pregled/Strojevi — oboje dostupno neizravno,
+   preko Rasporeda i detalja kvara/dijela). Proizvodnja: Pregled·Kvarovi·Raspored·Poruke (bez
+   Strojevi/Skladište — nema razloga naručivati ni pregledavati šifrarnik strojeva). */
+body[data-role="majstor"] .tab-inner,
+body[data-role="proizvodnja"] .tab-inner{grid-template-columns:repeat(4,1fr)}
+body[data-role="majstor"] #tabbar [data-tab="pregled"],
+body[data-role="majstor"] #tabbar [data-tab="strojevi"],
+body[data-role="proizvodnja"] #tabbar [data-tab="strojevi"],
+body[data-role="proizvodnja"] #tabbar [data-tab="dijelovi"]{display:none}
 .tab{position:relative;background:none;border:none;padding:9px 1px 10px;display:flex;flex-direction:column;
   align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;
   transition:color .14s ease}
@@ -2163,7 +2174,7 @@ function machineRow(m){
   return '<div class="row click" onclick="app.openStroj(\''+m.id+'\')">'+
     '<div class="grow"><div class="row-title"><span class="sdot '+st+'"></span>'+esc(m.name)+'</div>'+
     '<div class="row-sub">Zadnji kvar: '+(last?fmtDate(last):'—')+
-    ' &middot; Preventiva: '+(next?fmtDate(next):'—')+lateTxt+'</div></div>'+
+    ' &middot; Sljedeći pregled: '+(next?fmtDate(next):'—')+lateTxt+'</div></div>'+
     '<div class="row-right">'+statusChip(st)+'<span class="chev">›</span></div></div>';
 }
 
@@ -2220,8 +2231,8 @@ function renderStroj(){
       '<div style="margin-top:7px"><button class="btn-mini role-voditelj" onclick="app.urediStroj(\''+m.id+'\')">Uredi stroj</button></div></div>'+
       statusChip(machineStatus(m.id))+'</div></div>'+
     '<button class="btn primary block role-write" style="margin-bottom:4px" onclick="app.prijaviZaStroj(\''+m.id+'\')">Prijavi kvar na ovom stroju</button>'+
-    '<h2>Plan preventive</h2><div class="card">'+prevHtml+'</div>'+
-    '<button class="btn sec sm block role-write" style="margin-top:8px" onclick="app.novaPreventiva(\''+m.id+'\')">+ Dodaj stavku preventive</button>'+
+    '<h2>Plan redovnih pregleda</h2><div class="card">'+prevHtml+'</div>'+
+    '<button class="btn sec sm block role-write" style="margin-top:8px" onclick="app.novaPreventiva(\''+m.id+'\')">+ Dodaj stavku redovnog pregleda</button>'+
     '<h2>Bilješke o stroju</h2><div class="card"><div style="padding:11px 13px">'+
       (m.bilj ? '<div style="font-size:13.5px;white-space:pre-wrap">'+esc(m.bilj)+'</div>'
               : '<div class="row-sub">Nema bilješki (manual, serijski broj, napomene o servisu…)</div>')+
@@ -2917,7 +2928,7 @@ function renderAnalitika(){
         : '<div class="empty">Nema ponovljenih uzroka u periodu.</div>')+'</div>'+
     /* AUDIT-FIX (§14.2 t.4): sati po osobi — kvarovi + preventiva, samo voditelj/direktor */
     (osobaRedovi.length ? '<h2>Sati po osobi</h2><div class="card" style="padding:4px 0">'+
-      tbl(['Osoba','Kvarovi','Preventiva','Ukupno'], osobaRedovi)+'</div>' : '')+
+      tbl(['Osoba','Kvarovi','Redovni pregledi','Ukupno'], osobaRedovi)+'</div>' : '')+
     '<button class="btn primary block" style="margin-top:14px" onclick="app.izvozAnalitika()">Izvoz CSV — odabrano razdoblje</button>'+
     '<button class="btn sec block" style="margin-top:8px" onclick="app.analitikaIspis()">Ispis / PDF analitike</button>';
 }
@@ -3188,7 +3199,7 @@ function sljedecaStavka(iso){
     if(!datum || datum <= iso) return;
     if(!best || datum < best.datum){ var mm = m ? machineById(m) : null; best = { datum:datum, tip:tip, stroj: mm ? mm.name : '' }; }
   }
-  DATA.preventiva.forEach(function(p){ kand(p.next, 'Preventiva', p.m); });
+  DATA.preventiva.forEach(function(p){ kand(p.next, 'Redovni pregled', p.m); });
   otvoreniZadaci().forEach(function(z){ kand(z.rok, 'Zadatak', z.m); });
   sanacijeOtvorene().forEach(function(k){ kand(k.rok_sanacije, 'Sanacija', k.m); });
   return best;
@@ -3254,7 +3265,7 @@ function planRedak(x, opts){
   if(opts.gotov){
     avatar = avatarHtml(null, {gotov:true});
     naslov = esc(it.opis);
-    tekst.push(x.tip==='prev' ? 'Preventiva' : 'Zadatak');
+    tekst.push(x.tip==='prev' ? 'Redovni pregled' : 'Zadatak');
     if(x.osoba) tekst.push(esc(x.osoba));
     if(x.kad) tekst.push(x.kad);
     onclick = x.tip==='prev' ? "app.akcijeStavke('preventiva','"+it.id+"')" : "app.detaljKvara('"+it.id+"')";
@@ -3262,7 +3273,7 @@ function planRedak(x, opts){
     onclick = "app.akcijeStavke('preventiva','"+it.id+"')";
     naslov = esc(it.opis);
     var vanjski = it.izv && it.izv!=='interno';
-    tekst.push('Preventiva'+(vanjski ? ' · <b>'+esc(it.izv)+'</b>' : ''));
+    tekst.push('Redovni pregled'+(vanjski ? ' · <b>'+esc(it.izv)+'</b>' : ''));
     if(m) tekst.push(esc(m.name));
     avatar = avatarHtml(it.dodijeljen, { tip:'preventiva', id:it.id, servis:(!it.dodijeljen && vanjski) ? it.izv : null });
     if(!opts.tiho) cipovi += trajanjeChip(it);
@@ -3680,7 +3691,7 @@ function renderSustav(){
       '<h2 style="color:var(--red)">Opasna zona</h2>'+
       '<div class="card"><div class="row"><div class="grow">'+
         '<div class="row-title" style="font-size:13.5px">Brisanje demo podataka</div>'+
-        '<div class="row-sub">Prije prelaska na stvarne podatke: briše kvarove, preventivu, komentare i poruke. '+
+        '<div class="row-sub">Prije prelaska na stvarne podatke: briše kvarove, redovne preglede, komentare i poruke. '+
           'Strojevi, dijelovi i kontakti ostaju (osim ako odabereš i njih).</div>'+
         '<div style="margin-top:6px"><button class="btn-mini opasno" onclick="app.obrisiDemo(false)">Obriši evidencije</button> '+
           '<button class="btn-mini opasno" onclick="app.obrisiDemo(true)">Obriši baš sve</button></div>'+
@@ -4004,7 +4015,7 @@ var app = {
        ovdje, prvo što se pokaže, jer za sam izbornik nema mjesta za podnaslove. */
     var zaMajstora =
       '<div class="a-item"><b>1. Snalaženje u izborniku</b><div class="a-sub">Kvarovi = prijave problema. '+
-        'Raspored = planirano održavanje (preventiva, dogovoreni servisi) i tvoji zadaci — ne kalendar smjena. '+
+        'Raspored = planirano održavanje (redovni pregledi, dogovoreni servisi) i tvoji zadaci — ne kalendar smjena. '+
         'Skladište = rezervni dijelovi za strojeve, ne sirovine ni gotov proizvod. '+
         /* §16 P4: "kako dodajem novi dio? wtf" — nastalo jer voditelj-only gumb jednostavno
            nestane bez objašnjenja komu pripada (namjerno, "mrtva opcija se ne prikazuje", ali
@@ -4013,7 +4024,7 @@ var app = {
       '<div class="a-item"><b>2. Prijava kvara</b><div class="a-sub">Kvarovi → ⚡ Brza prijava: stroj, fotografija, kratki opis. Gotovo u 15 sekundi.</div></div>'+
       '<div class="a-item"><b>3. Moji zadaci</b><div class="a-sub">Na Pregledu, na vrhu — sve što je tebi dodijeljeno. Crveni broj na "Kvarovi" je tvoj broj zadataka.</div></div>'+
       '<div class="a-item"><b>4. Rad na kvaru</b><div class="a-sub">Klikni kvar → prozor s detaljima. Piši komentare što je napravljeno; kad završiš: "Riješi kvar" i upiši utrošeni dio.</div></div>'+
-      '<div class="a-item"><b>5. Preventiva</b><div class="a-sub">Zelena kvačica ✓ znači obavljeno — termin se sam pomiče na sljedeći put.</div></div>'+
+      '<div class="a-item"><b>5. Redovni pregled</b><div class="a-sub">Zelena kvačica ✓ znači obavljeno — termin se sam pomiče na sljedeći put.</div></div>'+
       '<div class="a-item"><b>6. Bez mreže</b><div class="a-sub">Ako WiFi padne, sve i dalje radi. Unosi se spremaju na mobitel i šalju sami kad se veza vrati (traka gore to pokazuje).</div></div>'+
       '<div class="a-item"><b>7. Obavijesti na mobitel</b><div class="a-sub">Rade kad aplikaciju dodaš na početni zaslon (Dodaj na početni zaslon / Add to Home Screen) i otvoriš je preko interneta. Uključuju se na dnu ekrana Poruke.</div></div>';
     var zaVoditelja =
@@ -4301,8 +4312,8 @@ var app = {
   },
   obrisiDemo: function(sve){
     var tekst = sve
-      ? 'Ovo briše SVE: kvarove, preventivu, komentare, poruke, dijelove, kontakte i strojeve.'
-      : 'Ovo briše kvarove, preventivu, komentare i poruke. Strojevi, dijelovi i kontakti ostaju.';
+      ? 'Ovo briše SVE: kvarove, redovne preglede, komentare, poruke, dijelove, kontakte i strojeve.'
+      : 'Ovo briše kvarove, redovne preglede, komentare i poruke. Strojevi, dijelovi i kontakti ostaju.';
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
       '<div class="modal-head"><h3>Obriši podatke?</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
@@ -4403,7 +4414,8 @@ var app = {
     var uloga = DEMO_ULOGE[ime] || 'majstor';
     SESSION = { ime: ime, role: uloga };
     document.body.dataset.role = uloga;
-    showScreen('pregled');
+    /* §16.5 #2: tehničar nema karticu "Pregled" (donja traka od 4) — njegov ekran je Raspored */
+    showScreen(uloga==='majstor' ? 'raspored' : 'pregled');
     toast('Gledaš kao: '+ime);
   },
   detaljKvara: function(kId){
@@ -4468,6 +4480,15 @@ var app = {
     if(dodatnoInfo) info += '<button type="button" class="btn-mini" style="margin:4px 0 0" '+
       'onclick="this.nextElementSibling.style.display=\'block\';this.style.display=\'none\'">+ Kategorija i smjena</button>'+
       '<div style="display:none">'+dodatnoInfo+'</div>';
+    /* §16 P3: čipovi "Gotovo do" — samo dok je kvar u radu i još nema procjene; nestaju sami
+       čim je procjena upisana (onda gore već piše "Procijenjeno gotovo") ili kvar zatvoren. */
+    if(!zadatak && k.status==='u_radu' && !k.procjena_gotovo)
+      info += '<div class="role-write" style="margin-top:8px">'+
+        '<div class="rasp-sheet-lbl">Gotovo do?</div><div class="rasp-cipovi">'+
+        '<button class="rasp-cip" onclick="app.postaviGotovoDo(\''+kId+'\',1)">+1 h</button>'+
+        '<button class="rasp-cip" onclick="app.postaviGotovoDo(\''+kId+'\',2)">+2 h</button>'+
+        '<button class="rasp-cip" onclick="app.postaviGotovoDo(\''+kId+'\',\'smjena\')">Kraj smjene</button>'+
+        '</div></div>';
     var kom = (DATA.komentari||[]).filter(function(c){ return c.kvar_id===kId; });
     var komHtml = kom.length ? kom.map(function(c){
       return '<div class="kvar-item"><div class="kvar-top"><span><b style="color:var(--text)">'+esc(c.tko)+'</b></span>'+
@@ -4494,6 +4515,11 @@ var app = {
          §16 P1: naručivanje (dobavljač, cijena) je voditeljev/nabava posao — tehničar je već
          javio "treba dio" (gore), ne mora i sam naručivati. */
       akcije += '<button class="btn sec block role-voditelj" style="margin-top:8px" onclick="app.naruciZaKvar(\''+kId+'\')">Naruči dio za ovaj kvar</button>';
+    /* §16 P3 (rupa #5 "dio ugrađen usred kvara"): dosad se moglo razdužiti tek pri zatvaranju
+       (Riješi kvar) ili na Skladištu "−" (gubi vezu s kvarom) — sad i dok je kvar još otvoren,
+       s istim filtrom dijelova kao "Naruči dio za ovaj kvar". */
+    if(jeOtvoren(k) && !zadatak)
+      akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.ugradiDioZaKvar(\''+kId+'\')">+ Ugrađen dio</button>';
     /* §15 #5: vanjski izvođač — kad tehničar/voditelj ne može sam (rashlada, elektro, garancija).
        Zove se s kvara: kontakt vrste Servis → tel: + zabilježi → zadatak s vezom + "Čeka servis". */
     if(jeOtvoren(k) && !zadatak)
@@ -5296,7 +5322,7 @@ var app = {
       .map(function(t){ return '<option'+(p.izv===t?' selected':'')+'>'+esc(t)+'</option>'; }).join('');
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
-      '<div class="modal-head"><h3>Uredi preventivu</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<div class="modal-head"><h3>Uredi redovni pregled</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<form onsubmit="app.saveUrediPreventivu(event,\''+pId+'\')">'+
         '<label>Zahvat</label><input name="opis" required value="'+esc(p.opis)+'">'+
         '<label>Interval</label><select name="interval">'+intOpts+'</select>'+
@@ -5406,6 +5432,53 @@ var app = {
         '<button class="btn primary block" type="submit">Dalje</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
+  },
+  /* §16 P3 (rupa #5): ugradnja dijela DOK je kvar još otvoren — isti filtar dijelova kao
+     "Naruči dio za ovaj kvar", ali razdužuje odmah umjesto da čeka zatvaranje kvara. */
+  ugradiDioZaKvar: function(kId){
+    if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
+    var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
+    if(!k) return;
+    var opts = DATA.dijelovi.filter(function(p){ return (p.strojevi||[]).indexOf(k.m) > -1; });
+    if(!opts.length) opts = DATA.dijelovi;
+    if(!opts.length){ alert('Nema unesenih dijelova u skladištu.'); return; }
+    var dioOpts = opts.map(function(p){ return '<option value="'+p.id+'">'+esc(p.naziv)+' (stanje '+p.stanje+')</option>'; }).join('');
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
+      '<div class="modal-head"><h3>Ugrađen dio</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<form onsubmit="app.saveUgradiDio(event,\''+kId+'\')">'+
+        '<label>Dio</label><select name="dio" required>'+dioOpts+'</select>'+
+        '<label>Količina</label><input type="number" name="kol" min="1" step="1" value="1">'+
+        '<button class="btn primary block" type="submit">Ugrađeno — skini sa skladišta</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</form></div></div>';
+  },
+  saveUgradiDio: async function(e, kId){
+    e.preventDefault();
+    var f = new FormData(e.target);
+    var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
+    var p = DATA.dijelovi.filter(function(x){ return x.id===f.get('dio'); })[0];
+    if(!k || !p) return;
+    var kol = Math.max(1, parseInt(f.get('kol'),10)||1);
+    app.closeModal();
+    var prije = p.stanje;
+    p.stanje = Math.max(0, p.stanje - kol);
+    k.zam = k.zam ? (k.zam+' + '+p.naziv+(kol>1?' ×'+kol:'')) : (p.naziv+(kol>1?' ×'+kol:''));
+    app.detaljKvara(kId);
+    rerender();
+    sysPoruka('🔧 Ugrađen dio: '+p.naziv+(kol>1?' ×'+kol:'')+' — '+k.opis+' ('+(SESSION.ime||'')+')', kId);
+    if(prije >= p.min && p.stanje < p.min)
+      sysPoruka('📦 Dio ispod minimuma: '+p.naziv+' (stanje '+p.stanje+', min '+p.min+') — naručiti!');
+    if(REMOTE && naMrezi()){
+      try{
+        var rpc = await sb.rpc('razduzi_dio', { p_id: p.id, p_kolicina: kol });
+        if(!rpc.error && typeof rpc.data === 'number') p.stanje = rpc.data;
+        else await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
+      }catch(err){ await apiUpdate('dijelovi', p.id, { stanje:p.stanje }); }
+    } else {
+      await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
+    }
+    await apiUpdate('kvarovi', kId, { zam:k.zam });
   },
   saveNarudzbu: async function(e, dioId){
     e.preventDefault();
@@ -6066,6 +6139,20 @@ var app = {
     await app.brzoCekaDio(kId);
     app.detaljKvara(kId);   /* osvježi otvoreni detalj da se vidi promjena */
   },
+  /* §16 P3 (rupa #3 "kad će stroj raditi?"): jedini put do procjena_gotovo do sada je bio
+     Uredi kvar (12 polja) — nitko ga stvarno nije popunjavao. Čip odmah nakon Preuzmi je
+     isti "gustoća iza dodira" princip kao Riješi-kvar/Zovi servis: jedan dodir, ne obrazac. */
+  postaviGotovoDo: async function(kId, satiOffset){
+    var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
+    if(!k) return;
+    var d;
+    if(satiOffset==='smjena'){ var g = smjenaGranice(); d = new Date(Date.now() + g.jos*3600000); }
+    else d = new Date(Date.now() + satiOffset*3600000);
+    k.procjena_gotovo = d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'T'+pad2(d.getHours())+':'+pad2(d.getMinutes());
+    app.detaljKvara(kId);
+    rerender();
+    await apiUpdate('kvarovi', kId, { procjena_gotovo:k.procjena_gotovo });
+  },
   /* ---------- §15 #5: vanjski izvođač ("zovi servis") ----------
      Model: kvar.ceka_servis + ZADATAK s vezom (izvor_kvar, kontakt_id) — ništa novo osim
      jednog boola. Mali CMMS-i to rade isto (docs/izvodjaci-uzori-2026-08.md): 3 stanja
@@ -6367,7 +6454,7 @@ var app = {
     var izvOpts = '<option>interno</option>'+DATA.partneri.map(function(p){ return '<option>'+esc(p.naziv)+'</option>'; }).join('');
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
-      '<div class="modal-head"><h3>Nova stavka preventive</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<div class="modal-head"><h3>Nova stavka redovnog pregleda</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<form onsubmit="app.savePreventiva(event,\''+mId+'\')">'+
         '<label>Zahvat</label><input name="opis" required placeholder="npr. podmazivanje ležajeva">'+
         '<label>Interval</label><select name="interval">'+
@@ -6573,8 +6660,11 @@ async function postLogin(){
   }
   osvjeziOfflineTraku();
   /* §16 P2: direktor (2×/tjedno) ima jedan relevantan ekran — € i "stoji li nešto".
-     Zapamćen zadnji ekran (npr. Strojevi od prošlog posjeta) mu ne služi kao svima ostalima. */
-  if(!initHash()) showScreen(SESSION.role==='readonly' ? 'pregled' : (zadnjiEkran() || 'pregled'));
+     Zapamćen zadnji ekran (npr. Strojevi od prošlog posjeta) mu ne služi kao svima ostalima.
+     §16.5 #2: tehničar nema karticu "Pregled" — prvi ulazak (bez zapamćenog ekrana) ide na
+     Raspored, njegov stvarni prvi ekran. */
+  if(!initHash()) showScreen(SESSION.role==='readonly' ? 'pregled' :
+    (zadnjiEkran() || (SESSION.role==='majstor' ? 'raspored' : 'pregled')));
   dobrodoslica();
   prikaziUvodAkoPrvi();
   sinkroniziraj();   /* pošalji što je ostalo od prošlog puta */

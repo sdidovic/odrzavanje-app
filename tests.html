@@ -418,7 +418,7 @@ async function testovi(W, D){
      D.querySelectorAll('#screen-raspored .rasp-st .av').length > 0 &&
      D.querySelectorAll('#screen-raspored .rasp-st .av.prazan').length > 0);
   ok('redak nosi tip riječju, ne chipom (nema .chip.zadatak u rasporedu)',
-     D.querySelector('#screen-raspored').textContent.indexOf('Preventiva') > -1 &&
+     D.querySelector('#screen-raspored').textContent.indexOf('Redovni pregled') > -1 &&
      D.querySelectorAll('#screen-raspored .chip.zadatak').length === 0);
   ok('preventiva nosi chip trajanja (≈ h) ili isprekidani "≈ ? h" kad nema procjene',
      D.querySelectorAll('#screen-raspored .rasp-traj').length > 0);
@@ -2500,7 +2500,8 @@ async function testovi(W, D){
   app.demoUloga('Tehničar'); await cekaj(100);
   jednako('prebacivanje na Tehničar postavlja ulogu "majstor"', W.SESSION.role, 'majstor');
   jednako('body dataset.role prati promjenu (CSS role-write/role-voditelj)', D.body.dataset.role, 'majstor');
-  jednako('prebacivanje uloge vodi na Pregled', W.CURRENT_SCREEN, 'pregled');
+  /* §16.5 #2: tehničar nema karticu "Pregled" (donja traka od 4) — njegov ekran je Raspored */
+  jednako('prebacivanje na tehničara vodi na Raspored (nema Pregled u traci)', W.CURRENT_SCREEN, 'raspored');
   app.demoUloga('Voditelj proizvodnje'); await cekaj(100);
   jednako('Voditelj proizvodnje dobiva ulogu "proizvodnja"', W.SESSION.role, 'proizvodnja');
   app.demoUloga('Direktor'); await cekaj(100);
@@ -2745,6 +2746,82 @@ async function testovi(W, D){
   ok('"ukupno zadnja 3 mj." broji stvarno samo zadnja 3 mj. (bez otkazanih/zadataka)',
      D.querySelector('#screen-stroj').textContent.indexOf(W.EUR(ocekivano16)) > -1);
   app.go('strojevi');
+
+  grupa('§16.5 — donja traka po ulozi, direktor i poruke');
+  W.SESSION = { ime:'Tehničar', role:'majstor' }; D.body.dataset.role = 'majstor';
+  ok('tehničar ima 4 vidljive kartice (Raspored·Kvarovi·Skladište·Poruke)', (function(){
+     var vidljivi = Array.prototype.filter.call(D.querySelectorAll('#tabbar .tab'), function(t){
+       return W.getComputedStyle(t).display !== 'none';
+     }).map(function(t){ return t.dataset.tab; });
+     return vidljivi.length === 4 && vidljivi.indexOf('pregled') === -1 &&
+       vidljivi.indexOf('strojevi') === -1 && vidljivi.indexOf('raspored') > -1 &&
+       vidljivi.indexOf('dijelovi') > -1;
+  })());
+  ok('tehničareva "Gledaj kao" ulazi na Raspored, ne Pregled', (function(){
+     app.demoUloga('Tehničar'); return W.CURRENT_SCREEN === 'raspored';
+  })());
+  W.SESSION = { ime:'Voditelj proizvodnje', role:'proizvodnja' }; D.body.dataset.role = 'proizvodnja';
+  ok('proizvodnja ima 4 vidljive kartice (Pregled·Kvarovi·Raspored·Poruke)', (function(){
+     var vidljivi = Array.prototype.filter.call(D.querySelectorAll('#tabbar .tab'), function(t){
+       return W.getComputedStyle(t).display !== 'none';
+     }).map(function(t){ return t.dataset.tab; });
+     return vidljivi.length === 4 && vidljivi.indexOf('strojevi') === -1 &&
+       vidljivi.indexOf('dijelovi') === -1 && vidljivi.indexOf('pregled') > -1;
+  })());
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  ok('voditelj i dalje ima svih 6 kartica vidljivo', (function(){
+     return Array.prototype.every.call(D.querySelectorAll('#tabbar .tab'), function(t){
+       return W.getComputedStyle(t).display !== 'none';
+     });
+  })());
+  W.SESSION = { ime:'Direktor', role:'readonly' }; D.body.dataset.role = 'readonly';
+  app.go('poruke'); await cekaj(100);
+  ok('direktor smije pisati poruke (obrazac postoji i radi, RLS ins_poruke nema ograničenje uloge)',
+     !!D.querySelector('#screen-poruke .msg-form textarea[name="tekst"]'));
+  var brPrijePoruke = W.DATA.poruke.length;
+  var fPoruka = D.querySelector('#screen-poruke .msg-form');
+  fPoruka.elements.tekst.value = 'TEST poruka direktora';
+  posalji(fPoruka); await cekaj(150);
+  jednako('poruka direktora je zabilježena', W.DATA.poruke.length, brPrijePoruke + 1);
+  W.DATA.poruke.pop(); W.save();
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+
+  grupa('§16 P3 — dovršetak (Gotovo do, Ugrađen dio)');
+  var kvarGotovo = W.DATA.kvarovi.filter(function(k){ return k.status==='u_radu' && (k.tip||'kvar')==='kvar' && !k.procjena_gotovo; })[0];
+  if(!kvarGotovo){
+    kvarGotovo = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; })[0];
+    kvarGotovo.status = 'u_radu'; kvarGotovo.procjena_gotovo = null;
+  }
+  app.detaljKvara(kvarGotovo.id); await cekaj(100);
+  ok('kvar u radu bez procjene nudi čipove "Gotovo do?"',
+     D.querySelector('#modal-root').textContent.indexOf('Gotovo do?') > -1);
+  await app.postaviGotovoDo(kvarGotovo.id, 2); await cekaj(100);
+  ok('"+2 h" upisuje procjenu ~2h unaprijed', (function(){
+     var d = new Date(kvarGotovo.procjena_gotovo);
+     return Math.abs(d.getTime() - (Date.now()+2*3600000)) < 5*60000;
+  })());
+  ok('nakon upisa čipovi "Gotovo do" nestaju (procjena već postoji)',
+     D.querySelector('#modal-root').textContent.indexOf('Gotovo do?') === -1);
+  ok('detalj sad prikazuje "Procijenjeno gotovo"',
+     D.querySelector('#modal-root').textContent.indexOf('Procijenjeno gotovo') > -1);
+  kvarGotovo.procjena_gotovo = null; app.closeModal();
+
+  var kvarDio = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar' && k.m; })[0];
+  var dioZaUgradnju = W.DATA.dijelovi[0];
+  var stanjePrijeUgradnje = dioZaUgradnju.stanje;
+  var zamPrije = kvarDio.zam;
+  app.detaljKvara(kvarDio.id); await cekaj(100);
+  ok('otvoren kvar nudi "+ Ugrađen dio"', D.querySelector('#modal-root').textContent.indexOf('Ugrađen dio') > -1);
+  app.ugradiDioZaKvar(kvarDio.id); await cekaj(100);
+  var fUgradi = D.querySelector('#modal-root form');
+  fUgradi.elements.dio.value = dioZaUgradnju.id;
+  posalji(fUgradi); await cekaj(150);
+  jednako('ugradnja razdužuje skladište', dioZaUgradnju.stanje, stanjePrijeUgradnje - 1);
+  ok('ugradnja upisuje dio u "Zamijenjeno"', (kvarDio.zam||'').indexOf(dioZaUgradnju.naziv) > -1);
+  ok('trag ugradnje je u kanalu',
+     W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Ugrađen dio') > -1 && p.kvar_id===kvarDio.id; }));
+  dioZaUgradnju.stanje = stanjePrijeUgradnje; kvarDio.zam = zamPrije; W.save();
+  app.closeModal();
 
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
