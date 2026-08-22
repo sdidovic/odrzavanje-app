@@ -1334,9 +1334,9 @@ function buildSeed(){
         ocekivano:isoShift(2), primljeno:null, cijena:145, napomena:'hitno — kompresor čeka', tko:'Voditelj' }
     ],
     poruke: [
-      { id:'po1', tko:'Voditelj',  tekst:'Dobrodošli u alat — od danas se sve prijave, dodjele i dogovori vode ovdje, ne usmeno.', created_at: isoShift(-1)+'T08:00:00Z' },
-      { id:'po2', tko:'Tehničar', tekst:'Pakirka P2 čeka oprugu dozatora, do tada folija ručno. Detalji u komentaru kvara.', created_at: isoShift(0)+'T06:40:00Z' },
-      { id:'po3', tko:'Voditelj', tekst:'Kompresor K1 pod nadzorom — očitavajte tlak svaki sat i javite padne li ispod 6 bara.', created_at: isoShift(0)+'T07:15:00Z' }
+      { id:'po1', tko:'Voditelj',  tekst:'Dobrodošli u alat — od danas se sve prijave, dodjele i dogovori vode ovdje, ne usmeno.', created_at: isoShift(-1)+'T08:00:00' },
+      { id:'po2', tko:'Tehničar', tekst:'Pakirka P2 čeka oprugu dozatora, do tada folija ručno. Detalji u komentaru kvara.', created_at: isoShift(0)+'T06:40:00' },
+      { id:'po3', tko:'Voditelj', tekst:'Kompresor K1 pod nadzorom — očitavajte tlak svaki sat i javite padne li ispod 6 bara.', created_at: isoShift(0)+'T07:15:00' }
     ],
     dokumenti: []   /* nova mogućnost — prazno stanje je pošteno dok se ne isproba */
   };
@@ -2257,7 +2257,7 @@ function renderStroj(){
         return '<div class="row click" onclick="app.otvoriDokument(\''+d.id+'\')">'+
           '<div class="grow"><div class="row-title" style="font-size:13.5px">'+dokIkona(d.tip)+' '+esc(d.naziv)+'</div>'+
           '<div class="row-sub">'+dokTipLabel(d.tip)+(d.tko?' &middot; '+esc(d.tko):'')+
-            ' &middot; '+fmtDate(d.created_at.slice(0,10))+(velicinaTxt(d.velicina)?' &middot; '+velicinaTxt(d.velicina):'')+'</div></div>'+
+            ' &middot; '+fmtDate(localDT(d.created_at).d)+(velicinaTxt(d.velicina)?' &middot; '+velicinaTxt(d.velicina):'')+'</div></div>'+
           '<button class="btn-mini opasno role-voditelj" onclick="event.stopPropagation();app.obrisiDokument(\''+d.id+'\')">Obriši</button>'+
         '</div>';
       }).join('') : '<div class="empty">Nema dokumenata (manual, shema, zapisnik servisa…)</div>';
@@ -3847,10 +3847,32 @@ function renderQR(){
 }
 
 /* =====================  render: Poruke (zajednički kanal)  ===================== */
-function fmtDateTime(ts){
+/* SIM-FIX: Supabase vraća timestamptz kao UTC ("...+00:00"/"...Z") — dosad se
+   samo REZALA string pa je prikazano vrijeme bilo UTC, ne hrvatsko. localDT
+   pretvara u lokalno SAMO za prikaz. Demo/seed zapisi bez zone (npr.
+   "2026-08-21T09:10:00") su već lokalni — ostavljamo netaknute, inače bi se
+   demo pomaknuo za offset. Koristiti isključivo za prikaz, ne za usporedbe
+   (te ostaju na sirovom stringu — konzistentne su dok uspoređuju sebe s
+   drugim sirovim stringom istog izvora). */
+function localDT(ts){
   var s = String(ts||'');
-  var d = s.slice(0,10), t = s.length > 11 ? s.slice(11,16) : '';
-  return (d ? fmtDate(d) : '') + (t ? ' ' + t : '');
+  if(!s) return {d:'', t:''};
+  var imaZonu = /(Z|[+\-]\d{2}:?\d{2})$/i.test(s);
+  if(!imaZonu){
+    /* mora barem izgledati kao YYYY-MM-DD — inače je besmislen ulaz, ne datum */
+    if(!/^\d{4}-\d{2}-\d{2}/.test(s)) return {d:'', t:''};
+    return { d: s.slice(0,10), t: s.length > 11 ? s.slice(11,16) : '' };
+  }
+  var dt = new Date(s);
+  if(isNaN(dt.getTime())) return {d:'', t:''};
+  return {
+    d: dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate()),
+    t: pad2(dt.getHours())+':'+pad2(dt.getMinutes())
+  };
+}
+function fmtDateTime(ts){
+  var dt = localDT(ts);
+  return (dt.d ? fmtDate(dt.d) : '') + (dt.t ? ' ' + dt.t : '');
 }
 function brojNeprocitanih(){
   var seen = ''; try{ seen = localStorage.getItem('porukeSeen') || ''; }catch(e){}
@@ -3876,7 +3898,9 @@ function porukeListaHtml(){
   var zadnjiDan = '', crtaPostavljena = false;
   return lista.length ? lista.map(function(p){
     var out = '';
-    var dan = String(p.created_at).slice(0,10);
+    /* SIM-FIX: grupiranje po LOKALNOM danu (localDT), ne po UTC danu iz baze —
+       inače poruka poslana npr. u 00:30 lokalno ide pod jučerašnji naslov. */
+    var dan = localDT(p.created_at).d;
     if(dan && dan !== zadnjiDan){
       zadnjiDan = dan;
       out += '<div class="msg-dan">'+(dan===todayISO() ? 'Danas' : fmtDate(dan))+'</div>';
@@ -3887,7 +3911,7 @@ function porukeListaHtml(){
     }
     var sustav = p.tko === 'Sustav';
     var moja = !sustav && p.tko === SESSION.ime;
-    var vrijeme = String(p.created_at).length > 11 ? String(p.created_at).slice(11,16) : '';
+    var vrijeme = localDT(p.created_at).t;
     var veza = p.kvar_id ? ' <a class="clink" onclick="app.izPoruke(\''+p.kvar_id+'\')">otvori kvar ›</a>' : '';
     out += '<div class="msg'+(moja?' moja':'')+(sustav?' sustav':'')+'">'+
       (sustav ? '' : '<div class="msg-meta">'+esc(p.tko)+' &middot; '+vrijeme+'</div>')+
@@ -4593,7 +4617,7 @@ var app = {
     var listaHtml = lista.length ? lista.map(function(c){
       return '<div class="kvar-item">'+
         '<div class="kvar-top"><span><b style="color:var(--text)">'+esc(c.tko)+'</b></span>'+
-        '<span>'+fmtDate(String(c.created_at).slice(0,10))+'</span></div>'+
+        '<span>'+fmtDate(localDT(c.created_at).d)+'</span></div>'+
         '<div style="font-size:13.5px;margin-top:3px">'+esc(c.tekst)+'</div></div>';
     }).join('') : '<div class="empty">Još nema komentara.</div>';
     $('#modal-root').innerHTML =

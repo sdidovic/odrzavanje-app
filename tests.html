@@ -2992,6 +2992,44 @@ async function testovi(W, D){
   ok('bez neto promjene (prije===poslije) ne šalje se poruka', tragova(dioB3b) === 0);
   W.QTY_TRAG_MS = 1500;                   /* vrati zadano da ne curi u druge testove */
 
+  grupa('SIM-FIX — vrijeme u lokalnoj zoni');
+  /* Supabase vraća timestamptz kao UTC ("...+00:00"/"...Z") — dosad se prikaz
+     samo REZAO iz stringa pa je satnica bila UTC, ne hrvatska. localDT to
+     ispravlja SAMO za prikaz; usporedbe/sortiranja i dalje rade nad sirovim
+     stringom (ostaju netaknute — konzistentne su same sa sobom). */
+  ok('localDT postoji', typeof W.localDT === 'function');
+
+  var utcISO = '2026-08-22T09:29:07+00:00';
+  var refD = new Date(utcISO);
+  var ocekT = W.pad2(refD.getHours())+':'+W.pad2(refD.getMinutes());
+  var ocekD = refD.getFullYear()+'-'+W.pad2(refD.getMonth()+1)+'-'+W.pad2(refD.getDate());
+  var lt1 = W.localDT(utcISO);
+  /* NE upisujemo tvrdo "11:29" — offset ovisi o vremenskoj zoni stroja koji vrti teste */
+  jednako('localDT pretvara UTC vrijeme u lokalni sat (iz getHours, ne tvrdi offset)', lt1.t, ocekT);
+  jednako('localDT pretvara UTC vrijeme u lokalni dan', lt1.d, ocekD);
+
+  var lt2 = W.localDT('2026-08-21T09:10:00');
+  jednako('localDT ne dira naivan zapis bez zone (demo/seed) — vrijeme ostaje isto', lt2.t, '09:10');
+  jednako('localDT ne dira naivan zapis bez zone (demo/seed) — dan ostaje isti', lt2.d, '2026-08-21');
+
+  ok('localDT na praznom stringu ne ruši prikaz', JSON.stringify(W.localDT('')) === JSON.stringify({d:'',t:''}));
+  ok('localDT na besmislenom stringu ne ruši prikaz', JSON.stringify(W.localDT('ovo nije datum')) === JSON.stringify({d:'',t:''}));
+
+  /* poruka poslana u UTC-u oko ponoći mora se grupirati pod SVOJ lokalni dan,
+     ne pod UTC dan iz baze — inače naslov dana "kasni" ili "žuri" sat-dva */
+  app.go('poruke'); await cekaj(150);
+  var pomocniISO = '2026-01-15T23:30:00Z';
+  var refPom = new Date(pomocniISO);
+  var ocekPomD = refPom.getFullYear()+'-'+W.pad2(refPom.getMonth()+1)+'-'+W.pad2(refPom.getDate());
+  W.DATA.poruke.push({id:'poTESTponoc', tko:'Sustav', tekst:'TEST poruka oko ponoći', kvar_id:null, created_at:pomocniISO});
+  await W.renderPoruke(); await cekaj(100);
+  var danHeaders = Array.from(D.querySelectorAll('#screen-poruke .msg-dan')).map(function(e){ return e.textContent; });
+  ok('poruka oko ponoći (UTC) grupirana je pod svoj lokalni dan',
+     danHeaders.indexOf(W.fmtDate(ocekPomD)) > -1,
+     'naslovi dana: ' + JSON.stringify(danHeaders) + ', očekivan: ' + W.fmtDate(ocekPomD));
+  W.DATA.poruke = W.DATA.poruke.filter(function(p){ return p.id !== 'poTESTponoc'; });
+  await W.renderPoruke(); await cekaj(100);
+
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
                        sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});
