@@ -1435,7 +1435,9 @@ async function testovi(W, D){
   grupa('Trenutno stoji');
   W.showScreen('pregled'); await cekaj(120);
   var stojiIma = D.querySelector('#screen-pregled').textContent.indexOf('Trenutno stoji') > -1;
-  var imaPravihKvarova = W.DATA.kvarovi.some(function(k){ return W.jeOtvoren(k) && !k.upoz && k.m && (k.tip||'kvar')==='kvar'; });
+  /* SIM-FIX: "stoji" više nije "otvoren i nije upoz" nego zaustavljaLiniju (hitno/čeka dio,
+     i dalje bez upoz) — isto pravilo kao filtar "Trenutno stoji" na Pregledu. */
+  var imaPravihKvarova = W.DATA.kvarovi.some(function(k){ return W.zaustavljaLiniju(k) && k.m; });
   jednako('sekcija se prikazuje točno kad nešto stoji', stojiIma, imaPravihKvarova);
   ok('upozorenja se ne broje kao zastoj', (function(){
     var upoz = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && k.upoz; })[0];
@@ -1446,11 +1448,25 @@ async function testovi(W, D){
     return html.slice(od, html.indexOf('<h2', od+5)).indexOf(upoz.opis) === -1;
   })());
 
+  grupa('SIM-FIX — zaustavljaLiniju(): "stoji li linija" iz stvarnih unosa, ne iz mrtvog polja upoz');
+  ok('otvoren kvar, prioritet normalno, bez čeka dio — NE zaustavlja liniju',
+     !W.zaustavljaLiniju({status:'otvoren', tip:'kvar', upoz:false, prioritet:'normalno', ceka_dio:false}));
+  ok('otvoren kvar, prioritet hitno — zaustavlja liniju',
+     W.zaustavljaLiniju({status:'otvoren', tip:'kvar', upoz:false, prioritet:'hitno', ceka_dio:false}));
+  ok('otvoren kvar s ceka_dio (prioritet normalno) — zaustavlja liniju',
+     W.zaustavljaLiniju({status:'otvoren', tip:'kvar', upoz:false, prioritet:'normalno', ceka_dio:true}));
+  ok('kvar s upoz:true i prioritetom hitno — NE zaustavlja liniju (izričito upozorenje pobjeđuje)',
+     !W.zaustavljaLiniju({status:'otvoren', tip:'kvar', upoz:true, prioritet:'hitno', ceka_dio:false}));
+  ok('zadatak s rokom, čak i hitno/ceka_dio — nikad ne zaustavlja liniju',
+     !W.zaustavljaLiniju({status:'otvoren', tip:'zadatak', upoz:false, prioritet:'hitno', ceka_dio:true, rok:W.todayISO()}));
+
   grupa('SIM-FIX K — "Kad će raditi" u sekciji Trenutno stoji');
   /* voditelj proizvodnje otvara app upravo zbog ovog podatka — isti redoslijed prioriteta
      kao Raspored (sadaRedak): procjena_gotovo → otvorena narudžba dijela. */
+  /* SIM-FIX: mora stvarno zaustavljati liniju da uđe u sekciju — ceka_dio/ceka_servis su
+     namjerno isključeni (testira se procjena_gotovo grana), pa je prioritet 'hitno'. */
   var kvarKgotov = { id:'kvK1', m:'e1', date:W.todayISO(), opis:'TEST K procjena gotovo', sati:0,
-    status:'u_radu', upoz:false, tip:'kvar', kategorija:'Ostalo', ceka_dio:false, ceka_servis:false,
+    status:'u_radu', upoz:false, tip:'kvar', kategorija:'Ostalo', prioritet:'hitno', ceka_dio:false, ceka_servis:false,
     poceo_at:new Date(Date.now()-3600000).toISOString(), procjena_gotovo: W.todayISO()+'T23:59' };
   W.DATA.kvarovi.push(kvarKgotov);
   W.showScreen('pregled'); await cekaj(120);
@@ -1679,9 +1695,11 @@ async function testovi(W, D){
   app.closeModal();
   W.confirm = stariConfirm2; W.alert = stariAlert2;
 
-  /* mjesečna brojka ne smije šutjeti o kvarovima koji upravo traju */
+  /* mjesečna brojka ne smije šutjeti o kvarovima koji upravo traju.
+     SIM-FIX: mora stvarno zaustavljati liniju (hitno) da uđe u "još traje" procjenu —
+     inače test slučajno prolazi zahvaljujući nepovezanom hitnom kvaru iz seeda. */
   W.DATA.kvarovi.push({id:'kvUT', m:'e1', date:W.todayISO(), opis:'TEST još traje', sati:0,
-    status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo',
+    status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo', prioritet:'hitno',
     created_at:new Date(Date.now()-6*3600000).toISOString()});
   W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role='voditelj';
   W.showScreen('pregled'); await cekaj(200);

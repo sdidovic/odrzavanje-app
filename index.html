@@ -1222,7 +1222,7 @@ function byDateDesc(a,b){ return b.date===a.date ? 0 : (b.date>a.date?1:-1); }
 function machineStatus(id){
   /* zadatak vezan uz stroj (npr. "naruči ležaj za P2") NIJE kvar — stroj zbog njega ne stoji */
   var open = DATA.kvarovi.filter(function(k){ return k.m===id && jeOtvoren(k) && (k.tip||'kvar')==='kvar'; });
-  for(var i=0;i<open.length;i++) if(!open[i].upoz) return 'kvar';
+  for(var i=0;i<open.length;i++) if(zaustavljaLiniju(open[i])) return 'kvar';
   return open.length ? 'upoz' : 'ok';
 }
 function statusChip(st){
@@ -1895,8 +1895,8 @@ function renderPregled(){
      Procjenu držimo odvojeno od dokazive brojke, ali je ne prešućujemo. */
   var uTijekuCost = 0;
   mk.forEach(function(k){
-    /* isto pravilo kao "Trenutno stoji": upozorenje nije zaustavljena linija */
-    if(!jeOtvoren(k) || k.upoz) return;
+    /* isto pravilo kao "Trenutno stoji": samo kvar koji stvarno zaustavlja liniju troši satnicu */
+    if(!zaustavljaLiniju(k)) return;
     var p0 = pocetakKvara(k);
     if(!p0) return;
     var sm0 = machineById(k.m);
@@ -1975,9 +1975,10 @@ function renderPregled(){
   }).join('');
 
   /* "Trenutno stoji" — jedina sekcija koja odgovara i direktoru i voditelju proizvodnje.
-     Samo pravi kvarovi (ne upozorenja), koliko već stoje i koliko je to do sada koštalo.
+     Samo kvarovi koji stvarno zaustavljaju liniju (ne obična otvorena prijava, ne
+     upozorenje), koliko već stoje i koliko je to do sada koštalo.
      Prazna lista → sekcija se ne prikazuje uopće. */
-  var stoje = open.filter(function(k){ return !k.upoz && k.m; })
+  var stoje = open.filter(function(k){ return zaustavljaLiniju(k) && k.m; })
     .sort(function(a,b){
       var pa = pocetakKvara(a), pb = pocetakKvara(b);
       /* najdulji zastoj na vrh; bez poznatog početka sortiramo po danu prijave */
@@ -2059,10 +2060,14 @@ function renderPregled(){
        ni do jednog krivca — najskuplji POJEDINAČNI zastoj ovaj mjesec, jedan klik do detalja. */
     var najveciK = null, najveciTrosak = -1;
     mk.forEach(function(k){
-      /* SIM-FIX: upozorenje ne zaustavlja liniju — isto pravilo kao uTijekuCost (~1893) i
-         filtar "Trenutno stoji" (~1974). Bez ovoga je stroj koji nikad nije stao mogao
-         ispasti "najveći zastoj mjeseca" jer mu je trošak rastao dok upozorenje traje. */
-      if(k.upoz) return;
+      /* SIM-FIX: dok je kvar otvoren, mora stvarno zaustavljati liniju (zaustavljaLiniju) da
+         uđe u utrku za "najveći zastoj" — isto pravilo kao uTijekuCost (~1896) i filtar
+         "Trenutno stoji" (~1980). Bez ovoga je otvoren kvar bez HITNO/čeka dio (ili stari
+         upoz:true zapis) mogao ispasti "najveći zastoj mjeseca" jer mu je trošak rastao dok
+         linija zapravo radi dalje. Riješen kvar NE prolazi kroz zaustavljaLiniju (ona po
+         definiciji vrijedi samo za otvorene) — i ne treba: kvarCost(k) niže već je stvarno
+         odrađeni broj sati, ne procjena koja raste, pa se ovdje ne gejta. */
+      if(jeOtvoren(k) && !zaustavljaLiniju(k)) return;
       var mN = machineById(k.m);
       var c = jeOtvoren(k)
         ? (function(){ var pN = pocetakKvara(k); return pN ? Math.max(0,(Date.now()-pN.getTime())/3600000)*(mN?mN.rate:350) : 0; })()
@@ -7090,6 +7095,14 @@ var TIP_PARTNERA = ['Dobavljač','Servis','Proizvođač','Ostalo'];
 function aktivni(){ return DATA.kvarovi.filter(function(k){ return k.status !== 'otkazan'; }); }
 /* nezavrsen = prijavljen ili netko vec radi na njemu */
 function jeOtvoren(k){ return k.status === 'otvoren' || k.status === 'u_radu'; }
+/* SIM-FIX: "stoji li linija" dosad je ovisilo o polju upoz koje nijedan obrazac ne
+   postavlja (samo demo seed) — pa je u živoj bazi SVAKI otvoreni kvar trošio satnicu
+   stroja. Sada se izvodi iz onoga što ljudi stvarno unose, i to riječima koje sučelje
+   već koristi: "HITNO — stoji linija" i "Čeka dio (naručeno, popravak stoji)".
+   upoz ostaje poštovan kao izričito "stroj radi dalje" (demo//postojeći zapisi). */
+function zaustavljaLiniju(k){
+  return jeOtvoren(k) && (k.tip||'kvar')==='kvar' && !k.upoz && (k.prioritet==='hitno' || !!k.ceka_dio);
+}
 function samoKvarovi(){ return aktivni().filter(function(k){ return (k.tip||'kvar') === 'kvar'; }); }
 function autoKat(opis){
   var o = String(opis||'').toLowerCase();
