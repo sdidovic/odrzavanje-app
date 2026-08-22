@@ -1255,6 +1255,10 @@ function repCounts(){
 
 /* =====================  podaci / localStorage  ===================== */
 var DATA = null;
+/* SIM-FIX B3: debounce trag za ručni +/- na skladištu (po id dijela).
+   Trajanje je varijabla da ga testovi mogu skratiti — preglednik prigušuje setTimeout
+   u pozadinskoj kartici, pa bi fiksnih 1,5 s činilo test nepouzdanim. */
+var QTY_DEBOUNCE = {}, QTY_TRAG_MS = 1500;
 function buildSeed(){
   return {
     machines: SEED_MACHINES.map(function(m){
@@ -5209,10 +5213,24 @@ var app = {
   qty: async function(id, delta){
     var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
     if(!p) return;
+    /* SIM-FIX B3: trag ručnog +/- na skladištu — debounce po dijelu ~1,5s da brzo
+       klikanje ne zatrpa kanal jednom porukom po dodiru; šalje se samo prije≠poslije. */
+    if(!QTY_DEBOUNCE[id]) QTY_DEBOUNCE[id] = { prije: p.stanje };
     p.stanje = Math.max(0, p.stanje + delta);   /* odmah na ekranu — brz dodir ne smije čekati mrežu */
     var el = $('#parts-list');
     if(el) el.innerHTML = partsListHtml();
     updateBadge();
+    (function(){
+      var pid = id, naziv = p.naziv;
+      clearTimeout(QTY_DEBOUNCE[pid].timer);
+      QTY_DEBOUNCE[pid].timer = setTimeout(function(){
+        var zap = QTY_DEBOUNCE[pid];
+        delete QTY_DEBOUNCE[pid];
+        if(zap && zap.prije !== p.stanje){
+          sysPoruka('📦 Ispravak stanja: '+naziv+' '+zap.prije+' → '+p.stanje+' ('+esc(SESSION.ime||'')+')');
+        }
+      }, QTY_TRAG_MS);
+    })();
     /* AUDIT-FIX: prije je ovo bio "pročitaj pa piši" (apiUpdate sa zadnjom poznatom
        vrijednosti) — dva brza dodira ili dva uređaja mogla su izgubiti jednu promjenu.
        Isti atomarni RPC koji već koristi trošenje dijela kod zatvaranja kvara: negativan
@@ -5827,6 +5845,15 @@ var app = {
         '<input type="number" name="stvarno_h" min="0" step="0.5"'+
           (p.trajanje_h != null ? ' value="'+p.trajanje_h+'"' : ' placeholder="npr. 1,5"')+'>'+
         zapisnikHtml+
+        /* SIM-FIX B1: utrošak dijela uz redovni pregled — po uzoru na "+ Dodatno" u rijesiKvar,
+           gustoća iza dodira (miran ekran): skriveno dok se svjesno ne otvori. */
+        '<button type="button" class="btn-mini" style="margin:4px 0 10px" '+
+          'onclick="this.nextElementSibling.style.display=\'block\';this.style.display=\'none\'">'+
+          '+ Dodatno (utrošeni dio)</button>'+
+        '<div style="display:none">'+
+          '<label>Utrošeni dio sa skladišta</label><select name="dio"><option value="">—</option>'+dioOptsZaStroj(p.m)+'</select>'+
+          '<label>Količina</label><input type="number" name="kol" min="1" step="1" value="1">'+
+        '</div>'+
         '<button class="btn primary block" type="submit">Potvrdi</button>'+
       '</form></div></div>';
   },
@@ -5842,12 +5869,39 @@ var app = {
     p.stvarno_h = isNaN(sh) ? null : sh;
     p.next = addDaysISO(datum, intervalDays(p.interval));
     var pd = PENDING_DOK; PENDING_DOK = null;
+    /* SIM-FIX B1: utrošeni dio uz redovni pregled — isti obrazac razduživanja kao saveRijesen */
+    var dioId = f.get('dio');
+    var kol = Math.max(1, parseInt(f.get('kol'),10)||1);
+    if(dioId){
+      var pdio = DATA.dijelovi.filter(function(x){ return x.id===dioId; })[0];
+      if(pdio){
+        var prijeDio = pdio.stanje;
+        pdio.stanje = Math.max(0, pdio.stanje - kol);
+        if(prijeDio >= pdio.min && pdio.stanje < pdio.min){
+          sysPoruka('📦 Dio ispod minimuma: '+pdio.naziv+' (stanje '+pdio.stanje+', min '+pdio.min+') — naručiti!');
+          toast('⚠ '+pdio.naziv+': stanje '+pdio.stanje+' (min '+pdio.min+') — naručiti');   /* SIM-FIX B6 */
+        }
+        if(REMOTE && naMrezi()){
+          try{
+            var rpcDio = await sb.rpc('razduzi_dio', { p_id: pdio.id, p_kolicina: kol });
+            if(!rpcDio.error && typeof rpcDio.data === 'number') pdio.stanje = rpcDio.data;
+            else await apiUpdate('dijelovi', pdio.id, { stanje:pdio.stanje });
+          }catch(e){ await apiUpdate('dijelovi', pdio.id, { stanje:pdio.stanje }); }
+        } else {
+          await apiUpdate('dijelovi', pdio.id, { stanje:pdio.stanje });
+        }
+      }
+    }
     app.closeModal();
     /* prije je uvijek padalo na Pregled — sad ostaje na ekranu s kojeg je i pokrenuto
        (Raspored, K4 lista radnji), stroj-detalj ostaje posebni slučaj kao i dosad */
     showScreen(CURRENT_M && !$('#screen-stroj').classList.contains('hidden') ? 'stroj' : (CURRENT_SCREEN||'pregled'));
     var pmm = machineById(p.m);
     sysPoruka('🔧 Preventiva obavljena: '+(pmm ? pmm.name+' — ' : '')+p.opis+' ('+esc(p.tkoZadnji||'')+')');
+    if(dioId){
+      var pdioNaziv = DATA.dijelovi.filter(function(x){ return x.id===dioId; })[0];
+      if(pdioNaziv) sysPoruka('🔧 Utrošeno uz pregled: '+pdioNaziv.naziv+' ×'+kol+' — '+p.opis+' ('+esc(p.tkoZadnji||'')+')');
+    }
     await apiUpdate('preventiva', p.id, { zadnje:p.zadnje, tko_zadnji:p.tkoZadnji, next:p.next, stvarno_h:p.stvarno_h });
     if(pd && p.m){
       var path = pd.dataUrl;

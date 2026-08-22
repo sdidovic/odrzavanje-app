@@ -2918,6 +2918,80 @@ async function testovi(W, D){
   app.closeModal();
   W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== kvarBezCekaDio.id; });
 
+  grupa('SIM-FIX B1 — utrošeni dio uz redovni pregled (preventiva)');
+  var prevB1 = W.DATA.preventiva.filter(function(p){ return p.next < W.todayISO(); })[1] || W.DATA.preventiva[1];
+  var dioB1 = W.DATA.dijelovi[0];
+  var stanjeB1Prije = dioB1.stanje;
+  app.obaviPreventivu(prevB1.id);
+  var fB1 = D.querySelector('#modal-root form');
+  ok('"Obavljeno" nudi select utrošenog dijela sa skladišta (SIM-FIX B1)', !!fB1.elements.dio);
+  jednako('zadana opcija dijela je prazna "—" (ništa se ne troši)', fB1.elements.dio.value, '');
+  ok('"Obavljeno" nudi polje količine, zadano 1', !!fB1.elements.kol && fB1.elements.kol.value === '1');
+  fB1.elements.dio.value = dioB1.id;
+  fB1.elements.kol.value = '2';
+  fB1.elements.tko.value = 'Tehničar';
+  posalji(fB1); await cekaj(150);
+  jednako('preventiva je svejedno potvrđena', prevB1.zadnje, W.todayISO());
+  jednako('skladište je razduženo za odabranu količinu', dioB1.stanje, stanjeB1Prije - 2);
+  ok('sistemski zapis o utrošku dijela uz pregled',
+     W.DATA.poruke.some(function(p){ return p.tko === 'Sustav' && p.tekst.indexOf('Utrošeno uz pregled') > -1 &&
+       p.tekst.indexOf(dioB1.naziv) > -1 && p.tekst.indexOf('×2') > -1; }));
+
+  grupa('SIM-FIX B1 — preventiva bez odabranog dijela ne dira skladište');
+  var prevB1b = W.DATA.preventiva.filter(function(p){ return p.id !== prevB1.id; })[0];
+  var porukeBrojPrije = W.DATA.poruke.length;
+  app.obaviPreventivu(prevB1b.id);
+  var fB1b = D.querySelector('#modal-root form');
+  fB1b.elements.tko.value = 'Tehničar';
+  posalji(fB1b); await cekaj(150);
+  ok('bez odabira dijela nema dodatnog zapisa o utrošku',
+     !W.DATA.poruke.slice(porukeBrojPrije).some(function(p){ return p.tekst.indexOf('Utrošeno uz pregled') > -1; }));
+
+  grupa('SIM-FIX B3 — trag ručnog +/- na skladištu (debounce)');
+  /* Debounce se oslanja na setTimeout u aplikaciji, a preglednik ga u POZADINSKOJ kartici
+     prigušuje — fiksno čekanje zato čini test nepouzdanim. Čekamo uvjet, ne sat, i
+     skraćujemo QTY_TRAG_MS gdje mjerimo ishod (ne trajanje). */
+  function tragova(dio){
+    return W.DATA.poruke.filter(function(p){
+      return p.tekst.indexOf('Ispravak stanja') > -1 && p.tekst.indexOf(dio.naziv) > -1; }).length;
+  }
+  async function cekajDok(uvjet, maxMs){
+    var kraj = Date.now() + (maxMs||20000);
+    while(Date.now() < kraj){ if(uvjet()) return true; await cekaj(100); }
+    return uvjet();
+  }
+  W.SESSION = { ime:'Tehničar', role:'majstor' };
+
+  /* 1) ne šalje se po dodiru — tvrdnja o IZOSTANKU, sigurna i uz prigušene tajmere */
+  var dioB3 = W.DATA.dijelovi[1] || W.DATA.dijelovi[0];
+  var stanjeB3Prije = dioB3.stanje;
+  await app.qty(dioB3.id, 1);
+  await cekaj(150);
+  ok('poruka o ispravku stanja se ne šalje odmah (čeka debounce)', tragova(dioB3) === 0);
+
+  /* 2) serija dodira → točno jedna poruka, s prije → poslije i imenom */
+  W.QTY_TRAG_MS = 0;                      /* mjerimo ishod, ne trajanje */
+  await app.qty(dioB3.id, 1);             /* ukupno +2 od početnog stanja */
+  await cekajDok(function(){ return tragova(dioB3) > 0; });
+  jednako('serija brzih dodira daje jednu poruku (ne po dodiru)', tragova(dioB3), 1);
+  jednako('stanje nakon dva +1', dioB3.stanje, stanjeB3Prije + 2);
+  ok('poruka nosi prije → poslije i ime iz SESSION',
+     W.DATA.poruke.some(function(p){ return p.tekst.indexOf('Ispravak stanja') > -1 && p.tekst.indexOf(dioB3.naziv) > -1 &&
+       p.tekst.indexOf(String(stanjeB3Prije)+' → '+String(stanjeB3Prije+2)) > -1 && p.tekst.indexOf('Tehničar') > -1; }));
+
+  /* 3) neto nula ne ostavlja trag. Da razlikujemo "još nije" od "nikad", pustimo poslije
+     njega kontrolni dodir na drugom dijelu: kad stigne NJEGOVA poruka, prošao je i raniji tajmer. */
+  var dioB3b = W.DATA.dijelovi[2] || W.DATA.dijelovi[0];
+  var stanjeB3bPrije = dioB3b.stanje;
+  await app.qty(dioB3b.id, 1);
+  await app.qty(dioB3b.id, -1);
+  var dioB3c = W.DATA.dijelovi[3] || W.DATA.dijelovi[0];
+  await app.qty(dioB3c.id, 1);
+  await cekajDok(function(){ return tragova(dioB3c) > 0; });
+  jednako('neto promjena +1-1 vraća stanje na isto', dioB3b.stanje, stanjeB3bPrije);
+  ok('bez neto promjene (prije===poslije) ne šalje se poruka', tragova(dioB3b) === 0);
+  W.QTY_TRAG_MS = 1500;                   /* vrati zadano da ne curi u druge testove */
+
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
                        sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});
