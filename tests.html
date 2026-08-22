@@ -195,6 +195,89 @@ async function testovi(W, D){
   ok('stornirani kvar ne ulazi u izračune',
      W.samoKvarovi().every(function(k){ return k.id !== novi.id; }));
 
+  grupa('§16.7: Uredi kvar — "+ Dodatno" (D)');
+  /* §16.4 P2 dovršetak: tehničaru je "Detaljno" maknuto s prijave — Uredi kvar mu ostaje
+     jedini put do prioriteta, pa smije nuditi samo TRI stalna polja (Opis, Datum, Prioritet). */
+  var zaDodatno = { id:'kvD1', m:'e1', date:W.todayISO(), opis:'TEST D dodatno', sati:0,
+    status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo', prioritet:'normalno',
+    created_at:new Date().toISOString() };
+  W.DATA.kvarovi.push(zaDodatno);
+  app.urediKvar(zaDodatno.id);
+  var fD = D.querySelector('#modal-root form');
+  var btnD = Array.prototype.filter.call(D.querySelectorAll('#modal-root button'),
+    function(b){ return b.textContent.indexOf('+ Dodatno') > -1; })[0];
+  ok('modal Uredi kvar ima gumb "+ Dodatno"', !!btnD);
+  ok('prije klika na "+ Dodatno" Prioritet je vidljiv', !!fD.elements.prioritet && fD.elements.prioritet.offsetParent !== null);
+  ok('prije klika na "+ Dodatno" Opis i Datum su vidljivi', fD.elements.opis.offsetParent !== null && fD.elements.date.offsetParent !== null);
+  ok('prije klika na "+ Dodatno" Stroj/Dodijeljen su SAKRIVENI', fD.elements.m.offsetParent === null && fD.elements.dodijeljen.offsetParent === null);
+  if(btnD) btnD.click();
+  ok('nakon klika na "+ Dodatno" Stroj i Dodijeljen postaju vidljivi',
+     fD.elements.m.offsetParent !== null && fD.elements.dodijeljen.offsetParent !== null);
+  app.closeModal();
+
+  grupa('§16.7: "Nije riješeno — vrati u rad" (E)');
+  /* iz "Riješen" dosad je jedini izlaz bio Storniraj — a to briše zapis iz analitike/MTTR-a/
+     CSV-a/IFS-a, iako se rad stvarno dogodio (popravak samo nije držao). */
+  var zaVrati = { id:'kvE1', m:'e1', date:W.todayISO(), opis:'TEST E vrati u rad', sati:3.5,
+    status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo', tko:'Tehničar', zam:'TEST remen',
+    dodijeljen:null, closed_at:new Date().toISOString(), created_at:new Date().toISOString() };
+  W.DATA.kvarovi.push(zaVrati);
+  app.detaljKvara(zaVrati.id);
+  ok('detalj riješenog kvara nudi gumb "Nije riješeno — vrati u rad"',
+     D.querySelector('#modal-root').textContent.indexOf('Nije riješeno') > -1);
+  app.closeModal();
+  app.vratiURad(zaVrati.id);
+  var fE = D.querySelector('#modal-root form');
+  ok('vratiURad traži razlog (isti obrazac kao storno, ne prompt())', !!fE && !!fE.elements.razlog);
+  fE.elements.razlog.value = 'popravak nije držao';
+  posalji(fE); await cekaj(150);
+  jednako('vratiURad vraća status (bez dodjele → otvoren)', zaVrati.status, 'otvoren');
+  ok('vratiURad briše closed_at', !zaVrati.closed_at);
+  jednako('sati ostaju netaknuti (rad je stvarno obavljen)', zaVrati.sati, 3.5);
+  jednako('tko ostaje netaknut', zaVrati.tko, 'Tehničar');
+  jednako('zamijenjeno ostaje netaknuto', zaVrati.zam, 'TEST remen');
+  ok('razlog je upisan kao komentar na kvar',
+     (W.DATA.komentari||[]).some(function(c){ return c.kvar_id===zaVrati.id && c.tekst.indexOf('popravak nije držao') > -1; }));
+  ok('sistemski zapis (sysPoruka) je nastao', W.DATA.poruke.some(function(p){ return p.kvar_id===zaVrati.id; }));
+  /* dodijeljen kvar vraća se u u_radu, ne u otvoren */
+  zaVrati.status = 'rijesen'; zaVrati.dodijeljen = 'Tehničar'; zaVrati.closed_at = new Date().toISOString();
+  app.vratiURad(zaVrati.id);
+  fE = D.querySelector('#modal-root form');
+  fE.elements.razlog.value = 'opet se pokvarilo';
+  posalji(fE); await cekaj(150);
+  jednako('uz postojeću dodjelu vraća u u_radu (ne otvoren)', zaVrati.status, 'u_radu');
+  app.detaljKvara(zaVrati.id);
+  ok('gumb "Nije riješeno" nestaje kad kvar više nije riješen',
+     D.querySelector('#modal-root').textContent.indexOf('Nije riješeno') === -1);
+  app.closeModal();
+  W.DATA.komentari = (W.DATA.komentari||[]).filter(function(c){ return c.kvar_id !== 'kvE1'; });
+  W.DATA.poruke = W.DATA.poruke.filter(function(p){ return p.kvar_id !== 'kvE1'; });
+
+  grupa('§16.7: eskalacija na HITNO se javlja (F)');
+  /* obavijest se dosad slala ISKLJUČIVO kad se promijeni dodijeljen — promjena prioriteta
+     je tiho odlazila u bazu; kvar prijavljen bez kvačice pa eskaliran na hitno je prošao
+     nezamijećen. */
+  var zaHitno = { id:'kvF1', m:'e1', date:W.todayISO(), opis:'TEST F eskalacija', sati:0,
+    status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo', prioritet:'normalno',
+    created_at:new Date().toISOString() };
+  W.DATA.kvarovi.push(zaHitno);
+  var porukeBrPrijeF = W.DATA.poruke.length;
+  app.urediKvar(zaHitno.id);
+  var fF = D.querySelector('#modal-root form');
+  fF.elements.prioritet.value = 'hitno';
+  posalji(fF); await cekaj(150);
+  jednako('prioritet je spremljen kao hitno', zaHitno.prioritet, 'hitno');
+  var novePorukeF = W.DATA.poruke.slice(porukeBrPrijeF);
+  ok('promjena prioriteta na hitno stvara sysPoruku koja sadrži "HITNO"',
+     novePorukeF.some(function(p){ return p.kvar_id===zaHitno.id && p.tekst.indexOf('HITNO') > -1; }));
+  var porukeBrPrijeF2 = W.DATA.poruke.length;
+  app.urediKvar(zaHitno.id);
+  posalji(D.querySelector('#modal-root form')); await cekaj(150);
+  jednako('ponovno spremanje bez promjene (već hitno) ne šalje novu HITNO poruku',
+     W.DATA.poruke.length, porukeBrPrijeF2);
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return ['kvD1','kvE1','kvF1'].indexOf(k.id) === -1; });
+  W.DATA.poruke = W.DATA.poruke.filter(function(p){ return p.kvar_id !== 'kvF1'; });
+
   grupa('Filteri i pretraga');
   app.go('kvarovi');
   app.setFilter('status', 'otvoren');
@@ -1665,6 +1748,15 @@ async function testovi(W, D){
   });
   W.location.hash = '';
   W.showScreen('pregled');
+  /* B (§16.7): jutarnji push šalje #pregled, ali majstor tu karticu nema u donjoj traci —
+     bez straže klik na obavijest baca ga na ekran bez osvijetljene kartice i bez "natrag". */
+  W.SESSION = { ime:'Tehničar', role:'majstor' }; D.body.dataset.role = 'majstor';
+  W.location.hash = '#pregled';
+  var otisaoNaPregled = W.initHash();
+  ok('#pregled s ulogom majstor otvara Raspored (B)', otisaoNaPregled && W.CURRENT_SCREEN === 'raspored');
+  W.location.hash = '';
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  W.showScreen('pregled');
 
   grupa('Lijep gumb umjesto native file inputa');
   app.brzaPrijava();
@@ -2585,6 +2677,20 @@ async function testovi(W, D){
   })());
   ok('majstor nema "Planiraj dan"', D.querySelector('#screen-raspored').textContent.indexOf('Planiraj dan') === -1);
   ok('"Sada u pogonu" majstor vidi cijelo (tim radi zajedno)', !!D.querySelector('#screen-raspored .rasp-sada'));
+  /* A (§16.7): hero brojke "Za odraditi"/"Kasni" moraju pratiti isti filtar osobe kao popis
+     ispod (prolaziFiltar) — prije popravka hero je uvijek pokazivao NEFILTRIRANU brojku
+     (npr. "5" dok je popis ispod imao samo 3 retka), jedini brojčani sažetak koji majstor ima
+     se nije slagao s onim što stvarno vidi ispod. */
+  var szA = W.danSazetak(W.todayISO());
+  var heroBrojke = D.querySelectorAll('#screen-raspored .rasp-hero .stat-num');
+  jednako('hero "Za odraditi" prati aktivan filtar osobe (A)', parseInt(heroBrojke[0].textContent,10), szA.nMoj);
+  jednako('hero "Kasni" prati aktivan filtar osobe (A)', parseInt(heroBrojke[2].textContent,10), szA.kasniMoj);
+  ok('filtar u ovom demou stvarno nešto isključuje (test nije prazan)', szA.nMoj < szA.n);
+  var sadaMojA = szA.sada.filter(function(k){ return W.prolaziFiltar({osoba:k.dodijeljen}); }).length;
+  var popisRedakaA = Array.prototype.filter.call(D.querySelectorAll('#screen-raspored .rasp-st:not(.st-gotov)'),
+    function(el){ return !el.closest('.rasp-sada'); }).length;
+  jednako('agenda (Kasni+Plan, bez "Sada u pogonu") ima točno onoliko redaka koliko hero broji za tu osobu (A)',
+     popisRedakaA, szA.nMoj - sadaMojA);
   app.demoUloga('Direktor'); await cekaj(100);
   app.go('raspored'); await cekaj(150);
   ok('readonly: nema ✓ gumba (skriveni), avatari bez "+" za dodjelu, pilule postoje za čitanje', (function(){
@@ -3051,6 +3157,23 @@ async function testovi(W, D){
      'naslovi dana: ' + JSON.stringify(danHeaders) + ', očekivan: ' + W.fmtDate(ocekPomD));
   W.DATA.poruke = W.DATA.poruke.filter(function(p){ return p.id !== 'poTESTponoc'; });
   await W.renderPoruke(); await cekaj(100);
+
+  grupa('§16.7: danSazetak uspoređuje lokalni dan, ne UTC (C)');
+  /* closed_at je UTC iz baze; todayISO() je LOKALNI datum — usporedba sirovih stringova
+     (String(closed_at).slice(0,10)!==iso) krivo broji "odrađeno danas" u rubnim satima kad
+     lokalna ponoć još nije UTC ponoć (ili obrnuto). localDT(ts).d mora se koristiti umjesto. */
+  var isoC = W.todayISO();
+  var closedUtcC = new Date(isoC+'T00:20:00').toISOString();   /* lokalno rano jutros danas */
+  ok('test je stvarno rubni slučaj (UTC dan kalendarski različit od lokalnog)',
+     closedUtcC.slice(0,10) !== isoC, 'closed_at (UTC): '+closedUtcC+', lokalni dan: '+isoC);
+  var zadC = { id:'kvC1', m:null, date:isoC, opis:'TEST C UTC rub', sati:0,
+    status:'rijesen', upoz:false, tip:'zadatak', kategorija:'Ostalo', tko:'Tehničar',
+    closed_at: closedUtcC };
+  W.DATA.kvarovi.push(zadC);
+  var szC = W.danSazetak(isoC);
+  ok('kvar zatvoren u UTC vremenu koje lokalno pada na drugi dan broji se pod lokalni dan (C)',
+     szC.gotove.some(function(g){ return g.item && g.item.id === 'kvC1'; }));
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== 'kvC1'; });
 
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',

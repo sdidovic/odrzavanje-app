@@ -3221,14 +3221,19 @@ function danSazetak(iso){
   });
   DATA.kvarovi.forEach(function(z){
     if((z.tip||'kvar')!=='zadatak' || z.status!=='rijesen' || !z.closed_at) return;
-    if(String(z.closed_at).slice(0,10)!==iso) return;
+    /* C: closed_at je UTC iz baze, iso (todayISO) je LOKALNI datum — usporedba sirovih
+       stringova krivo broji "odrađeno danas" u rubnim satima. localDT().d vraća lokalni dan. */
+    if(localDT(z.closed_at).d!==iso) return;
     var d = new Date(z.closed_at);
     gotove.push({ tip:'zad', item:z, osoba:z.tko||null, h:null, kad: isNaN(d.getTime()) ? '' : fmtSat(d) });
   });
   var poOsobi = {};
   function po(ime){ var k = ime || '__nitko'; if(!poOsobi[k]) poOsobi[k] = {n:0,h:0,bezH:0,gotN:0,gotH:0}; return poOsobi[k]; }
   MAJSTORI.forEach(function(m){ po(m); }); po('Voditelj'); po(null);
-  var sati = 0, bezProcjene = 0, kasni = 0;
+  var sati = 0, bezProcjene = 0, kasni = 0, nMoj = 0, kasniMoj = 0;
+  /* A: hero brojke moraju pratiti isti filtar osobe kao popis ispod (prolaziFiltar) — inače
+     hero pokaže "5" dok popis ima 3 retka. Nedodijeljene stavke prolaze filtar (kandidati
+     svima), pa ulaze i u *Moj varijantu — isto kao što ih popis već prikazuje. */
   stavke.forEach(function(x){
     var o = po(x.osoba); o.n++;
     if(x.tip==='prev'){
@@ -3236,16 +3241,19 @@ function danSazetak(iso){
       else { sati += x.h; o.h += x.h; }
     }
     if(x.datum < danas) kasni++;
+    if(prolaziFiltar(x)){ nMoj++; if(x.datum < danas) kasniMoj++; }
   });
   sada.forEach(function(k){
     var o = po(k.dodijeljen); o.n++;
     if(k.status==='u_radu'){ var s = satiKvara(k); sati += s; o.h += s; }
+    if(prolaziFiltar({osoba:k.dodijeljen})) nMoj++;
   });
   gotove.forEach(function(g){ var o = po(g.osoba); o.gotN++; if(g.h) o.gotH += g.h; });
   return {
     iso:iso, danas:jeDanas, kl:kl, stavke:stavke, sada:sada, gotove:gotove,
     n: stavke.length + sada.length, nGotove: gotove.length,
     sati: Math.round(sati*10)/10, bezProcjene:bezProcjene, kasni:kasni,
+    nMoj:nMoj, kasniMoj:kasniMoj,
     hitno: sada.filter(function(k){ return k.prioritet==='hitno'; }).length,
     poOsobi:poOsobi
   };
@@ -3467,13 +3475,18 @@ function renderHero(sz){
   var desnoTxt = sz.bezProcjene>0
     ? '<span class="role-voditelj"'+(voditelj ? ' onclick="app.planirajDan()"' : '')+'>'+sz.bezProcjene+' bez procjene sati</span>'
     : (sz.sati>0 ? '<span class="role-voditelj">sve procijenjeno</span>' : '');
+  /* A: dok je filtar po osobi aktivan (majstor uvijek, ili bilo tko ručno kroz pilulu),
+     hero mora pokazati ISTU brojku koju popis ispod stvarno prikazuje (prolaziFiltar) —
+     inače hero laže (npr. "5" dok popis ima 3 retka). */
+  var heroN = RASP_FILTER_OSOBA ? sz.nMoj : sz.n;
+  var heroKasni = RASP_FILTER_OSOBA ? sz.kasniMoj : sz.kasni;
   return '<div class="card rasp-hero'+(gotovo?' gotovo':'')+'">'+
     '<div class="rasp-hero-r1 fade"><div><div class="rasp-dan-h2">'+pref+danUTjednu(iso)+'</div>'+
       '<div class="rasp-dan-h1">'+(gotovo ? '<span class="rasp-kv-ok">'+SVG_KVACICA+'</span>' : '')+parseInt(p[2],10)+'. '+MJESECI_G[parseInt(p[1],10)-1]+'</div></div>'+desno+'</div>'+
     '<div class="rasp-hero-grid fade">'+
-      '<div class="rasp-stat" onclick="app.rasporedSkokNa(\'plan\')"><span class="stat-num">'+sz.n+'</span><span class="stat-label">Za odraditi</span></div>'+
+      '<div class="rasp-stat" onclick="app.rasporedSkokNa(\'plan\')"><span class="stat-num">'+heroN+'</span><span class="stat-label">Za odraditi</span></div>'+
       '<div class="rasp-stat role-voditelj"'+(voditelj ? ' onclick="app.planirajDan()"' : '')+'>'+satiTxt+'<span class="stat-label">od '+kapacitet+' h</span></div>'+
-      '<div class="rasp-stat" onclick="app.rasporedSkokNa(\'kasni\')"><span class="stat-num'+(sz.kasni>0?' crv':'')+'">'+sz.kasni+'</span><span class="stat-label">Kasni</span></div>'+
+      '<div class="rasp-stat" onclick="app.rasporedSkokNa(\'kasni\')"><span class="stat-num'+(heroKasni>0?' crv':'')+'">'+heroKasni+'</span><span class="stat-label">Kasni</span></div>'+
     '</div>'+
     '<div class="rasp-prog-wrap fade"><div class="rasp-prog">'+seg+'</div>'+
       '<div class="rasp-prog-txt"><span>'+lijevo+'</span><span>'+desnoTxt+'</span></div></div>'+
@@ -4595,6 +4608,10 @@ var app = {
       akcije += '<button class="btn '+(zadatak?'sec':'primary')+' block role-write" style="margin-top:14px" onclick="app.preuzmiKvar(\''+kId+'\')">Preuzimam — radim na ovome</button>';
     if(jeOtvoren(k))
       akcije += '<button class="btn '+(k.status==='otvoren' && !zadatak ? 'sec' : 'primary')+' block role-write" style="margin-top:'+(k.status==='otvoren'?'8':'14')+'px" onclick="app.rijesiKvar(\''+kId+'\')">'+(zadatak?'Označi obavljeno':'Riješi kvar')+'</button>';
+    /* E: dosad je iz "Riješen" jedini izlaz bio Storniraj — a to briše zapis iz analitike/
+       MTTR-a/CSV-a/IFS-a, iako se rad stvarno dogodio. Ovo vraća u tijek bez brisanja traga. */
+    if(k.status==='rijesen')
+      akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.vratiURad(\''+kId+'\')">Nije riješeno — vrati u rad</button>';
     if(jeOtvoren(k) && !zadatak)
       /* premješteno s kartice: prekidač koji ne mora stajati na svakoj kartici u popisu */
       akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.cekaDioIzDetalja(\''+kId+'\')">'+
@@ -6012,6 +6029,43 @@ var app = {
       ((prijasnji && prijasnji !== SESSION.ime) ? ' (preuzeo od '+prijasnji+')' : ''), k.id);
     await apiUpdate('kvarovi', kId, { status:'u_radu', poceo_at:k.poceo_at, dodijeljen:k.dodijeljen });
   },
+  /* E: iz "Riješen" dosad nije bilo povratka osim Storniraj — a storno kvar briše iz
+     analitike/MTTR-a/CSV-a/IFS-a, iako se rad stvarno dogodio (popravak samo nije držao).
+     Isti obrazac kao storno (PLAN-KAIZEN K-1: prompt() je loš UX, razlog ostaje u evidenciji
+     kao komentar). sati/tko/zam se NE diraju — taj rad je stvarno obavljen. */
+  vratiURad: function(kId){
+    var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
+    if(!k) return;
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
+      '<div class="modal-head"><h3>Nije riješeno — vrati u rad</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<div class="row-sub" style="margin-bottom:2px">'+esc(k.opis)+'</div>'+
+      '<form onsubmit="app.saveVratiURad(event,\''+kId+'\')">'+
+        '<label>Razlog (ostaje u evidenciji)</label>'+
+        '<textarea name="razlog" rows="2" required placeholder="npr. popravak nije držao, kvar se ponovio…"></textarea>'+
+        '<button class="btn primary block" type="submit">Vrati u rad</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '</form></div></div>';
+  },
+  saveVratiURad: async function(e, kId){
+    e.preventDefault();
+    var razlog = String(new FormData(e.target).get('razlog')||'').trim();
+    if(!razlog) return;
+    var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
+    if(!k) return;
+    k.status = k.dodijeljen ? 'u_radu' : 'otvoren';
+    k.closed_at = null;
+    app.closeModal();
+    showScreen('kvarovi');
+    if(!DATA.komentari) DATA.komentari = [];
+    var kom = { id:'ko'+Date.now(), kvar_id:kId, tekst:'Vraćeno u rad: '+razlog,
+                tko: SESSION.ime || 'Voditelj', created_at: new Date().toISOString() };
+    DATA.komentari.push(kom);
+    await apiInsert('komentari', { kvar_id:kId, tekst:kom.tekst, tko:kom.tko }, kom);
+    var m = machineById(k.m);
+    sysPoruka('↩️ Vraćeno u rad — '+(m?m.name+': ':'')+k.opis+' („'+razlog+'”)', k.id);   /* BEZ pusha (E) */
+    await apiUpdate('kvarovi', k.id, { status:k.status, closed_at:k.closed_at });
+  },
   rijesiKvar: function(kId){
     if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
@@ -6181,26 +6235,20 @@ var app = {
         '<label>Sudjelovali</label>'+sudjelovaliCheckbox(k.sudjelovali||'')+
         '<label>Zamijenjeno</label><input name="zam" value="'+esc(k.zam||'')+'">'
       : '';
-    $('#modal-root').innerHTML =
-      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
-      '<div class="modal-head"><h3>Uredi '+(k.tip==='zadatak'?'zadatak':'kvar')+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<form onsubmit="app.saveUredi(event,\''+kId+'\')">'+
+    /* D (§16.4 P2 dovršetak): tehničaru je "Detaljno" maknuto s prijave — Uredi kvar mu
+       ostaje jedini put do prioriteta, pa smije ponuditi samo TRI stalna polja (Opis, Datum,
+       Prioritet; + Rok/Ponavljanje za zadatak). Sve ostalo ide iza "+ Dodatno", isti DOM-trik
+       kao Riješi kvar (dugme sakriva sebe, otkriva sljedeći div). Dodijeljen NAMJERNO nije
+       među stalnima — dodjela je voditeljev posao, ne tehničarov. */
+    var dodatno =
         '<label>Stroj</label><select name="m">'+strojOpts+'</select>'+
-        '<label>Opis</label><textarea name="opis" rows="2" required>'+esc(k.opis)+'</textarea>'+
-        '<label>Datum</label><input type="date" name="date" value="'+k.date+'" required>'+
         '<label>Trajanje zastoja (h)</label><input type="number" name="sati" step="0.5" min="0" value="'+k.sati+'">'+
         '<label>Kategorija</label><select name="kategorija">'+katOpts+'</select>'+
-        '<label>Prioritet</label><select name="prioritet">'+priOpts+'</select>'+
         '<label>Smjena</label><select name="smjena"><option value=""'+(k.smjena?'':' selected')+'>—</option>'+smjOpts+'</select>'+
         '<label>Dodijeljen</label><select name="dodijeljen">'+majOpts+'</select>'+
         (k.tip!=='zadatak' && jeOtvoren(k)
           ? '<label>Procijenjeno gotovo do (izborno)</label>'+
             '<input type="datetime-local" name="procjena_gotovo" value="'+esc(k.procjena_gotovo||'')+'">'
-          : '')+
-        (k.tip==='zadatak'
-          ? '<label>Rok</label><input type="date" name="rok" value="'+esc(k.rok||'')+'">'+
-            '<label>Ponavljanje (dana; prazno = ne ponavlja se)</label>'+
-            '<input type="number" name="ponavljanje" min="1" step="1" value="'+(k.ponavljanje||'')+'">'
           : '')+
         rijeseno+
         (k.status!=='rijesen'
@@ -6213,7 +6261,23 @@ var app = {
         '<div id="polje-sanacije" style="margin-top:8px'+(k.privremeni?'':';display:none')+'">'+
           '<label>Rok trajne sanacije</label>'+
           '<input type="date" name="rok_sanacije" value="'+esc(k.rok_sanacije||'')+'">'+
-        '</div>'+
+        '</div>';
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
+      '<div class="modal-head"><h3>Uredi '+(k.tip==='zadatak'?'zadatak':'kvar')+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<form onsubmit="app.saveUredi(event,\''+kId+'\')">'+
+        '<label>Opis</label><textarea name="opis" rows="2" required>'+esc(k.opis)+'</textarea>'+
+        '<label>Datum</label><input type="date" name="date" value="'+k.date+'" required>'+
+        '<label>Prioritet</label><select name="prioritet">'+priOpts+'</select>'+
+        (k.tip==='zadatak'
+          ? '<label>Rok</label><input type="date" name="rok" value="'+esc(k.rok||'')+'">'+
+            '<label>Ponavljanje (dana; prazno = ne ponavlja se)</label>'+
+            '<input type="number" name="ponavljanje" min="1" step="1" value="'+(k.ponavljanje||'')+'">'
+          : '')+
+        '<button type="button" class="btn-mini" style="margin:4px 0 10px" '+
+          'onclick="this.nextElementSibling.style.display=\'block\';this.style.display=\'none\'">'+
+          '+ Dodatno (stroj, dodjela, trajanje…)</button>'+
+        '<div style="display:none">'+dodatno+'</div>'+
         '<button class="btn primary block" type="submit">Spremi izmjene</button>'+
         '<button class="btn sec block role-voditelj" type="button" style="margin-top:8px" onclick="app.stornirajKvar(\''+kId+'\')">Storniraj (pogrešan unos)</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
@@ -6225,6 +6289,7 @@ var app = {
     if(!k) return;
     var f = new FormData(e.target);
     var prijeDodijeljen = k.dodijeljen;
+    var prijePrioritet = k.prioritet;
     k.m = f.get('m') || null;
     k.opis = String(f.get('opis')||'').trim() || k.opis;
     k.date = f.get('date') || k.date;
@@ -6257,6 +6322,15 @@ var app = {
     if(k.dodijeljen && k.dodijeljen !== prijeDodijeljen && jeOtvoren(k)){
       var dm = machineById(k.m);
       posaljiObavijest('📋 Dodijeljeno tebi', (dm?dm.name+': ':'')+k.opis, '#kvarovi', k.dodijeljen);
+    }
+    /* F: obavijest se dosad slala ISKLJUČIVO kad se promijeni dodijeljen — promjena
+       prioriteta je tiho odlazila u bazu. Kvar prijavljen bez kvačice pa eskaliran na
+       hitno je prošao nezamijećen. Isto pravilo kao obavijestNoviKvar za novi hitni kvar:
+       broadcast (bez samoZa) svima, ne samo dodijeljenom. */
+    if(k.prioritet==='hitno' && prijePrioritet!=='hitno' && jeOtvoren(k)){
+      var hm = machineById(k.m);
+      sysPoruka('🔴 HITNO — '+(hm?hm.name+': ':'')+k.opis+' ('+(SESSION.ime||'')+')', k.id);
+      posaljiObavijest('🔴 HITNO', (hm?hm.name+': ':'')+k.opis, '#kvarovi');
     }
     app.closeModal();
     /* zadatak uređen s Rasporeda vraća na Raspored, ne na Kvarove */
@@ -7061,6 +7135,10 @@ function initHash(){
   var stroj = /#stroj=([\w-]+)/.exec(location.hash || '');
   if(stroj && machineById(stroj[1])){ app.openStroj(stroj[1]); return true; }
   var ime = String(location.hash || '').replace('#','');
+  /* B: jutarnja obavijest šalje #pregled, ali tehničar tu karticu nema u donjoj traci —
+     bez straže klik na obavijest baca majstora na ekran bez osvijetljene kartice i bez
+     "natrag". Pokrivа i već poslane obavijesti (ruta se ne mijenja, samo odredište). */
+  if(ime==='pregled' && SESSION.role==='majstor') ime = 'raspored';
   if(HASH_EKRANI.indexOf(ime) > -1){ showScreen(ime); return true; }
   return false;
 }
