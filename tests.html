@@ -2823,6 +2823,101 @@ async function testovi(W, D){
   dioZaUgradnju.stanje = stanjePrijeUgradnje; kvarDio.zam = zamPrije; W.save();
   app.closeModal();
 
+  grupa('SIM-FIX A1 — preventiva: isti popis intervala u novom i uredi modalu');
+  var strojZaPrev = W.DATA.machines[0];
+  app.novaPreventiva(strojZaPrev.id); await cekaj(100);
+  ok('novi modal preventive sadrži "svakih 7 dana"',
+     D.querySelector('#modal-root').innerHTML.indexOf('svakih 7 dana') > -1);
+  app.closeModal();
+
+  grupa('SIM-FIX A3 — "Riješi kvar" za zadatak koristi rječnik zadatka, ne kvara');
+  var zadZaRijesi = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='zadatak'; })[0];
+  if(!zadZaRijesi){
+    zadZaRijesi = {id:'ztest'+Date.now(), m:null, date:W.todayISO(), opis:'TEST zadatak za rješavanje',
+      sati:0, status:'otvoren', upoz:false, tip:'zadatak', kategorija:'Ostalo', dodijeljen:'Voditelj',
+      ceka_dio:false, ceka_servis:false, prioritet:'normalno', otpusteno:false, privremeni:false, rok_sanacije:null};
+    W.DATA.kvarovi.push(zadZaRijesi);
+  }
+  app.rijesiKvar(zadZaRijesi.id); await cekaj(100);
+  var modalZad = D.querySelector('#modal-root').textContent;
+  ok('modal zadatka ne spominje "zastoja"', modalZad.indexOf('zastoja') === -1);
+  ok('modal zadatka ne nudi "Zatvori kvar"', modalZad.indexOf('Zatvori kvar') === -1);
+  ok('naslov modala je "Označi obavljeno"', modalZad.indexOf('Označi obavljeno') > -1);
+  var fZad = D.querySelector('#modal-root form');
+  jednako('polje sati kod zadatka nije obavezno', fZad.elements.sati.required, false);
+  posalji(fZad); await cekaj(150);
+  jednako('zadatak bez upisanog vremena sprema sati:0', zadZaRijesi.sati, 0);
+  jednako('zadatak je riješen', zadZaRijesi.status, 'rijesen');
+
+  grupa('SIM-FIX B2 — "Ugrađen dio"/"Naruči dio" nude i nevezane dijelove');
+  var strojZaDio = W.DATA.machines.filter(function(mm){
+    return W.DATA.dijelovi.some(function(d){ return (d.strojevi||[]).indexOf(mm.id) > -1; });
+  })[0];
+  if(strojZaDio){
+    var nevezaniDio = W.DATA.dijelovi.filter(function(d){ return (d.strojevi||[]).indexOf(strojZaDio.id) === -1; })[0];
+    var kvarZaOpts = { id:'ktest'+Date.now(), m:strojZaDio.id, date:W.todayISO(), opis:'TEST kvar za opcije dijelova',
+      sati:0, status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo', dodijeljen:'Voditelj',
+      ceka_dio:false, ceka_servis:false, prioritet:'normalno', otpusteno:false, privremeni:false, rok_sanacije:null };
+    W.DATA.kvarovi.push(kvarZaOpts);
+    app.ugradiDioZaKvar(kvarZaOpts.id); await cekaj(100);
+    var selDio = D.querySelector('#modal-root select[name="dio"]');
+    ok('select "Ugrađen dio" sadrži i nevezani dio', nevezaniDio ?
+       Array.prototype.some.call(selDio.options, function(o){ return o.value === nevezaniDio.id; }) : true);
+    app.closeModal();
+    W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== kvarZaOpts.id; });
+  }
+
+  grupa('SIM-FIX B5 — "Riješi kvar" labela "Što je napravljeno / zamijenjeno"');
+  var kvarZaLabelu = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; })[0];
+  app.rijesiKvar(kvarZaLabelu.id); await cekaj(100);
+  ok('labela "Što je napravljeno / zamijenjeno" postoji',
+     D.querySelector('#modal-root').textContent.indexOf('Što je napravljeno / zamijenjeno') > -1);
+  app.closeModal();
+
+  grupa('SIM-FIX B6 — toast kad ugradnja dijela spusti stanje na/ispod minimuma');
+  var toastPoruke = [];
+  var origToast = W.toast;
+  W.toast = function(msg){ toastPoruke.push(msg); origToast(msg); };
+  var dioIspodMin = { id:'dtest'+Date.now(), naziv:'TEST dio ispod minimuma', stanje:5, min:5, strojevi:[] };
+  W.DATA.dijelovi.push(dioIspodMin);
+  var kvarZaB6 = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; })[0];
+  app.ugradiDioZaKvar(kvarZaB6.id); await cekaj(100);
+  var fB6 = D.querySelector('#modal-root form');
+  fB6.elements.dio.value = dioIspodMin.id;
+  posalji(fB6); await cekaj(150);
+  ok('toast upozorava na stanje ispod minimuma',
+     toastPoruke.some(function(t){ return t.indexOf(dioIspodMin.naziv) > -1 && t.indexOf('naručiti') > -1; }));
+  W.toast = origToast;
+  W.DATA.dijelovi = W.DATA.dijelovi.filter(function(d){ return d.id !== dioIspodMin.id; });
+
+  grupa('SIM-FIX C1 — privremeni popravak / rok sanacije i u "Riješi kvar"');
+  var kvarZaSanaciju = { id:'ctest'+Date.now(), m:W.DATA.machines[0].id, date:W.todayISO(), opis:'TEST kvar za sanaciju',
+    sati:1, status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo', dodijeljen:'Voditelj',
+    ceka_dio:false, ceka_servis:false, prioritet:'normalno', otpusteno:false, privremeni:false, rok_sanacije:null };
+  W.DATA.kvarovi.push(kvarZaSanaciju);
+  app.rijesiKvar(kvarZaSanaciju.id); await cekaj(100);
+  ok('"Riješi kvar" nudi kvačicu "Privremeni popravak"',
+     D.querySelector('#modal-root').textContent.indexOf('Privremeni popravak') > -1);
+  var fSan = D.querySelector('#modal-root form');
+  fSan.elements.sati.value = '2';
+  fSan.elements.privremeni.checked = true;
+  fSan.elements.rok_sanacije.value = W.isoShift(14);
+  posalji(fSan); await cekaj(150);
+  jednako('kvačica "privremeni" je spremljena', kvarZaSanaciju.privremeni, true);
+  jednako('rok sanacije je spremljen', kvarZaSanaciju.rok_sanacije, W.isoShift(14));
+
+  grupa('SIM-FIX C3 — "Naruči dio za ovaj kvar" i bez oznake "Čeka dio"');
+  var kvarBezCekaDio = { id:'c3test'+Date.now(), m:W.DATA.machines[0].id, date:W.todayISO(), opis:'TEST kvar bez čeka_dio',
+    sati:0, status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo', dodijeljen:'Voditelj',
+    ceka_dio:false, ceka_servis:false, prioritet:'normalno', otpusteno:false, privremeni:false, rok_sanacije:null };
+  W.DATA.kvarovi.push(kvarBezCekaDio);
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  app.detaljKvara(kvarBezCekaDio.id); await cekaj(100);
+  ok('otvoren kvar bez "čeka dio" ipak nudi "Naruči dio za ovaj kvar" voditelju',
+     D.querySelector('#modal-root').innerHTML.indexOf('app.naruciZaKvar') > -1);
+  app.closeModal();
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== kvarBezCekaDio.id; });
+
   grupa('Otpornost');
   W.DATA.kvarovi.push({id:'kvX', m:'nepostojeci', date:W.todayISO(), opis:'TEST siroče',
                        sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo'});

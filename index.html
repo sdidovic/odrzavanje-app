@@ -1139,6 +1139,11 @@ function isoShift(days){
   return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
 }
 function todayISO(){ return isoShift(0); }
+// SIM-FIX A1: zajednički popis intervala preventive — isti u "novi" i "uredi" modalu
+var PREVENTIVA_INTERVALI = ['svakih 7 dana','svakih 30 dana','svakih 60 dana','svakih 90 dana','svakih 180 dana','svakih 12 mjeseci'];
+function prevIntOpts(selected){
+  return PREVENTIVA_INTERVALI.map(function(iv){ return '<option'+(selected===iv?' selected':'')+'>'+iv+'</option>'; }).join('');
+}
 function fmtDate(iso){
   var p = iso.split('-');
   return parseInt(p[2],10)+'.'+parseInt(p[1],10)+'.'+p[0]+'.';
@@ -2064,6 +2069,8 @@ function renderPregled(){
       '<div class="rasp-hero-r1"><div>'+
         '<div class="rasp-dan-h2">Trošak zastoja · '+esc(monthLabel())+'</div>'+
         '<div class="rasp-dan-h1" onclick="app.go(\'analitika\')" style="cursor:pointer">'+EUR(cost)+trend+'</div>'+
+        /* SIM-FIX C4: iznos bez oznake izgleda kao brojka za čitanje, ne dodir — diskretan link ispod kaže da vodi dalje */
+        '<div class="row-sub" onclick="app.go(\'analitika\')" style="cursor:pointer">Analitika ›</div>'+
       '</div><div><div class="rasp-smjena">prvih '+danMj+' dana</div>'+
         (uTijekuCost > 0 ? '<div class="rasp-smjena-jos">+ '+EUR(uTijekuCost)+' još traje</div>' : '')+'</div></div>'+
       najveciRedak+
@@ -2595,6 +2602,19 @@ function otvoreneNarudzbe(){
     .sort(function(a,b){ return String(a.ocekivano||'9999').localeCompare(String(b.ocekivano||'9999')); });
 }
 function dioPoId(id){ return DATA.dijelovi.filter(function(x){ return x.id===id; })[0] || null; }
+// SIM-FIX B2: "Naruči dio"/"Ugrađen dio" su dosad prikazivali SAMO dijelove vezane uz stroj —
+// dio bez veze u šifrarniku izgledao je kao da ga skladište nema. Sad: prvo vezani, pa razdjelnik,
+// pa svi ostali (abecedno) — ništa se ne skriva.
+function dioOptsZaStroj(mId){
+  var vezani = DATA.dijelovi.filter(function(p){ return (p.strojevi||[]).indexOf(mId) > -1; });
+  var vezaniIds = {}; vezani.forEach(function(p){ vezaniIds[p.id] = true; });
+  var ostali = DATA.dijelovi.filter(function(p){ return !vezaniIds[p.id]; })
+    .sort(function(a,b){ return a.naziv.localeCompare(b.naziv,'hr'); });
+  var opt = function(p){ return '<option value="'+p.id+'">'+esc(p.naziv)+' (stanje '+p.stanje+')</option>'; };
+  return vezani.map(opt).join('') +
+    (vezani.length && ostali.length ? '<option disabled>──────</option>' : '') +
+    ostali.map(opt).join('');
+}
 /* jedan izvor istine za "je li dio naručen": otvorena narudžba u Nabavi */
 function narudzbaZaDio(id){
   return otvoreneNarudzbe().filter(function(n){ return n.dio_id === id; })[0] || null;
@@ -4509,10 +4529,12 @@ var app = {
            voditeljev posao (§2), pa tekst i sam kaže kome se to javlja, ne pretpostavlja da je
            TEHNIČAR taj koji naručuje (brzoCekaDio šalje sysPoruku + obavijest voditelju). */
         (k.ceka_dio ? '✓ Čeka dio — makni oznaku' : 'Treba dio — javi voditelju')+'</button>';
-    if(jeOtvoren(k) && !zadatak && k.ceka_dio && !narudzbaZaKvar)
+    if(jeOtvoren(k) && !zadatak && !narudzbaZaKvar)
       /* K-3: veza narudžba->kvar se upiše sama dolaskom iz ovog konteksta.
          §16 P1: naručivanje (dobavljač, cijena) je voditeljev/nabava posao — tehničar je već
-         javio "treba dio" (gore), ne mora i sam naručivati. */
+         javio "treba dio" (gore), ne mora i sam naručivati.
+         SIM-FIX C3: prije se gumb skrivao dok voditelj ne postavi ceka_dio — a voditelj
+         često unaprijed zna da treba naručiti dio, prije nego tehničar javi. */
       akcije += '<button class="btn sec block role-voditelj" style="margin-top:8px" onclick="app.naruciZaKvar(\''+kId+'\')">Naruči dio za ovaj kvar</button>';
     /* §16 P3 (rupa #5 "dio ugrađen usred kvara"): dosad se moglo razdužiti tek pri zatvaranju
        (Riješi kvar) ili na Skladištu "−" (gubi vezu s kvarom) — sad i dok je kvar još otvoren,
@@ -4726,7 +4748,9 @@ var app = {
         '<label>Što treba obaviti</label><textarea name="opis" rows="2" required placeholder="'+
           (kvar?'npr. naruči ležaj 6208':'npr. dogovoriti termin servisa s MB Frigo')+'"></textarea>'+
         /* "+ Na ovaj dan" s kalendara (K3) predispuni rok — dva dodira do gotovog obrasca */
-        '<label>Rok (prazno = bez roka)</label><input type="date" name="rok" min="'+todayISO()+'"'+
+        /* SIM-FIX A4: min=danas je tiho odbijao prošli rok — "trebalo je jučer" je legitiman
+           unos, i takav zadatak se odmah vidi kao "Kasni" bez posebne obrade. */
+        '<label>Rok (prazno = bez roka)</label><input type="date" name="rok"'+
           (rok ? ' value="'+esc(rok)+'"' : '')+'>'+
         '<label>Tko</label><select name="dodijeljen"><option value="">—</option>'+osobaOpts('')+'</select>'+
         '<label>Kontakt (izborno)</label><select name="kontakt_id">'+kontOpts+'</select>'+
@@ -5315,8 +5339,7 @@ var app = {
     if(jeTempId(pId)){ alert('Zapis se upravo sprema — pokušaj za par sekundi.'); return; }
     var p = DATA.preventiva.filter(function(x){ return x.id===pId; })[0];
     if(!p) return;
-    var intOpts = ['svakih 7 dana','svakih 30 dana','svakih 60 dana','svakih 90 dana','svakih 180 dana','svakih 12 mjeseci']
-      .map(function(iv){ return '<option'+(p.interval===iv?' selected':'')+'>'+iv+'</option>'; }).join('');
+    var intOpts = prevIntOpts(p.interval);
     var izvOpts = ['interno'].concat(DATA.partneri.map(function(x){ return x.naziv; }))
       .map(function(t){ return '<option'+(p.izv===t?' selected':'')+'>'+esc(t)+'</option>'; }).join('');
     $('#modal-root').innerHTML =
@@ -5419,10 +5442,8 @@ var app = {
     if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
     if(!k) return;
-    var opts = DATA.dijelovi.filter(function(p){ return (p.strojevi||[]).indexOf(k.m) > -1; });
-    if(!opts.length) opts = DATA.dijelovi;   /* nema dio vezan uz taj stroj u šifrarniku — ponudi sve */
-    if(!opts.length){ alert('Nema unesenih dijelova u skladištu.'); return; }
-    var dioOpts = opts.map(function(p){ return '<option value="'+p.id+'">'+esc(p.naziv)+' (stanje '+p.stanje+')</option>'; }).join('');
+    if(!DATA.dijelovi.length){ alert('Nema unesenih dijelova u skladištu.'); return; }
+    var dioOpts = dioOptsZaStroj(k.m);
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Naruči dio za ovaj kvar</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
@@ -5438,10 +5459,8 @@ var app = {
     if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
     if(!k) return;
-    var opts = DATA.dijelovi.filter(function(p){ return (p.strojevi||[]).indexOf(k.m) > -1; });
-    if(!opts.length) opts = DATA.dijelovi;
-    if(!opts.length){ alert('Nema unesenih dijelova u skladištu.'); return; }
-    var dioOpts = opts.map(function(p){ return '<option value="'+p.id+'">'+esc(p.naziv)+' (stanje '+p.stanje+')</option>'; }).join('');
+    if(!DATA.dijelovi.length){ alert('Nema unesenih dijelova u skladištu.'); return; }
+    var dioOpts = dioOptsZaStroj(k.m);
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Ugrađen dio</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
@@ -5466,8 +5485,11 @@ var app = {
     app.detaljKvara(kId);
     rerender();
     sysPoruka('🔧 Ugrađen dio: '+p.naziv+(kol>1?' ×'+kol:'')+' — '+k.opis+' ('+(SESSION.ime||'')+')', kId);
-    if(prije >= p.min && p.stanje < p.min)
+    if(prije >= p.min && p.stanje < p.min){
       sysPoruka('📦 Dio ispod minimuma: '+p.naziv+' (stanje '+p.stanje+', min '+p.min+') — naručiti!');
+      /* SIM-FIX B6: sysPoruka ide u povijest koju treba otvoriti — toast se vidi odmah, na licu mjesta */
+      toast('⚠ '+p.naziv+': stanje '+p.stanje+' (min '+p.min+') — naručiti');
+    }
     if(REMOTE && naMrezi()){
       try{
         var rpc = await sb.rpc('razduzi_dio', { p_id: p.id, p_kolicina: kol });
@@ -5871,53 +5893,71 @@ var app = {
     if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
     if(!k) return;
+    /* SIM-FIX A3: zadatak (npr. iz "Zovi servis") posuđivao je cijeli rječnik kvara —
+       "zastoj linije", "Zatvori kvar", skladište — iako zadatak ništa od toga nema. */
+    var zadatak = (k.tip||'kvar')==='zadatak';
     PENDING_FOTO = '';
     var m = machineById(k.m) || {name:''};
     var dioOpts = '<option value="">—</option>' + DATA.dijelovi.map(function(d){
       return '<option value="'+d.id+'">'+esc(d.naziv)+' (stanje '+d.stanje+')</option>';
     }).join('');
-    $('#modal-root').innerHTML =
-      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
-      '<div class="modal-head"><h3>Riješi kvar</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<div class="row-sub" style="margin-bottom:2px">'+esc(m.name)+' &middot; '+esc(k.opis)+'</div>'+
-      '<form onsubmit="app.saveRijesen(event,\''+kId+'\')">'+
+    var satiPolje = zadatak
+      ? '<label>Utrošeno vremena (h, izborno)</label>'+
+        '<input type="number" name="sati" step="0.5" min="0" max="720" placeholder="prazno = 0">'
+      : (function(){
         /* Brza prijava sprema sati:0. Kad bi ovdje pisala nula, ona bi i ostala —
            a to je jedini kanal kojim stvarni zastoj ikad uđe u evidenciju.
            AUDIT-FIX (§14.2 t.1): prijedlog se računa uživo iz poceo_at→sada, ne iz starog
            k.sati (koji je do sada bio ili zastarjela nagađanje s prijave, ili već upisan). */
-        (function(){
-          var pK = pocetakKvara(k);
-          var satiUzivo = pK ? Math.round(((Date.now()-pK.getTime())/3600000)*2)/2 : 0;
-          var predlog = satiUzivo > 0 ? satiUzivo : k.sati;
-          return '<label>Ukupno trajanje zastoja (h)</label>'+
-            '<input type="number" name="sati" step="0.5" min="0" max="720" required'+
-              (predlog > 0 ? ' value="'+predlog+'"' : ' placeholder="koliko je linija stvarno stajala"')+'>'+
-            (satiUzivo > 0
-              ? '<div class="row-sub" style="margin-top:-4px">Predloženo prema vremenu otkad je preuzeto — ispravi ako treba.</div>'
-              : (predlog > 0 ? '' : '<div class="row-sub" style="margin-top:-4px">Upiši stvarno trajanje — iz ovoga se računa trošak zastoja.</div>'));
-        })()+
+        var pK = pocetakKvara(k);
+        var satiUzivo = pK ? Math.round(((Date.now()-pK.getTime())/3600000)*2)/2 : 0;
+        var predlog = satiUzivo > 0 ? satiUzivo : k.sati;
+        return '<label>Ukupno trajanje zastoja (h)</label>'+
+          '<input type="number" name="sati" step="0.5" min="0" max="720" required'+
+            (predlog > 0 ? ' value="'+predlog+'"' : ' placeholder="koliko je linija stvarno stajala"')+'>'+
+          (satiUzivo > 0
+            ? '<div class="row-sub" style="margin-top:-4px">Predloženo prema vremenu otkad je preuzeto — ispravi ako treba.</div>'
+            : (predlog > 0 ? '' : '<div class="row-sub" style="margin-top:-4px">Upiši stvarno trajanje — iz ovoga se računa trošak zastoja.</div>'));
+      })();
+    var dodatno = zadatak ? '' :
+        '<label>Utrošeni dio sa skladišta</label><select name="dio">'+dioOpts+'</select>'+
+        '<label>Količina</label><input type="number" name="kol" min="1" step="1" value="1">'+
+        '<label>Što je napravljeno / zamijenjeno</label><input name="zam" placeholder="npr. remen, brtva… (prazno ako ništa)">'+
+        /* SIM-FIX C1: privremeni popravak/rok sanacije dosad je bio dostupan samo u "Uredi kvar" —
+           majstor koji zatvara kvar na licu mjesta ionako zna je li popravak privremen. */
+        '<label class="prekidac" style="margin-top:8px"><input type="checkbox" name="privremeni"'+(k.privremeni?' checked':'')+
+          ' onchange="app.prekidacSanacije(this.checked)"><span>Privremeni popravak (traži trajnu sanaciju)</span></label>'+
+        '<div id="polje-sanacije" style="margin-top:8px'+(k.privremeni?'':';display:none')+'">'+
+          '<label>Rok trajne sanacije</label>'+
+          '<input type="date" name="rok_sanacije" value="'+esc(k.rok_sanacije||'')+'">'+
+        '</div>';
+    $('#modal-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
+      '<div class="modal-head"><h3>'+(zadatak?'Označi obavljeno':'Riješi kvar')+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<div class="row-sub" style="margin-bottom:2px">'+esc(m.name)+' &middot; '+esc(k.opis)+'</div>'+
+      '<form onsubmit="app.saveRijesen(event,\''+kId+'\')">'+
+        satiPolje+
         /* §16 P2: voditelj koji zatvara kvar za tehničara ne bi trebao morati mijenjati select
            s njegovog imena na tehničarovo — pretpostavka je "tko je radio", ne "tko zatvara". */
         '<label>Riješio</label><select name="tko">'+majstorOpts(k.dodijeljen || SESSION.ime)+'</select>'+
-        '<label class="prekidac"><input type="checkbox" name="otpusteno"'+(k.otpusteno?' checked':'')+'>'+
-          '<span>Linija otpuštena nakon čišćenja i pregleda na strana tijela</span></label>'+
+        (zadatak ? '' :
+          '<label class="prekidac"><input type="checkbox" name="otpusteno"'+(k.otpusteno?' checked':'')+'>'+
+            '<span>Linija otpuštena nakon čišćenja i pregleda na strana tijela</span></label>')+
         /* AUDIT-FIX (UX): 8 polja iste vizualne težine tražilo je skrolanje i procjenu
            koje je od njih obavezno (samo Sati) za najčešću radnju "gotovo je, zatvori" —
            isti princip "gustoća iza dodira" koji app već koristi na Kvarovima/Skladištu. */
         '<button type="button" class="btn-mini" style="margin:4px 0 10px" '+
           'onclick="this.nextElementSibling.style.display=\'block\';this.style.display=\'none\'">'+
-          '+ Dodatno (sudionici, utrošeni dio, foto)</button>'+
+          '+ Dodatno ('+(zadatak?'sudionici, foto':'sudionici, utrošeni dio, foto')+')</button>'+
         '<div style="display:none">'+
           '<label>Sudjelovali (ako je radilo više ljudi)</label>'+sudjelovaliCheckbox('')+
-          '<label>Utrošeni dio sa skladišta</label><select name="dio">'+dioOpts+'</select>'+
-          '<label>Količina</label><input type="number" name="kol" min="1" step="1" value="1">'+
-          '<label>Zamijenjeno (opis, ako dio nije sa skladišta)</label><input name="zam" placeholder="npr. remen, brtva… (prazno ako ništa)">'+
+          dodatno+
           '<label style="margin-top:12px">Fotografija popravka (izborno)</label>'+
           '<input type="file" id="foto-input" class="file-input" accept="image/*" capture="environment" onchange="app.fotoOdabrana(event)">'+
           '<label for="foto-input" class="btn sec block file-label" id="foto-label">📷 Slikaj gotov popravak</label>'+
           '<img id="foto-prev" class="foto-prev" alt="pregled fotografije">'+
         '</div>'+
-        '<button class="btn primary block" type="submit" style="margin-top:8px">Zatvori kvar</button>'+
+        '<button class="btn primary block" type="submit" style="margin-top:8px">'+(zadatak?'Obavljeno':'Zatvori kvar')+'</button>'+
         '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
@@ -5926,9 +5966,15 @@ var app = {
     var k = DATA.kvarovi.filter(function(x){ return x.id===kId; })[0];
     if(!k) return;
     var f = new FormData(e.target);
+    var zadatak = (k.tip||'kvar')==='zadatak';
+    /* SIM-FIX A3: zadatak nema "zastoj" — polje je izborno, prazno = 0, bez upozorenja o danima */
     var sh = parseFloat(f.get('sati'));
-    if(isNaN(sh) || sh < 0 || sh > 720){ alert('Trajanje zastoja mora biti između 0 i 720 sati (30 dana).'); return; }
-    if(sh > 72 && !confirm('Upisano je '+H(sh)+' — to je '+Math.round(sh/24*10)/10+' dana. Je li točno?')) return;
+    if(zadatak){
+      if(isNaN(sh) || sh < 0) sh = 0;
+    } else {
+      if(isNaN(sh) || sh < 0 || sh > 720){ alert('Trajanje zastoja mora biti između 0 i 720 sati (30 dana).'); return; }
+      if(sh > 72 && !confirm('Upisano je '+H(sh)+' — to je '+Math.round(sh/24*10)/10+' dana. Je li točno?')) return;
+    }
     k.sati = sh;
     k.status = 'rijesen'; k.upoz = false; k.ceka_dio = false; k.ceka_servis = false;
     /* IFS: u izvještaj ide samo ono što je netko stvarno potvrdio */
@@ -5936,6 +5982,11 @@ var app = {
     k.tko = f.get('tko');
     k.sudjelovali = f.getAll('sudjelovali_ime').join(', ') || null;
     k.zam = String(f.get('zam')||'').trim() || null;
+    if(!zadatak){
+      /* SIM-FIX C1: privremeni popravak/rok sanacije se sad mogu upisati i pri zatvaranju kvara */
+      k.privremeni = !!f.get('privremeni');
+      k.rok_sanacije = k.privremeni ? (f.get('rok_sanacije') || null) : null;
+    }
     /* razduživanje skladišta: utrošeni dio smanjuje stanje i upisuje se u "Zamijenjeno" */
     var dioId = f.get('dio');
     var kol = Math.max(1, parseInt(f.get('kol'),10)||1);
@@ -5946,8 +5997,10 @@ var app = {
         p.stanje = Math.max(0, p.stanje - kol);
         if(!k.zam) k.zam = p.naziv + (kol>1 ? ' ×'+kol : '');
         else k.zam += ' + ' + p.naziv + (kol>1 ? ' ×'+kol : '');
-        if(prije >= p.min && p.stanje < p.min)
+        if(prije >= p.min && p.stanje < p.min){
           sysPoruka('📦 Dio ispod minimuma: '+p.naziv+' (stanje '+p.stanje+', min '+p.min+') — naručiti!');
+          toast('⚠ '+p.naziv+': stanje '+p.stanje+' (min '+p.min+') — naručiti');   /* SIM-FIX B6 */
+        }
         /* atomarno u bazi: dva majstora u isto vrijeme ne smiju izgubiti komad */
         if(REMOTE && naMrezi()){
           try{
@@ -5970,7 +6023,22 @@ var app = {
     if(pendingFotoGotov) k.foto_rijeseno = REMOTE ? await uploadFoto(pendingFotoGotov) : pendingFotoGotov;
     await apiUpdate('kvarovi', k.id, { sati:k.sati, status:k.status, upoz:false, ceka_dio:false, ceka_servis:false,
       otpusteno:k.otpusteno, tko:k.tko, zam:k.zam, sudjelovali:k.sudjelovali,
+      privremeni:k.privremeni, rok_sanacije:k.rok_sanacije,
       foto_rijeseno:k.foto_rijeseno, closed_at:new Date().toISOString() });
+    /* SIM-FIX A2: "Zovi servis" stvara zadatak (izvor_kvar, opis "Servis …") koji je do sada
+       ostajao otvoren i nakon što je sam kvar riješen — nitko ga svjesno ne zatvara. Kvar je
+       riješen ⇒ poziv servisu za taj kvar je gotova priča. */
+    if(k.tip!=='zadatak'){
+      var vezaniZad = DATA.kvarovi.filter(function(x){
+        return x.izvor_kvar===k.id && x.tip==='zadatak' && jeOtvoren(x) && String(x.opis||'').indexOf('Servis ')===0;
+      });
+      for(var vzI=0; vzI<vezaniZad.length; vzI++){
+        var vz = vezaniZad[vzI];
+        vz.status = 'rijesen';
+        sysPoruka('✅ Zadatak obavljen: '+vz.opis, vz.id);
+        await apiUpdate('kvarovi', vz.id, { status:'rijesen', closed_at:new Date().toISOString() });
+      }
+    }
   },
   urediKvar: function(kId){
     if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
@@ -6456,9 +6524,7 @@ var app = {
       '<div class="modal-head"><h3>Nova stavka redovnog pregleda</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<form onsubmit="app.savePreventiva(event,\''+mId+'\')">'+
         '<label>Zahvat</label><input name="opis" required placeholder="npr. podmazivanje ležajeva">'+
-        '<label>Interval</label><select name="interval">'+
-          '<option>svakih 30 dana</option><option>svakih 60 dana</option><option>svakih 90 dana</option>'+
-          '<option>svakih 180 dana</option><option>svakih 12 mjeseci</option></select>'+
+        '<label>Interval</label><select name="interval">'+prevIntOpts()+'</select>'+
         '<label>Sljedeći termin</label><input type="date" name="next" value="'+isoShift(30)+'" required>'+
         '<label>Izvođač</label><select name="izv">'+izvOpts+'</select>'+
         '<label>Dodijeljeno (izborno)</label><select name="dodijeljen"><option value="">—</option>'+osobaOpts('')+'</select>'+
