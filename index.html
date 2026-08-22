@@ -504,9 +504,8 @@ body[data-role="majstor"] .btn-audit,body[data-role="proizvodnja"] .btn-audit{di
 .login-title{font-size:12px;font-weight:700;margin-bottom:var(--r5);color:var(--muted);
   text-transform:uppercase;letter-spacing:1px}
 .login-opis{font-size:13px;color:var(--text-2);line-height:1.5;margin:-4px 0 var(--r4)}
-.user-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--r2);margin-bottom:var(--r4)}
-/* neparan broj ljudi: zadnja pločica preko cijele širine, da ne visi pola reda */
-.user-tile:last-child:nth-child(odd){grid-column:1 / -1}
+/* jedan stupac, po hijerarhiji (vidi loginPrioritet) — direktor gore, tehničar dolje */
+.user-tiles{display:grid;grid-template-columns:1fr;gap:var(--r2);margin-bottom:var(--r4)}
 .user-tile{padding:16px 8px;background:var(--card);border:1.5px solid var(--border);
   border-radius:var(--radius-s);font-size:15px;font-weight:650;cursor:pointer;box-shadow:var(--sjena-1);
   transition:border-color .14s ease, background .14s ease, transform .1s ease}
@@ -6611,9 +6610,20 @@ var app = {
 };
 
 /* =====================  prijava — pomoćne  ===================== */
+/* Pločice idu po hijerarhiji u firmi, ne abecedno/kako baza vrati red — direktor
+   gore, tehničar dolje. Ime nosi ulogu i za stvarne korisnike (nema uloge u
+   prijava_popis), pa se prepoznaje po nazivu; nepoznato ime pada na dno kao "tehničar". */
+function loginPrioritet(naziv){
+  if(naziv==='Direktor') return 0;
+  if(naziv==='Voditelj') return 1;
+  if(naziv==='Voditelj proizvodnje') return 2;
+  return 3;
+}
 function renderLoginTiles(){
   var el = $('#user-tiles');
-  if(el) el.innerHTML = KORISNICI.map(function(k){
+  if(el) el.innerHTML = KORISNICI.slice().sort(function(a,b){
+    return loginPrioritet(a.naziv)-loginPrioritet(b.naziv);
+  }).map(function(k){
     return '<div class="user-tile'+(LOGIN_SEL===k.naziv?' sel':'')+'" onclick="app.odaberiKorisnika(\''+esc(k.naziv)+'\')">'+esc(k.naziv)+'</div>';
   }).join('');
 }
