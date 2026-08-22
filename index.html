@@ -1991,6 +1991,17 @@ function renderPregled(){
         var p = pocetakKvara(k);
         /* bez poznatog početka ne postoji trošak "do sada" — prazno je poštenije od nule */
         var sati = p ? Math.max(0, (Date.now() - p.getTime())/3600000) : null;
+        /* SIM-FIX K: voditelj proizvodnje otvara app upravo zbog "kad će raditi" — dosad je ovaj
+           redak pokazivao samo koliko stroj već stoji, ne i procjenu gotovosti. Isti redoslijed
+           prioriteta kao Raspored (sadaRedak, ~3524): procjena_gotovo → otvorena narudžba dijela. */
+        var gotovo = '';
+        if(k.procjena_gotovo){
+          var pg = new Date(k.procjena_gotovo);
+          if(!isNaN(pg.getTime())) gotovo = ' &middot; <span class="rasp-do'+(pg.getTime() < Date.now() ? ' kasni' : '')+'">→ '+fmtSat(pg)+'</span>';
+        } else {
+          var narudzba = (DATA.nabava||[]).filter(function(x){ return x.kvar_id===k.id && !x.primljeno; })[0];
+          if(narudzba && narudzba.ocekivano) gotovo = ' &middot; dio stiže ~'+fmtDate(narudzba.ocekivano);
+        }
         return '<div class="row click" onclick="app.detaljKvara(\''+k.id+'\')">'+
           '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(sm.name)+
             (k.prioritet==='hitno' ? ' <span class="chip kvar">HITNO</span>' : '')+
@@ -1998,7 +2009,7 @@ function renderPregled(){
             (k.ceka_servis ? ' <span class="chip servis">Čeka servis</span>' : '')+'</div>'+
           '<div class="row-sub">'+esc(k.opis)+'</div>'+
           '<div class="row-sub">'+(trajanjeKvara(k) || 'u tijeku')+
-            (k.dodijeljen ? ' &middot; <b>'+esc(k.dodijeljen)+'</b>' : ' &middot; nedodijeljen')+'</div></div>'+
+            (k.dodijeljen ? ' &middot; <b>'+esc(k.dodijeljen)+'</b>' : ' &middot; nedodijeljen')+gotovo+'</div></div>'+
           (vidiFinancije() && sati !== null
             ? '<div class="row-right"><div class="stoji-cijena">'+EUR(sati * (sm.rate||350))+
               '<span>do sada</span></div></div>'
@@ -2556,7 +2567,9 @@ function partRow(p){
     (infoHtml ? '<div class="dio-info" onclick="event.stopPropagation()">'+infoHtml+'</div>' : '')+
     '<div class="dio-detalj" onclick="event.stopPropagation()">'+
       (nar
-        ? '<button class="btn-mini role-voditelj" onclick="app.go(\'nabava\')">Otvori u Nabavi</button> '
+        /* SIM-FIX M2: otvoriti Nabavu (i tamo zaprimiti) smije i tehničar — RLS mu to već
+           dopušta; samo "Naruči" (odluka o trošku) ostaje voditeljev, ispod. */
+        ? '<button class="btn-mini role-write" onclick="app.go(\'nabava\')">Otvori u Nabavi</button> '
         : '<button class="btn-mini role-voditelj" onclick="app.naruciDio(\''+p.id+'\')">Naruči</button> ')+
       '<button class="btn-mini role-voditelj" onclick="app.urediDio(\''+p.id+'\')">Uredi</button>'+
       /* AUDIT-FIX (UX): +/- mijenja stanje samo za 1 po dodiru — kod veće isporuke ili
@@ -2703,10 +2716,12 @@ function renderDijelovi(){
   DATA.dijelovi.forEach(function(p){ vrijednost += p.stanje * p.cijena; });
   var ispodMin = zaNaruciti().length;   /* isti broj kao na Pregledu i Nabavi */
   $('#screen-dijelovi').innerHTML =
-    /* §16 P1: naručivanje (Nabava, novi dio, cijene) je voditeljev/nabava posao (§2) — tehničar
-       i proizvodnja stanje čitaju i troše (stepper na retku), ne naručuju. */
-    '<div class="role-voditelj" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'+
-      '<button class="btn primary" style="position:relative" onclick="app.go(\'nabava\')">Nabava'+
+    /* §16 P1 / SIM-FIX M2: naručivanje (cijena, dobavljač) ostaje voditeljev posao, ali
+       zaprimanje isporuke RLS već dopušta tehničaru — kombi dostavi kutiju, a tehničar dosad
+       nije mogao ni otvoriti Nabavu da digne stepper. "Nabava" je zato role-write; "+ Novi dio"
+       (šifrarnik/cijena) ostaje isključivo voditeljev. */
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'+
+      '<button class="btn primary role-write" style="position:relative" onclick="app.go(\'nabava\')">Nabava'+
         (function(){
           var otv = otvoreneNarudzbe();
           if(!otv.length) return '';
@@ -3800,7 +3815,8 @@ function renderSustav(){
       '<div style="margin-top:6px">'+
         (KV_SVE ? '' : '<button class="btn-mini" onclick="app.ucitajSve()">Učitaj cijelu povijest</button> ')+
         '<button class="btn-mini" onclick="app.izvoz()">Izvoz JSON</button> '+
-        '<button class="btn-mini" onclick="app.izvozCSV(0)">Izvoz CSV</button>'+
+        '<button class="btn-mini" onclick="app.izvozCSV(0)">Izvoz CSV</button> '+
+        '<button class="btn-mini role-voditelj" onclick="app.izvozSkladiste()">Izvoz skladišta (CSV)</button>'+
       '</div></div></div></div>'+
     '<button class="btn sec sm block" style="margin-top:8px" onclick="app.uvozCSV()">Uvoz strojeva i dijelova (CSV)</button>'+
     '<button class="btn sec sm block" style="margin-top:8px" onclick="app.go(\'qr\')">QR naljepnice za strojeve</button>'+
@@ -4896,6 +4912,19 @@ var app = {
     if(!z) return;
     z.status = 'rijesen'; z.tko = SESSION.ime || null;
     z.closed_at = new Date().toISOString();   /* Raspored v45: "Odrađeno danas" na Planu dana */
+    /* SIM-FIX J: obrnuti smjer od SIM-FIX A2 (koja zatvaranjem kvara gasi servisni zadatak).
+       "Zovi servis" postavlja izvor.ceka_servis i stvara ovaj zadatak s izvor_kvar — dosad se
+       oznaka "Čeka servis" gasila samo zatvaranjem SAMOG kvara, pa je ostajala zauvijek ako bi
+       netko prvo kvačicom obavio servisni zadatak. Vrijedi i kad je zadatak ponavljajući (grana
+       ispod) — gasi se ceka_servis na izvoru za OVU obavljenu instancu, nova instanca ne dira. */
+    if(z.izvor_kvar){
+      var izvor = DATA.kvarovi.filter(function(x){ return x.id===z.izvor_kvar; })[0];
+      if(izvor && izvor.ceka_servis){
+        izvor.ceka_servis = false;
+        sysPoruka('✓ "Čeka servis" skinuto (obavljen zadatak: '+z.opis+')', izvor.id);
+        await apiUpdate('kvarovi', izvor.id, { ceka_servis:false });
+      }
+    }
     /* S5: ponavljajući zadatak — obavljanjem se sam stvori sljedeći.
        Sidro je rok (Todoist pravilo); za davno zakasnjeli zadatak broji se od danas,
        inače bi sljedeći termin odmah bio u prošlosti. */
@@ -5252,6 +5281,21 @@ var app = {
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'kvarovi-' + todayISO() + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  },
+  /* SIM-FIX L: "Izvoz CSV" izvozi samo kvarove — skladišta nema nikako, a vlasnik je tražio
+     Excel. Isti Blob/BOM/a.download obrazac kao izvozCSV (BOM zbog dijakritika u Excelu). */
+  izvozSkladiste: function(){
+    var glava = 'sifra;naziv;za koji stroj;lokacija;stanje;minimum;dobavljac;cijena;kategorija';
+    var redovi = DATA.dijelovi.map(function(d){
+      var c = function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; };
+      return [d.sku||'', d.naziv, d.stroj||'', d.lokacija||'', d.stanje, d.min, d.dob||'',
+              d.cijena, d.kategorija||''].map(c).join(';');
+    });
+    var blob = new Blob(['﻿'+glava+'\n'+redovi.join('\n')], {type:'text/csv;charset=utf-8'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'skladiste-' + todayISO() + '.csv';
     document.body.appendChild(a); a.click(); a.remove();
   },
   izvoz: function(){
@@ -5666,13 +5710,32 @@ var app = {
     n.primljena_kolicina = novaPrimljena;
     n.primljeno = zavrseno ? todayISO() : null;
     if(p) p.stanje = p.stanje + kol;
-    showScreen('nabava');
+    /* SIM-FIX M4: majstor stiže u Nabavu preko "Nabava"/"Otvori u Nabavi" na Skladištu — Nabava
+       mu nije u donjoj traci, pa bi nakon zaprimanja ostao na ekranu bez povratka. Vrati ga na
+       ekran s kojeg je stvarno došao (isti PRIJASNJI_EKRAN obrazac kao drugdje u appu); voditelj
+       ostaje na Nabavi jer tipično zaprima više stavki zaredom. */
+    showScreen(SESSION.role==='majstor' ? (PRIJASNJI_EKRAN || 'dijelovi') : 'nabava');
     if(REMOTE && naMrezi()){
+      /* SIM-FIX M1: dosad je SVAKI neuspjeh RPC-a (i "prava" mrežna greška i čisto "netko je
+         narudžbu već zaprimio") padao u isti catch koji upisuje lokalno optimistički izračunato
+         stanje izravno preko apiUpdate — pa su dva uređaja koja zaprime istu narudžbu skoro
+         istovremeno mogla dvaput dodati zalihu. primi_nabavu (schema.sql) vraća SQL null (bez
+         greške) kad "where primljeno is null" ne nađe redak jer je narudžba u međuvremenu već
+         zatvorena — to razdvajamo od prave greške. */
       try{
         var rpc = await sb.rpc('primi_nabavu', { p_id:id, p_kolicina:kol, p_datum:todayISO() });
-        if(!rpc.error && typeof rpc.data === 'number' && p) p.stanje = rpc.data;
-        else throw rpc.error || new Error('rpc');
+        if(rpc.error) throw rpc.error;
+        if(typeof rpc.data === 'number'){
+          if(p) p.stanje = rpc.data;
+        } else {
+          /* već zaprimljeno negdje drugdje — bez ijednog upisa, samo osvježi iz baze */
+          toast('Ova narudžba je već zaprimljena');
+          try{ await load(); }catch(e2){}
+          rerender();
+          return;
+        }
       }catch(e){
+        /* mrežna/serverska greška — postojeći fallback: upiši izravno (offline-tolerant) */
         await apiUpdate('nabava', id, { primljeno:n.primljeno, primljena_kolicina:n.primljena_kolicina });
         if(p) await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
       }
@@ -6099,7 +6162,10 @@ var app = {
     var dodatno = zadatak ? '' :
         '<label>Utrošeni dio sa skladišta</label><select name="dio">'+dioOpts+'</select>'+
         '<label>Količina</label><input type="number" name="kol" min="1" step="1" value="1">'+
-        '<label>Što je napravljeno / zamijenjeno</label><input name="zam" placeholder="npr. remen, brtva… (prazno ako ništa)">'+
+        /* SIM-FIX H: bez value ovo polje je pri zatvaranju uvijek bilo prazno — tehničar koji je
+           usred kvara "+ Ugrađen dio" već upisao k.zam ne dira polje koje vidi prazno, pa
+           saveRijesen (ispod) taj zapis prepiše u null; zaliha ostaje točna, razlog nestane. */
+        '<label>Što je napravljeno / zamijenjeno</label><input name="zam" value="'+esc(k.zam||'')+'" placeholder="npr. remen, brtva… (prazno ako ništa)">'+
         /* SIM-FIX C1: privremeni popravak/rok sanacije dosad je bio dostupan samo u "Uredi kvar" —
            majstor koji zatvara kvar na licu mjesta ionako zna je li popravak privremen. */
         '<label class="prekidac" style="margin-top:8px"><input type="checkbox" name="privremeni"'+(k.privremeni?' checked':'')+
@@ -6771,8 +6837,11 @@ var app = {
   audit: function(dani){
     dani = parseInt(dani,10) || 30;
     var t30 = isoShift(-dani);
-    var zahvati = DATA.kvarovi.filter(function(k){ return k.status==='rijesen' && k.date>=t30; }).sort(byDateDesc);
-    var otvoreni = DATA.kvarovi.filter(function(k){ return jeOtvoren(k); });
+    /* SIM-FIX I: zadaci (tip='zadatak', npr. "Naruči ležaj") nisu zahvat na stroju niti
+       otvorena stavka održavanja — bez ovog uvjeta ulazili su u audit sa zastojem 0,0 h i
+       zbunjivali auditora među stvarnim kvarovima. */
+    var zahvati = DATA.kvarovi.filter(function(k){ return k.status==='rijesen' && k.date>=t30 && (k.tip||'kvar')==='kvar'; }).sort(byDateDesc);
+    var otvoreni = DATA.kvarovi.filter(function(k){ return jeOtvoren(k) && (k.tip||'kvar')==='kvar'; });
 
     var prevHtml = DATA.machines.map(function(m){
       var ps = DATA.preventiva.filter(function(p){ return p.m===m.id; });
@@ -6835,8 +6904,12 @@ var app = {
     var otvHtml = otvoreni.length
       ? '<h4>7. Otvorene stavke</h4>'+otvoreni.map(function(k){
           var m = machineById(k.m) || {name: (k.tip==='zadatak' ? 'Zadatak' : '—')};
+          /* SIM-FIX I: "upoz" ne postavlja nijedan obrazac — status je uvijek pisao krivo.
+             Isti redoslijed prioriteta kao Raspored (sadaRedak, ~3524): ceka_dio → ceka_servis
+             → u radu → otvoren. */
+          var stanje = k.ceka_dio ? 'čeka dio' : k.ceka_servis ? 'čeka servis' : k.status==='u_radu' ? 'u radu' : 'otvoren';
           return '<div class="a-item"><b>'+fmtDate(k.date)+'</b> — '+esc(m.name)+': '+esc(k.opis)+
-            '<div class="a-sub">status: '+(k.upoz?'upozorenje':'otvoren kvar')+', u tijeku</div></div>';
+            '<div class="a-sub">status: '+stanje+', u tijeku</div></div>';
         }).join('')
       : '';
 

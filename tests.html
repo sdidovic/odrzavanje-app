@@ -1054,6 +1054,70 @@ async function testovi(W, D){
   ok('trag skidanja oznake je u kanalu',
      W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('skinuto') > -1 && p.kvar_id===kvarCekaDio.id; }));
 
+  grupa('SIM-FIX M1 — savePrimitak razdvaja "već zaprimljeno" od prave mrežne greške');
+  /* dva uređaja koja zaprime istu narudžbu skoro istovremeno: primi_nabavu (schema.sql) vraća
+     SQL null (bez greške) kad "where primljeno is null" ne nađe redak — to NE smije upisati
+     ništa preko apiUpdate fallbacka, samo osvježiti iz baze. */
+  var stariSbM1 = W.sb, stariRemoteM1 = W.REMOTE, stariNMM1 = W.naMrezi,
+      stariToastM1 = W.toast, stariLoadM1 = W.load, stariAlertM1 = W.alert;
+  W.REMOTE = true; W.naMrezi = function(){ return true; }; W.alert = function(){};
+  var dioM1 = W.DATA.dijelovi[0];
+  var stanjeM1Prije = dioM1.stanje;
+  var narM1 = { id:'narM1test', dio_id:dioM1.id, kolicina:2, primljena_kolicina:0,
+    primljeno:null, kvar_id:null, narucen:W.todayISO() };
+  W.DATA.nabava.push(narM1);
+  var zadnjiToastM1 = '';
+  W.toast = function(m){ zadnjiToastM1 = m; };
+  var loadPozvanM1 = false;
+  W.load = function(){ loadPozvanM1 = true; return Promise.resolve(); };
+  /* mock nema .from — da bi nenamjeran poziv apiUpdate glasno pukao umjesto tihog upisa */
+  W.sb = { rpc: function(){ return Promise.resolve({data:null, error:null}); } };
+  app.primiNabavu(narM1.id); await cekaj(80);
+  var fM1 = D.querySelector('#modal-root form');
+  fM1.elements.kol.value = '2';
+  posalji(fM1); await cekaj(200);
+  ok('RPC koji vrati null (već zaprimljeno) javlja toast "već zaprimljena"',
+     zadnjiToastM1.indexOf('već zaprimljena') > -1, 'toast: '+zadnjiToastM1);
+  ok('nakon "već zaprimljeno" se podaci osvježe iz baze (load), bez lokalnog upisa preko apiUpdate',
+     loadPozvanM1);
+  W.sb = stariSbM1; W.REMOTE = stariRemoteM1; W.naMrezi = stariNMM1;
+  W.toast = stariToastM1; W.load = stariLoadM1; W.alert = stariAlertM1;
+  W.DATA.nabava = W.DATA.nabava.filter(function(n){ return n.id !== 'narM1test'; });
+  dioM1.stanje = stanjeM1Prije;
+  app.closeModal();
+
+  grupa('SIM-FIX M2/M4 — tehničar smije zaprimiti isporuku, ali ne naručiti');
+  var dioZaNarM = { id:'dioM2', naziv:'TEST M dio za naručiti', stanje:1, min:5, strojevi:[],
+    dob:'', cijena:1, kategorija:'Ostalo' };
+  var dioZaStigloM = W.DATA.dijelovi[0];
+  var narM2 = { id:'narM2test', dio_id:dioZaStigloM.id, kolicina:1, primljena_kolicina:0,
+    kvar_id:null, primljeno:null, ocekivano:null, narucen:W.todayISO() };
+  W.DATA.dijelovi.push(dioZaNarM);
+  W.DATA.nabava.push(narM2);
+  W.SESSION = { ime:'Tehničar', role:'majstor' }; D.body.dataset.role = 'majstor';
+  app.go('dijelovi'); await cekaj(150);
+  var btnNabavaTabM = Array.prototype.filter.call(D.querySelectorAll('#screen-dijelovi button'),
+    function(b){ return b.textContent.indexOf('Nabava') === 0; })[0];
+  ok('tehničar vidi gumb "Nabava" na Skladištu (RLS mu zaprimanje već dopušta)',
+     !!btnNabavaTabM && W.getComputedStyle(btnNabavaTabM).display !== 'none');
+  app.go('nabava'); await cekaj(200);
+  var btnStigloM = D.querySelector('#screen-nabava button[onclick="app.primiNabavu(\'narM2test\')"]');
+  var btnNaruciM = D.querySelector('#screen-nabava button[onclick="app.naruciDio(\'dioM2\')"]');
+  ok('s ulogom majstor gumb za zaprimanje ("Stiglo") je vidljiv',
+     !!btnStigloM && W.getComputedStyle(btnStigloM).display !== 'none');
+  ok('s ulogom majstor gumb za naručivanje ("Naruči") NIJE vidljiv',
+     !!btnNaruciM && W.getComputedStyle(btnNaruciM).display === 'none');
+  /* nakon zaprimanja majstor se vraća na ekran s kojeg je došao (Nabava mu nije u traci) */
+  app.primiNabavu(narM2.id); await cekaj(100);
+  var fM2 = D.querySelector('#modal-root form');
+  fM2.elements.kol.value = '1';
+  posalji(fM2); await cekaj(200);
+  jednako('nakon zaprimanja majstor se vraća na ekran s kojeg je došao (Skladište)', W.CURRENT_SCREEN, 'dijelovi');
+  W.DATA.dijelovi = W.DATA.dijelovi.filter(function(d){ return d.id !== 'dioM2'; });
+  W.DATA.nabava = W.DATA.nabava.filter(function(n){ return n.id !== 'narM2test'; });
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  app.go('nabava'); await cekaj(150);
+
   grupa('§15 #5 — "Zovi servis": vanjski izvođač s kvara (zadatak s vezom + Čeka servis)');
   W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
   var kvarServis = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar' && !k.ceka_servis; })[0];
@@ -1094,6 +1158,21 @@ async function testovi(W, D){
   ok('makni oznaku briše Čeka servis', kvarServis.ceka_servis === false);
   app.closeModal();
   W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k !== zadServis; }); W.save();
+
+  grupa('SIM-FIX J — ✓ servisnog zadatka skida "Čeka servis" s kvara');
+  /* suprotan smjer od SIM-FIX A2 (zatvaranje kvara gasi servisni zadatak) — ovdje se
+     obavljanjem SERVISNOG ZADATKA gasi ceka_servis na kvaru iz kojeg je nastao. */
+  var kvarJ = { id:'kvJ1', m:'e1', date:W.todayISO(), opis:'TEST J servisni kvar', sati:0,
+    status:'u_radu', upoz:false, tip:'kvar', kategorija:'Ostalo', ceka_servis:true, ceka_dio:false };
+  var zadJ = { id:'zadJ1', m:'e1', date:W.todayISO(), opis:'Servis — TEST J', sati:0,
+    status:'otvoren', upoz:false, tip:'zadatak', kategorija:'Ostalo', dodijeljen:'Voditelj',
+    izvor_kvar:kvarJ.id, kontakt_id:null };
+  W.DATA.kvarovi.push(kvarJ, zadJ);
+  await app.obaviZadatak(zadJ.id); await cekaj(150);
+  ok('obavljanje servisnog zadatka gasi ceka_servis na izvornom kvaru', kvarJ.ceka_servis === false);
+  ok('trag gašenja "Čeka servis" je u kanalu',
+     W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Čeka servis') > -1 && p.kvar_id===kvarJ.id; }));
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id!=='kvJ1' && k.id!=='zadJ1'; }); W.save();
 
   grupa('Iskustvo na stroju');
   app.openStroj('e1'); await cekaj(150);
@@ -1243,6 +1322,38 @@ async function testovi(W, D){
      odsjek3.indexOf(zaPriv.opis) === -1, 'odjeljak 3: '+odsjek3.slice(0,120));
   app.closeModal();
 
+  grupa('SIM-FIX I — IFS izvještaj ne miješa zadatke s kvarovima; status govori istinu');
+  /* zadatak (npr. "Naruči ležaj") nije zahvat na stroju niti otvorena stavka održavanja —
+     bez uvjeta na tip ulazio je u audit sa zastojem 0,0 h. */
+  var zadIfsRij = { id:'zadIfs1', m:'e1', date:W.todayISO(), opis:'TEST I zadatak riješen', sati:0,
+    status:'rijesen', upoz:false, tip:'zadatak', kategorija:'Ostalo', tko:'Tehničar' };
+  var zadIfsOtv = { id:'zadIfs2', m:'e1', date:W.todayISO(), opis:'TEST I zadatak otvoren', sati:0,
+    status:'otvoren', upoz:false, tip:'zadatak', kategorija:'Ostalo' };
+  W.DATA.kvarovi.push(zadIfsRij, zadIfsOtv);
+  app.audit(90); await cekaj(150);
+  var ifsI = D.querySelector('#modal-root').textContent;
+  ok('zadatak se ne pojavljuje među zahvatima u IFS izvještaju', ifsI.indexOf('TEST I zadatak riješen') === -1);
+  ok('zadatak se ne pojavljuje među otvorenim stavkama u IFS izvještaju', ifsI.indexOf('TEST I zadatak otvoren') === -1);
+  app.closeModal();
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id!=='zadIfs1' && k.id!=='zadIfs2'; });
+
+  /* status u odjeljku "Otvorene stavke" mora pratiti stvarno stanje (isti prioritet kao
+     Raspored), ne polje "upoz" koje nijedan obrazac ne postavlja */
+  var kvarIfsCekaDio = { id:'kvIfsA', m:'e2', date:W.todayISO(), opis:'TEST I čeka dio', sati:0,
+    status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo', ceka_dio:true };
+  var kvarIfsURadu = { id:'kvIfsB', m:'e2', date:W.todayISO(), opis:'TEST I u radu', sati:0,
+    status:'u_radu', upoz:false, tip:'kvar', kategorija:'Ostalo' };
+  W.DATA.kvarovi.push(kvarIfsCekaDio, kvarIfsURadu);
+  app.audit(90); await cekaj(150);
+  var ifsI2 = D.querySelector('#modal-root').textContent;
+  var iA = ifsI2.indexOf('TEST I čeka dio'), iB = ifsI2.indexOf('TEST I u radu');
+  ok('otvorena stavka koja čeka dio piše "status: čeka dio"',
+     iA > -1 && ifsI2.slice(iA, iA+120).indexOf('status: čeka dio') > -1);
+  ok('otvorena stavka u radu piše "status: u radu"',
+     iB > -1 && ifsI2.slice(iB, iB+120).indexOf('status: u radu') > -1);
+  app.closeModal();
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id!=='kvIfsA' && k.id!=='kvIfsB'; });
+
   grupa('Trajanje otvorenog kvara');
   /* grupa iznad zatvara kvarove — ako više nijedan nije otvoren, prijavi novi */
   /* zadatak od F3 može nositi stroj — "otvoren s m" više nije dokaz da je kvar */
@@ -1334,6 +1445,38 @@ async function testovi(W, D){
     if(od === -1) return true;
     return html.slice(od, html.indexOf('<h2', od+5)).indexOf(upoz.opis) === -1;
   })());
+
+  grupa('SIM-FIX K — "Kad će raditi" u sekciji Trenutno stoji');
+  /* voditelj proizvodnje otvara app upravo zbog ovog podatka — isti redoslijed prioriteta
+     kao Raspored (sadaRedak): procjena_gotovo → otvorena narudžba dijela. */
+  var kvarKgotov = { id:'kvK1', m:'e1', date:W.todayISO(), opis:'TEST K procjena gotovo', sati:0,
+    status:'u_radu', upoz:false, tip:'kvar', kategorija:'Ostalo', ceka_dio:false, ceka_servis:false,
+    poceo_at:new Date(Date.now()-3600000).toISOString(), procjena_gotovo: W.todayISO()+'T23:59' };
+  W.DATA.kvarovi.push(kvarKgotov);
+  W.showScreen('pregled'); await cekaj(120);
+  var htmlK = D.querySelector('#screen-pregled').innerHTML;
+  var iK = htmlK.indexOf('TEST K procjena gotovo');
+  ok('kvar s procjena_gotovo prikazuje "→" u sekciji Trenutno stoji',
+     iK > -1 && htmlK.slice(iK, iK+400).indexOf('→ '+W.fmtSat(new Date(kvarKgotov.procjena_gotovo))) > -1,
+     'isječak: '+htmlK.slice(iK, iK+400));
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== 'kvK1'; });
+
+  var kvarKnarudzba = { id:'kvK2', m:'e2', date:W.todayISO(), opis:'TEST K dio stiže', sati:0,
+    status:'otvoren', upoz:false, tip:'kvar', kategorija:'Ostalo', ceka_dio:true, ceka_servis:false };
+  var dioZaK = W.DATA.dijelovi[0];
+  var narK = { id:'narK1', dio_id:dioZaK.id, kolicina:1, kvar_id:'kvK2', primljeno:null,
+    ocekivano: W.isoShift(3), narucen:W.todayISO() };
+  W.DATA.kvarovi.push(kvarKnarudzba);
+  W.DATA.nabava.push(narK);
+  W.showScreen('pregled'); await cekaj(120);
+  var htmlK2 = D.querySelector('#screen-pregled').innerHTML;
+  var iK2 = htmlK2.indexOf('TEST K dio stiže');
+  ok('kvar bez procjene, ali s otvorenom narudžbom, prikazuje "dio stiže ~"',
+     iK2 > -1 && htmlK2.slice(iK2, iK2+400).indexOf('dio stiže ~'+W.fmtDate(narK.ocekivano)) > -1,
+     'isječak: '+htmlK2.slice(iK2, iK2+400));
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== 'kvK2'; });
+  W.DATA.nabava = W.DATA.nabava.filter(function(n){ return n.id !== 'narK1'; });
+  W.showScreen('pregled'); await cekaj(100);
 
   grupa('Pregled presložen — S2 (prvo što gori, pa brojke, pa povijest)');
   var html2 = D.querySelector('#screen-pregled').innerHTML;
@@ -3001,6 +3144,38 @@ async function testovi(W, D){
   ok('labela "Što je napravljeno / zamijenjeno" postoji',
      D.querySelector('#modal-root').textContent.indexOf('Što je napravljeno / zamijenjeno') > -1);
   app.closeModal();
+
+  grupa('SIM-FIX H — zatvaranje kvara ne briše ranije ugrađeni dio');
+  /* tehničar je usred kvara koristio "+ Ugrađen dio" (upisuje k.zam) — pri zatvaranju polje
+     "zam" ranije nije nosilo value pa je izgledalo prazno; ako ga tehničar ne dira,
+     saveRijesen ga prepisuje u null i razlog nestaje iz "Potrošeno zadnjih 6 mj." i CSV-a. */
+  var kvarZaZam = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; })[0];
+  kvarZaZam.zam = 'TEST već ugrađen remen';
+  app.rijesiKvar(kvarZaZam.id); await cekaj(100);
+  var fZam = D.querySelector('#modal-root form');
+  D.querySelector('#modal-root .btn-mini').click(); await cekaj(80);   /* otvori "+ Dodatno" */
+  ok('kvar s postojećim k.zam otvara obrazac s tim tekstom', fZam.elements.zam.value === 'TEST već ugrađen remen');
+  app.closeModal();
+  kvarZaZam.zam = null;
+
+  grupa('SIM-FIX L — izvoz skladišta u CSV');
+  ok('izvozSkladiste postoji', typeof W.app.izvozSkladiste === 'function');
+  /* isti Blob/BOM/a.download obrazac kao izvozCSV — presrećemo Blob i a.click() da test
+     ne pokrene stvarno preuzimanje datoteke u pregledniku */
+  var capturedCsvL = null;
+  var OrigBlobL = W.Blob;
+  W.Blob = function(parts, opts){ capturedCsvL = parts; return new OrigBlobL(parts, opts); };
+  var OrigCreateElL = D.createElement.bind(D);
+  D.createElement = function(tag){
+    var el = OrigCreateElL(tag);
+    if(String(tag).toLowerCase()==='a') el.click = function(){};
+    return el;
+  };
+  app.izvozSkladiste();
+  D.createElement = OrigCreateElL;
+  W.Blob = OrigBlobL;
+  var csvTekstL = capturedCsvL ? capturedCsvL.join('') : '';
+  ok('zaglavlje sadrži "stanje;minimum"', csvTekstL.indexOf('stanje;minimum') > -1, csvTekstL.slice(0,200));
 
   grupa('SIM-FIX B6 — toast kad ugradnja dijela spusti stanje na/ispod minimuma');
   var toastPoruke = [];
