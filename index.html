@@ -135,7 +135,7 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
   font-weight:600;letter-spacing:.1px}   /* kontrast na obojenoj podlozi — hala, sunce */
 /* 4 KPI broja na Analitici — ista veličina, jer su jednako važni. 2×2 mreža daje dovoljno
    prostora da broj stane u jedan red — overflow-wrap:anywhere je prije lomio brojku usred znamenke */
-.stat-num.kpi{font-size:17px;letter-spacing:-.3px;white-space:nowrap}
+.stat-num.kpi{font-size:21px;letter-spacing:-.3px;white-space:nowrap}   /* SIM-FIX: 17px je bilo presitno za glavne brojke Analitike */
 .stat.red{background:var(--red-bg);border-color:var(--red-border)}   .stat.red .stat-num{color:var(--red)}
 .stat.yellow{background:var(--yellow-bg);border-color:var(--yellow-border)} .stat.yellow .stat-num{color:var(--yellow)}
 .stat.green{background:var(--green-bg);border-color:var(--green-border)} .stat.green .stat-num{color:var(--green)}
@@ -300,6 +300,10 @@ h2 .btn-mini{min-height:34px;padding:6px 11px;font-size:12px;text-transform:none
    (€ ovaj mjesec) + trend, 3 statistike, i JEDAN redak "sada stoji / sve radi" */
 .dir-hero .rasp-dan-h1{font-size:34px;letter-spacing:-.8px;margin-top:4px}
 .dir-hero .rasp-dan-h1 .trend{display:block;font-size:12px;letter-spacing:0;margin-top:4px}
+/* SIM-FIX: .trend (:144) je pisan za tamnu podlogu (big-card) — na direktorovoj bijeloj
+   hero kartici je kontrast ~1,7:1. Ista varijabla paleta (--red/--green), svijetla podloga. */
+.dir-hero .trend.up{background:var(--red-bg);color:var(--red)}
+.dir-hero .trend.down{background:var(--green-bg);color:var(--green)}
 .dir-hero .rasp-hero-r1{align-items:flex-start}
 .dir-stoji{display:flex;align-items:center;gap:9px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);
   font-size:13.5px;font-weight:600;color:var(--text);cursor:pointer;min-height:44px}
@@ -547,8 +551,10 @@ body:not([data-role="voditelj"]) .role-voditelj{display:none !important}
 body[data-role="proizvodnja"] .role-fin{display:none !important}
 /* §16 P1: kad "Detaljno" (role-voditelj) nestane, ⚡ Brza prijava ostaje sama — puna širina */
 body:not([data-role="voditelj"]) .kvar-akcije-grid{grid-template-columns:1fr !important}
-/* §16 P1: kad "od N h" (kapacitet, role-voditelj) nestane, ostaju 2 stat kartice */
-body:not([data-role="voditelj"]) .rasp-hero-grid{grid-template-columns:repeat(2,1fr) !important}
+/* §16 P1: kad "od N h" (kapacitet, role-voditelj) nestane, ostaju 2 stat kartice.
+   SIM-FIX: selektor je bio pisan za Raspored, ali .rasp-hero-grid koristi i direktorov
+   dir-hero na Pregledu (koji uvijek ima 3 kartice) — suženo na #screen-raspored. */
+body:not([data-role="voditelj"]) #screen-raspored .rasp-hero-grid{grid-template-columns:repeat(2,1fr) !important}
 
 /* ---------- sesija / izvoz ---------- */
 .session-row{margin-top:22px;text-align:center;font-size:12px;color:var(--muted)}
@@ -2042,6 +2048,10 @@ function renderPregled(){
        ni do jednog krivca — najskuplji POJEDINAČNI zastoj ovaj mjesec, jedan klik do detalja. */
     var najveciK = null, najveciTrosak = -1;
     mk.forEach(function(k){
+      /* SIM-FIX: upozorenje ne zaustavlja liniju — isto pravilo kao uTijekuCost (~1893) i
+         filtar "Trenutno stoji" (~1974). Bez ovoga je stroj koji nikad nije stao mogao
+         ispasti "najveći zastoj mjeseca" jer mu je trošak rastao dok upozorenje traje. */
+      if(k.upoz) return;
       var mN = machineById(k.m);
       var c = jeOtvoren(k)
         ? (function(){ var pN = pocetakKvara(k); return pN ? Math.max(0,(Date.now()-pN.getTime())/3600000)*(mN?mN.rate:350) : 0; })()
@@ -2052,7 +2062,8 @@ function renderPregled(){
       ? '<div class="row click" onclick="app.detaljKvara(\''+najveciK.id+'\')" style="margin-top:8px">'+
           '<div class="grow"><div class="row-title" style="font-size:13.5px">Najveći zastoj: '+
             esc((machineById(najveciK.m)||{name:'—'}).name)+'</div>'+
-          '<div class="row-sub">'+(trajanjeKvara(najveciK)||H(najveciK.sati))+' &middot; '+EUR(najveciTrosak)+'</div></div>'+
+          '<div class="row-sub">'+(trajanjeKvara(najveciK)||H(najveciK.sati))+' &middot; '+EUR(najveciTrosak)+
+            (jeOtvoren(najveciK) ? ' &middot; u tijeku' : '')+'</div></div>'+
           '<span class="chev">›</span></div>'
       : '';
     var sveRadi = stoje.length === 0;
@@ -2072,9 +2083,11 @@ function renderPregled(){
     dirHero = '<div class="card rasp-hero dir-hero'+(sveRadi && !open.length ? ' gotovo' : '')+'">'+
       '<div class="rasp-hero-r1"><div>'+
         '<div class="rasp-dan-h2">Trošak zastoja · '+esc(monthLabel())+'</div>'+
-        '<div class="rasp-dan-h1" onclick="app.go(\'analitika\')" style="cursor:pointer">'+EUR(cost)+trend+'</div>'+
-        /* SIM-FIX C4: iznos bez oznake izgleda kao brojka za čitanje, ne dodir — diskretan link ispod kaže da vodi dalje */
-        '<div class="row-sub" onclick="app.go(\'analitika\')" style="cursor:pointer">Analitika ›</div>'+
+        '<div class="rasp-dan-h1">'+EUR(cost)+trend+'</div>'+
+        /* SIM-FIX (§16 rupa "Analitika" — tri slabe mete): iznos u eurima više nije dodir
+           (tri mete za istu radnju svode se na jednu), a diskretni sivi tekst postaje prava
+           pilula — isti uzorak (.rasp-skok) kao "Danas ›" na Rasporedu, min. 44px za dodir. */
+        '<button class="rasp-skok" style="margin-top:8px;min-height:44px" onclick="app.go(\'analitika\')">Analitika i izvoz ›</button>'+
       '</div><div><div class="rasp-smjena">prvih '+danMj+' dana</div>'+
         (uTijekuCost > 0 ? '<div class="rasp-smjena-jos">+ '+EUR(uTijekuCost)+' još traje</div>' : '')+'</div></div>'+
       najveciRedak+
@@ -2114,9 +2127,12 @@ function renderPregled(){
       '<div class="card">'+ last3.map(function(k){ return eventRow(k); }).join('') +'</div>')+
     '<div class="session-row">'+
       (REMOTE ? 'Prijavljen: <b>'+esc(SESSION.ime)+'</b> ('+esc(NAZIV_ULOGE[SESSION.role]||SESSION.role)+') &middot; <a onclick="app.odjava()">Odjava</a> &middot; ' : '')+
-      '<a class="role-voditelj" onclick="app.izvoz()">Izvoz podataka</a>'+
-      '<span class="role-voditelj"> &middot; <a onclick="app.izvozCSV()">Izvoz CSV</a></span>'+
-      ' &middot; <a onclick="app.pomoc()">Pomoć</a>'+
+      /* SIM-FIX: razdjelnik prije "Pomoć" je stajao izvan role-voditelj span-a, pa je
+         direktoru (oba linka iznad skrivena) ostajao sirot "· Pomoć". Razdjelnik je sad
+         UNUTAR span-a koji nosi svoj link, pa se skriva zajedno s njim. */
+      '<span class="role-voditelj"><a onclick="app.izvoz()">Izvoz podataka</a> &middot; </span>'+
+      '<span class="role-voditelj"><a onclick="app.izvozCSV()">Izvoz CSV</a> &middot; </span>'+
+      '<a onclick="app.pomoc()">Pomoć</a>'+
     '</div>';
 }
 function statCard(n, label, color, onclick){
@@ -2937,6 +2953,35 @@ function renderAnalitika(){
         (ANA_MJESEC ? 'prethodnim mjesecom' : 'prethodnih '+ANA_DANA+' dana')+
         ' ('+prethodno.n+' kvarova, '+H(prethodno.sati)+', '+EUR(prethodno.cost)+')</div>'
       : '')+
+    /* SIM-FIX (Analitika — nijedan graf): direktorovo glavno pitanje je "bolje ili gore",
+       a KPI brojke i pet tablica na to ne odgovaraju na prvi pogled. Isti bar-row/bar-track/
+       bar-fill uzorak kao trendHtml na Pregledu (~1963), ali cijela evidencija (ne trenutni
+       ANA_DANA/ANA_MJESEC filtar) i do 12 mjeseci — kratki filtar bi inače graf sveo na
+       1 stupac. Zadaci/stornirani su već isključeni preko samoKvarovi() (isto kao uk.cost). */
+    '<h2>Trošak zastoja po mjesecima</h2><div class="card">'+
+      (function(){
+        var mjTrosak = {};
+        samoKvarovi().forEach(function(k){
+          var key = k.date.slice(0,7);
+          mjTrosak[key] = (mjTrosak[key]||0) + kvarCost(k);
+        });
+        var mjKljucevi = Object.keys(mjTrosak).sort().slice(-12);
+        if(!mjKljucevi.length) return '<div class="empty">Nema podataka za graf.</div>';
+        var tekuciMjesec = todayISO().slice(0,7);
+        var maxMj = Math.max.apply(null, mjKljucevi.map(function(kk){ return mjTrosak[kk]; }).concat([1]));
+        var visestrukaGodina = mjKljucevi[0].slice(0,4) !== mjKljucevi[mjKljucevi.length-1].slice(0,4);
+        return mjKljucevi.map(function(kk){
+          var idx = parseInt(kk.slice(5,7),10) - 1;
+          var uTijeku = kk === tekuciMjesec;
+          var label = esc(MJESECI[idx])+(visestrukaGodina ? " '"+kk.slice(2,4) : '');
+          return '<div class="bar-row" style="cursor:default">'+
+            '<div class="bar-name">'+label+(uTijeku ? ' <span class="nepotpun">u tijeku</span>' : '')+'</div>'+
+            '<div class="bar-track"><div class="bar-fill'+(uTijeku?' u-tijeku':'')+
+              '" style="width:'+Math.round(mjTrosak[kk]/maxMj*100)+'%"></div></div>'+
+            '<div class="bar-val">'+EUR(mjTrosak[kk])+'</div></div>';
+        }).join('');
+      })()+
+    '</div>'+
     '<h2>Po stroju</h2><div class="card" style="padding:4px 0">'+
       tbl(['Stroj','Kvarova','Sati','Trošak','MTTR'], strojRedovi,
         strojRedovi.length ? ['Ukupno', uk.n, H(uk.sati), EUR(uk.cost), mttr?H(mttr):'—'] : null)+'</div>'+

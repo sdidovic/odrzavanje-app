@@ -350,6 +350,11 @@ async function testovi(W, D){
      var ukPrev = 0; Object.keys(d.poOsobi).forEach(function(i){ ukPrev += d.poOsobi[i].satiPrev; }); return ukPrev > 0;
   })());
   ok('sekcija "Sati po osobi" je iscrtana', D.querySelector('#screen-analitika').textContent.indexOf('Sati po osobi') > -1);
+  /* SIM-FIX: Analitika je dosad bila brojke + pet tablica, bez ijednog grafa — direktorovo
+     glavno pitanje "je li bolje ili gore" nije imalo vizualni odgovor. */
+  ok('Analitika ima graf "Trošak zastoja po mjesecima" s barem jednim stupcem',
+     D.querySelector('#screen-analitika').textContent.indexOf('Trošak zastoja po mjesecima') > -1 &&
+     D.querySelectorAll('#screen-analitika .bar-fill').length > 0);
 
   grupa('Offline red');
   ok('red je prazan na početku (demo)', W.RED.length === 0);
@@ -2700,6 +2705,23 @@ async function testovi(W, D){
     ok('direktor vidi "Najveći zastoj" — put od trenda do krivca',
        D.querySelector('#screen-pregled').textContent.indexOf('Najveći zastoj') > -1);
   }
+  /* SIM-FIX: upozorenje ne zaustavlja liniju, pa ne smije postati "najveći zastoj" —
+     makar mu je (jer je "otvoreno" jako dugo) hipotetski trošak ogroman. */
+  W.DATA.kvarovi.push({id:'kvUPOZ-test', m:'t1', date:W.todayISO(), opis:'TEST upozorenje davno otvoreno',
+    sati:0, status:'otvoren', upoz:true, tip:'kvar', kategorija:'Ostalo',
+    created_at:new Date(Date.now()-1000*3600000).toISOString()});
+  app.go('pregled'); await cekaj(100);
+  var dirHeroTest = D.querySelector('#screen-pregled .dir-hero');
+  ok('upozorenje ne postaje "najveći zastoj" iako mu je hipotetski trošak veći od cijelog mjeseca',
+     !!dirHeroTest && dirHeroTest.textContent.indexOf('Tunel za zamrzavanje') === -1);
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id!=='kvUPOZ-test'; });
+  app.go('pregled'); await cekaj(100);
+  /* SIM-FIX: tri slabe mete do Analitike (iznos bez oznake, sivi 12,5px tekst, skriveni gumb)
+     svedene na jednu pravu pilulu; iznos u eurima više nije zaseban dodir. */
+  ok('direktorov pregled ima pravu metu "Analitika i izvoz" (SIM-FIX: tri mete → jedna)',
+     D.querySelector('#screen-pregled').textContent.indexOf('Analitika i izvoz') > -1);
+  ok('iznos u eurima na direktorovu hero-u više nije zaseban dodir',
+     !D.querySelector('#screen-pregled .dir-hero .rasp-dan-h1').hasAttribute('onclick'));
   ok('NAZIV_ULOGE ima čitljive nazive za sve uloge (session-row)',
      W.NAZIV_ULOGE.majstor==='Tehničar održavanja' && W.NAZIV_ULOGE.readonly.indexOf('Direktor')>-1 &&
      W.NAZIV_ULOGE.proizvodnja==='Voditelj proizvodnje' && W.NAZIV_ULOGE.voditelj==='Voditelj održavanja');
