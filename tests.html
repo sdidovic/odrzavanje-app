@@ -794,9 +794,10 @@ async function testovi(W, D){
 
   grupa('Dijelovi i kontakti');
   app.go('dijelovi');
-  ok('kritični dijelovi su na vrhu', D.querySelector('#parts-list h2').textContent.indexOf('minimuma') > -1);
-  ok('pretraga skladišta ima novi naziv (F4 §2a)',
-     D.querySelector('#screen-dijelovi input[type="search"]').placeholder.indexOf('skladište') > -1);
+  /* SMJER-B: sekcije sad idu kroz .sec (isti obrazac kao Raspored), ne <h2> */
+  ok('kritični dijelovi su na vrhu', D.querySelector('#parts-list .sec').textContent.indexOf('minimuma') > -1);
+  ok('pretraga skladišta ima novi placeholder (SMJER-B maketa SkladisteB)',
+     D.querySelector('#screen-dijelovi input[type="search"]').placeholder.indexOf('dobavljač') > -1);
   ok('kartica na Pregledu kaže "Za naručiti", ne "Dijelovi za naručiti"', (function(){
      W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
      app.go('pregled');
@@ -817,7 +818,8 @@ async function testovi(W, D){
   ok('lokacija se vidi u rastvorenom retku', D.querySelector('#parts-list').innerHTML.indexOf('Polica B2') > -1);
   app.otvoriDio(dioZaLok.id);
   app.traziDio('remen');
-  ok('pretraga dijelova filtrira', D.querySelectorAll('#parts-list .row').length < W.DATA.dijelovi.length);
+  /* SMJER-B: redak dijela je sad .li (obrazac Rasporeda), ne .row */
+  ok('pretraga dijelova filtrira', D.querySelectorAll('#parts-list .li').length < W.DATA.dijelovi.length);
   app.traziDio('');
   /* korisnikov feedback: "naručeno" ne znači "stiglo" — chip mora ostati pošten */
   var dioZaChip = W.DATA.dijelovi.filter(function(p){ return p.stanje < p.min && !W.narudzbaZaDio(p.id); })[0];
@@ -839,6 +841,55 @@ async function testovi(W, D){
   app.traziKontakt('frigo');
   jednako('pretraga kontakata', D.querySelectorAll('#kontakti-list .row').length, 1);
   app.traziKontakt('');
+
+  grupa('SMJER-B Skladište (redizajn — maketa SkladisteB)');
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  var dBSpodMin = { id:'dBSpodMin', naziv:'TEST dio ispod min', stroj:'V1', lokacija:'A1',
+    stanje:0, min:2, dob:'Tokić', cijena:1, kategorija:'Ostalo', strojevi:[] };
+  var dBUDolasku = { id:'dBUDolasku', naziv:'TEST dio u dolasku', stroj:'E1', lokacija:'A2',
+    stanje:1, min:3, dob:'Bomark', cijena:1, kategorija:'Ostalo', strojevi:[] };
+  W.DATA.dijelovi.push(dBSpodMin, dBUDolasku);
+  var nBDolasku = { id:'nbBDolasku', dio_id:'dBUDolasku', kolicina:2, dobavljac:'Bomark',
+    narucen:W.todayISO(), ocekivano:W.isoShift(3), primljeno:null, primljena_kolicina:null, cijena:1, tko:'Voditelj' };
+  W.DATA.nabava.push(nBDolasku);
+  app.go('dijelovi'); await cekaj(150);
+  ok('dio ispod minimuma je pod sekcijom "Ispod minimuma"',
+     D.querySelector('#parts-list .sec.crv').nextElementSibling.textContent.indexOf('TEST dio ispod min') > -1);
+  ok('voditelj vidi gumb "Naruči" na retku ispod minimuma',
+     D.querySelector('#parts-list .sec.crv').nextElementSibling
+       .querySelector('button[onclick*="app.naruciDio(\'dBSpodMin\')"]') !== null);
+  ok('dio s otvorenom narudžbom je pod sekcijom "U dolasku", ne "Ispod minimuma"', (function(){
+    var ispodMinBlok = D.querySelector('#parts-list .sec.crv').nextElementSibling;
+    var uDolaskuBlok = ispodMinBlok.nextElementSibling.nextElementSibling; // .sec "U dolasku" pa .card
+    return ispodMinBlok.textContent.indexOf('TEST dio u dolasku') === -1 &&
+           uDolaskuBlok.textContent.indexOf('TEST dio u dolasku') > -1;
+  })());
+  ok('gumb "Stiglo" na retku u dolasku poziva primiNabavu',
+     D.querySelector('#parts-list button[onclick*="app.primiNabavu(\'nbBDolasku\')"]') !== null);
+  W.SESSION = { ime:'Tehničar', role:'majstor' }; D.body.dataset.role = 'majstor';
+  app.go('dijelovi'); await cekaj(150);
+  ok('majstor ne vidi gumb "Naruči" na retku ispod minimuma (role-voditelj)',
+     W.getComputedStyle(D.querySelector('#parts-list button[onclick*="app.naruciDio(\'dBSpodMin\')"]')).display === 'none');
+  ok('majstor vidi gumb "Stiglo" (zaprimanje je role-write)',
+     W.getComputedStyle(D.querySelector('#parts-list button[onclick*="app.primiNabavu(\'nbBDolasku\')"]')).display !== 'none');
+  ok('stepper (qbtn) se ne prikazuje u sklopljenom popisu', D.querySelector('#parts-list .qbtn') === null);
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  app.go('dijelovi'); await cekaj(100);
+  ok('#fab na Dijelovima ima varijantu "+" i zove noviDio', (function(){
+    var f = D.getElementById('fab');
+    var vidljiv = W.getComputedStyle(f).display !== 'none';
+    var zoveNoviDio = f.innerHTML.indexOf('M12 5v14M5 12h14') > -1;
+    return vidljiv && zoveNoviDio;
+  })());
+  W.DATA.dijelovi = W.DATA.dijelovi.filter(function(p){ return p.id!=='dBSpodMin' && p.id!=='dBUDolasku'; });
+  W.DATA.nabava = W.DATA.nabava.filter(function(n){ return n.id!=='nbBDolasku'; });
+  /* prazna sekcija se ne renderira */
+  var dijeloviBezIspod = W.DATA.dijelovi.every(function(p){ return p.stanje >= p.min || W.narudzbaZaDio(p.id); });
+  if(dijeloviBezIspod){
+    app.go('dijelovi'); await cekaj(100);
+    ok('prazna sekcija "Ispod minimuma" se ne prikazuje', D.querySelector('#parts-list .sec.crv') === null);
+  }
+  app.go('pregled'); await cekaj(80);
 
   grupa('Status "u radu"');
   var otv = W.DATA.kvarovi.filter(function(k){ return k.status === 'otvoren'; })[0];
@@ -938,6 +989,38 @@ async function testovi(W, D){
   ok('zapis je kratak i vodi na kvar', zadnja.kvar_id === neki.id && zadnja.tekst.length < 160);
   app.closeModal();
   ok('nepročitane se broje', typeof W.brojNeprocitanih() === 'number');
+
+  grupa('SMJER-B Poruke (redizajn — maketa PorukeB)');
+  app.go('poruke'); await cekaj(150);
+  ok('sustavska poruka nema emoji prefiks u prikazu (DATA.poruke.tekst ostaje netaknut)', (function(){
+    var svihP = W.DATA.poruke.length;
+    W.sysPoruka('🔴 HITNO — TEST prijava kvara');
+    return true;
+  })());
+  app.go('poruke'); await cekaj(150);
+  ok('sustavska poruka s emoji prefiksom u DATA-i nema emoji u DOM prikazu', (function(){
+    var el = Array.prototype.filter.call(D.querySelectorAll('#screen-poruke .msg.sustav .msg-txt'),
+      function(x){ return x.textContent.indexOf('TEST prijava kvara') > -1; })[0];
+    return !!el && el.textContent.indexOf('🔴') === -1 && el.textContent.indexOf('HITNO') > -1;
+  })());
+  ok('sustavska HITNO poruka je vizualno crvena (.msg.sustav.hitno)',
+     D.querySelector('#screen-poruke .msg.sustav.hitno') !== null);
+  W.DATA.poruke = W.DATA.poruke.filter(function(p){ return p.tekst.indexOf('TEST prijava kvara') === -1; });
+  app.go('poruke'); await cekaj(150);
+  ok('dan separator postoji (.msg-dan)', D.querySelector('#screen-poruke .msg-dan') !== null);
+  var svihP2 = W.DATA.poruke.length;
+  var formaB = D.querySelector('#screen-poruke form');
+  formaB.elements.tekst.value = 'TEST SMJER-B moja poruka';
+  posalji(formaB); await cekaj(250);
+  jednako('slanje i dalje dodaje poruku u kanal', W.DATA.poruke.length, svihP2 + 1);
+  app.go('poruke'); await cekaj(150);
+  ok('moja poruka ima klasu .moja', (function(){
+    var el = Array.prototype.filter.call(D.querySelectorAll('#screen-poruke .msg.moja'),
+      function(x){ return x.textContent.indexOf('TEST SMJER-B moja poruka') > -1; })[0];
+    return !!el;
+  })());
+  W.DATA.poruke = W.DATA.poruke.filter(function(p){ return p.tekst.indexOf('TEST SMJER-B moja poruka') === -1; });
+  app.go('poruke'); await cekaj(150);
 
   grupa('Poruke kao chat — S9');
   app.go('poruke'); await cekaj(150);
@@ -1791,8 +1874,9 @@ async function testovi(W, D){
   W.showScreen('nabava'); await cekaj(150);
   var naNabavi = W.zaNaruciti().length;
   W.showScreen('dijelovi'); await cekaj(150);
-  var naDijelovima = parseInt((D.querySelector('#screen-dijelovi').textContent
-    .match(/ispod minimuma:\s*(\d+)/)||[0,'-1'])[1], 10);
+  /* SMJER-B: broj sad stoji u sekciji "Ispod minimuma" (.sec.crv), ne u tekstu "ispod minimuma: N" */
+  var secKrit = D.querySelector('#screen-dijelovi .sec.crv');
+  var naDijelovima = secKrit ? parseInt(secKrit.querySelectorAll('span')[1].textContent, 10) : 0;
   jednako('Pregled i Nabava broje isto', naKartici, naNabavi);
   jednako('Dijelovi broje isto', naDijelovima, naNabavi);
 
@@ -1860,8 +1944,11 @@ async function testovi(W, D){
 
   /* Dijelovi: sklopljen redak nosi samo naziv, oznaku i stanje; dodir otvara ostalo */
   app.go('dijelovi'); await cekaj(150);
-  ok('sklopljen redak dijela nema gumbe',
-     D.querySelector('#parts-list .row .btn-mini') === null &&
+  /* SMJER-B: sklopljen redak dijela je .li; kategorijski redak (partRow) nema gumbe dok
+     se ne rastvori — retci u sekcijama Ispod minimuma/U dolasku smiju imati svoj gumb
+     (Naruči/Stiglo), to je namjerno (miran ekran = jedna jasna radnja po retku ondje). */
+  ok('sklopljen redak dijela u kategoriji nema gumbe',
+     D.querySelector('#parts-list .card:not([style*="red"]):not([style*="yellow"]) .li .btn-mini') === null &&
      D.querySelector('#parts-list .dio-detalj') === null);
   var prviDio = W.DATA.dijelovi[0];
   app.otvoriDio(prviDio.id); await cekaj(120);
