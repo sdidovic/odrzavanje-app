@@ -2091,16 +2091,18 @@ async function testovi(W, D){
   })());
   app.rasporedGrupaToggle('bezRoka'); await cekaj(80);   /* zatvori za sljedeće testove */
   W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== 'kvBezRokaTest'; });
-  /* #14: Kvarovi prazno stanje razlikuje "nema ničega" od "filter ne pogađa ništa" */
+  /* #14 (SMJER-B redizajn): prazno stanje je sad fiksni tekst PO ČIPU (KvaroviB maketa,
+     stavka 5) umjesto filter-svjesne poruke — "nema ničega" i "filter ne pogađa ništa"
+     pod čipom Otvoreni dijele istu poruku po dizajnu. */
   app.go('kvarovi'); await cekaj(100);
   var sviKvarovi = W.DATA.kvarovi.slice();
   W.DATA.kvarovi = [];
   app.resetFiltere(); await cekaj(80);
-  ok('prazno skladište kvarova kaže da nema prijava, ne "nema za filter"',
-     D.querySelector('#screen-kvarovi').textContent.indexOf('Prvi prijavi') > -1);
+  ok('prazno stanje čipa "Otvoreni" ima objašnjavajući tekst',
+     D.querySelector('#screen-kvarovi').textContent.indexOf('Nema otvorenih kvarova') > -1);
   app.setFilterTiho('q','xyz-ne-postoji'); await cekaj(80);
-  ok('prazan REZULTAT filtera i dalje kaže "za odabrani filter"',
-     D.querySelector('#screen-kvarovi').textContent.indexOf('za odabrani filter') > -1);
+  ok('prazan REZULTAT pretrage i dalje prikazuje prazno stanje čipa',
+     D.querySelector('#screen-kvarovi').textContent.indexOf('Nema otvorenih kvarova') > -1);
   app.resetFiltere();
   W.DATA.kvarovi = sviKvarovi;
   app.go('kvarovi'); await cekaj(100); app.resetFiltere();
@@ -2112,22 +2114,22 @@ async function testovi(W, D){
      D.querySelector('#parts-list .dio-detalj .qval') !== null &&
      D.querySelector('#parts-list .dio-detalj .qval').textContent === String(dioZaQval.stanje));
   app.otvoriDio(dioZaQval.id);
-  /* #21: kartica kvara na max 3 segmenta — sudjelovali/zamijenjeno/storno žive u detalju */
+  /* #21 (SMJER-B redizajn, KvaroviB maketa): podnaslov retka sad izričito traži
+     "dio ako ga ima" — kartica SADA prikazuje zamijenjeni dio (obrnuto od starog
+     audit-fixa koji ga je skrivao); detalj ga i dalje prikazuje. */
   var rijesenSaZam = W.DATA.kvarovi.filter(function(k){ return k.status==='rijesen' && k.zam; })[0];
   if(rijesenSaZam){
     app.go('kvarovi'); await cekaj(100);
-    /* §16 P2: riješeni su sklopljeni po defaultu ("samo aktualno") — rastvori da ih se vidi
-       (postavi izravno, ne toggle — ne znamo stanje s kojim smo ušli, i vraćamo ga poslije) */
-    W.KV_RIJESENI_OTVOREN = true; W.renderKvarovi(); await cekaj(80);
+    app.setKvCip('svi'); await cekaj(80);
     var kartica = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
       function(el){ return el.textContent.indexOf(rijesenSaZam.opis) > -1; })[0];
-    ok('kartica ne prikazuje "Zamijenjeno" (ostaje u detalju)',
-       !!kartica && kartica.querySelector('.kvar-meta').textContent.indexOf('Zamijenjeno') === -1);
+    ok('kartica sad prikazuje zamijenjeni dio u podnaslovu (SMJER-B: "dio ako ga ima")',
+       !!kartica && kartica.querySelector('.kvar-meta').textContent.indexOf(rijesenSaZam.zam) > -1);
     app.detaljKvara(rijesenSaZam.id); await cekaj(100);
     ok('detalj I DALJE prikazuje "Zamijenjeno"',
        D.querySelector('#modal-root').textContent.indexOf('Zamijenjeno') > -1);
     app.closeModal();
-    W.KV_RIJESENI_OTVOREN = false;   /* vrati sklopljeno za sljedeće testove */
+    app.setKvCip('otvoreni'); await cekaj(80);   /* vrati zadani čip za sljedeće testove */
   }
 
   grupa('Z1 — dovršetak §11.5 (bez migracije)');
@@ -2760,19 +2762,21 @@ async function testovi(W, D){
   app.pinOko('pin', okoBtn);
   D.getElementById('screen-login').classList.remove('show');
 
-  /* U2: riješen kvar je normalno stanje — kartica bez chipa, bez kategorije, bez "Riješio" */
+  /* U2 (SMJER-B redizajn popisa): "Riješeni" se sad gledaju kroz čip "Riješeni 30 d" —
+     KV_RIJESENI_OTVOREN/kvRijeseniToggle su uklonjeni, zamijenjeni jednim KV_CIP-om.
+     Novi dizajn NAMJERNO vraća status chip "Riješen" na karticu (maketa KvaroviB) —
+     obrnuto od starog audit-fixa koji ga je skrivao; "Riješio" i dalje ostaje samo u detalju. */
   app.go('kvarovi'); await cekaj(120); app.resetFiltere(); await cekaj(80);
-  /* §16 P2: riješeni su sklopljeni po defaultu — rastvori da ih se vidi (izravno, ne toggle) */
-  W.KV_RIJESENI_OTVOREN = true; W.renderKvarovi(); await cekaj(80);
-  var rijesenaKartica = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
-    function(el){ return el.textContent.indexOf('Zastoj') > -1; })[0];
-  ok('kartica riješenog kvara nema chip (riješeno je normalno stanje, ne alarm)',
-     !!rijesenaKartica && rijesenaKartica.querySelector('.chip') === null);
+  app.setKvCip('rijeseni30'); await cekaj(80);
+  var rijesenChip = D.querySelector('#screen-kvarovi .kvar-item .k.grn, #screen-kvarovi .kvar-item .k.yel');
+  var rijesenaKartica = rijesenChip ? rijesenChip.closest('.kvar-item') : null;
+  ok('kartica riješenog/privremenog kvara nosi status chip (SMJER-B: sad vidljivo u popisu)',
+     !!rijesenaKartica);
   ok('kartica ne prikazuje "Riješio" (živi u detalju)',
-     rijesenaKartica.textContent.indexOf('Riješio') === -1);
-  W.KV_RIJESENI_OTVOREN = false;   /* vrati sklopljeno za sljedeće testove */
+     !rijesenaKartica || rijesenaKartica.textContent.indexOf('Riješio') === -1);
+  app.setKvCip('otvoreni'); await cekaj(80);   /* vrati zadani čip za sljedeće testove */
   var otvorenaKartica = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
-    function(el){ return el.querySelector('.chip.kvar, .chip.rad, .chip.upoz'); })[0];
+    function(el){ return el.querySelector('.k'); })[0];
   ok('otvoren/u radu kvar i dalje nosi status chip', !!otvorenaKartica);
 
   /* U4: QR naljepnice — izbor standardnog A4 arka mijenja print raspored */
@@ -3056,17 +3060,82 @@ async function testovi(W, D){
   var otvBroj16 = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; }).length;
   jednako('zadano stanje: samo aktivni kvarovi odmah vidljivi (povijest sklopljena)',
      D.querySelectorAll('#screen-kvarovi .kvar-item').length, otvBroj16);
-  var imaRijesenih16 = D.querySelector('#screen-kvarovi').textContent.indexOf('Riješeni — zadnjih 30 dana') > -1;
-  if(imaRijesenih16){
-    app.kvRijeseniToggle(); await cekaj(100);
-    ok('rastvaranje "Riješeni" dodaje kartice povijesti u DOM',
-       D.querySelectorAll('#screen-kvarovi .kvar-item').length > otvBroj16);
-    app.kvRijeseniToggle(); await cekaj(100);
+  /* SMJER-B: sklopivi blok "Riješeni — zadnjih 30 dana" je uklonjen — zamijenjen čipom
+     "Riješeni 30 d" (KV_CIP), koji je jedini izvor istine za prikaz (vidi grupa "SMJER-B Kvarovi"). */
+  var rijBroj16 = W.DATA.kvarovi.filter(function(k){
+    return k.status==='rijesen' && k.date>=W.isoShift(-30) && (k.tip||'kvar')==='kvar'; }).length;
+  if(rijBroj16){
+    app.setKvCip('rijeseni30'); await cekaj(100);
+    ok('čip "Riješeni 30 d" prikazuje karticu povijesti u DOM-u',
+       D.querySelectorAll('#screen-kvarovi .kvar-item').length === rijBroj16);
+    app.setKvCip('otvoreni'); await cekaj(100);
   }
   app.setFilter('q','a'); await cekaj(100);
   ok('pretraga vraća jednu ravnu listu, ne umjetnu podjelu',
      D.querySelector('#screen-kvarovi').textContent.indexOf('Riješeni — zadnjih 30 dana') === -1);
   app.resetFiltere(); await cekaj(80);
+
+  grupa('SMJER-B Kvarovi — čipovi Otvoreni/Riješeni 30 d/Svi (KvaroviB maketa)');
+  app.go('kvarovi'); await cekaj(100);
+  jednako('zadani čip je "Otvoreni"', W.KV_CIP, 'otvoreni');
+  var kvStaje = { id:'kvSMB-staje', m:'e1', date:W.todayISO(), opis:'TEST SMJER-B zaustavlja liniju',
+    sati:0, status:'otvoren', prioritet:'hitno', tip:'kvar', kategorija:'Ostalo',
+    created_at:new Date().toISOString() };
+  var kvOtkazan = { id:'kvSMB-otkazan', m:'e1', date:W.isoShift(-2), opis:'TEST SMJER-B otkazan',
+    sati:0, status:'otkazan', tip:'kvar', kategorija:'Ostalo', created_at:W.isoShift(-2)+'T09:00:00' };
+  var kvStariRijesen = { id:'kvSMB-stari', m:'e1', date:W.isoShift(-90), opis:'TEST SMJER-B star riješen',
+    sati:2, status:'rijesen', tip:'kvar', kategorija:'Ostalo', created_at:W.isoShift(-90)+'T09:00:00' };
+  var zadSMB = { id:'zadSMB-test', m:'e1', date:W.todayISO(), opis:'TEST SMJER-B zadatak',
+    sati:0, status:'otvoren', tip:'zadatak', kategorija:'Ostalo', created_at:new Date().toISOString() };
+  W.DATA.kvarovi.push(kvStaje, kvOtkazan, kvStariRijesen, zadSMB);
+  app.go('kvarovi'); await cekaj(100);
+
+  ok('kvar koji zaustavlja liniju ima crvenu lijevu traku', (function(){
+    var el = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
+      function(e){ return e.textContent.indexOf(kvStaje.opis) > -1; })[0];
+    return !!el && el.getAttribute('style') && el.getAttribute('style').indexOf('border-left-color') > -1;
+  })());
+  ok('zadatak se ne pojavljuje među kvarovima',
+     D.querySelector('#screen-kvarovi').textContent.indexOf(zadSMB.opis) === -1);
+
+  app.setKvCip('rijeseni30'); await cekaj(100);
+  ok('čip "Riješeni 30 d" prikazuje samo riješene u zadnjih 30 dana (stari riješen ispada)',
+     D.querySelector('#screen-kvarovi').textContent.indexOf(kvStariRijesen.opis) === -1 &&
+     D.querySelector('#screen-kvarovi').textContent.indexOf(kvOtkazan.opis) === -1);
+  ok('čip "Riješeni 30 d" ne prikazuje otvorene',
+     D.querySelector('#screen-kvarovi').textContent.indexOf(kvStaje.opis) === -1);
+
+  app.setKvCip('svi'); await cekaj(100);
+  ok('čip "Svi" uključuje i starije riješene i otkazane',
+     D.querySelector('#screen-kvarovi').textContent.indexOf(kvStariRijesen.opis) > -1 &&
+     D.querySelector('#screen-kvarovi').textContent.indexOf(kvOtkazan.opis) > -1);
+  ok('otkazani kvar na čipu "Svi" nosi čip "Otkazan"', (function(){
+    var el = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .kvar-item'),
+      function(e){ return e.textContent.indexOf(kvOtkazan.opis) > -1; })[0];
+    return !!el && !!el.querySelector('.k.grey') && el.querySelector('.k.grey').textContent.indexOf('Otkazan') > -1;
+  })());
+
+  W.SESSION = { ime:'Proizvodnja', role:'proizvodnja' }; D.body.dataset.role = 'proizvodnja';
+  W.showScreen('kvarovi'); await cekaj(100);
+  ok('proizvodnja ne vidi .eur (trošak) na popisu kvarova',
+     D.querySelector('#screen-kvarovi .eur, #screen-kvarovi .stoji-cijena') === null);
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+
+  var sviKvSMB = W.DATA.kvarovi.slice();
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return (k.tip||'kvar')!=='kvar'; });
+  app.setKvCip('otvoreni'); app.resetFiltere(); await cekaj(100);
+  ok('prazno stanje (Otvoreni) ima objašnjavajući tekst',
+     D.querySelector('#screen-kvarovi').textContent.indexOf('Nema otvorenih kvarova') > -1);
+  app.setKvCip('rijeseni30'); await cekaj(100);
+  ok('prazno stanje (Riješeni 30 d) ima objašnjavajući tekst',
+     D.querySelector('#screen-kvarovi').textContent.indexOf('Nema riješenih u zadnjih 30 dana') > -1);
+  app.setKvCip('svi'); await cekaj(100);
+  ok('prazno stanje (Svi) ima objašnjavajući tekst',
+     D.querySelector('#screen-kvarovi').textContent.indexOf('Još nema prijava') > -1);
+
+  W.DATA.kvarovi = sviKvSMB.filter(function(k){
+    return ['kvSMB-staje','kvSMB-otkazan','kvSMB-stari','zadSMB-test'].indexOf(k.id) === -1; });
+  app.setKvCip('otvoreni'); app.resetFiltere(); await cekaj(80);
 
   app.go('raspored'); await cekaj(150);
   if(D.querySelector('#screen-raspored').textContent.indexOf('Sljedećih 7 dana') > -1){

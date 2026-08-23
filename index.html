@@ -153,6 +153,15 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
 .k.yel{background:var(--yellow-bg);color:var(--yellow)}
 .k.acc{background:var(--accent-soft);color:var(--accent)}
 .k.grey{background:var(--bg);color:var(--muted)}
+.k.grn{background:var(--green-bg);color:var(--green)}
+/* SMJER-B Kvarovi: red filter-čipova iznad popisa — vodoravno skrolabilan, bez vidljive trake */
+.f-trak{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;-ms-overflow-style:none;scrollbar-width:none}
+.f-trak::-webkit-scrollbar{display:none}
+.f{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:18px;
+  font-size:var(--t-sub);font-weight:600;border:1.5px solid var(--accent-rub);background:var(--card);
+  color:var(--accent);white-space:nowrap;flex:none;cursor:pointer}
+.f.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.eur{font-size:var(--t-meta);font-weight:700;color:var(--text);flex:none;text-align:right;min-width:56px}
 /* prsten je vizualno 22px, ali dodirna meta ≥44px kroz pseudo-element (hala, rukavice) */
 .ring{width:22px;height:22px;border-radius:50%;border:2px solid var(--border-jaci);flex:none;
   position:relative;cursor:pointer}
@@ -2484,6 +2493,83 @@ function kvarItem(k, showMachine){
     '<div class="kvar-meta">'+meta+'</div>'+brzeAkcije+'</div>';
 }
 
+/* SMJER-B: redak popisa Kvarovi — .li/.t/.s/.k iz zajedničkog rječnika (Raspored).
+   Zadržava kvar-brzo (dodjela s kartice) i kvar-meta (test-kuka) iz starog kvarItem. */
+function kvRedak(k){
+  var m = machineById(k.m) || {id:'', name:'Nepoznat stroj'};
+  var otvoren = jeOtvoren(k);
+  var stoji = zaustavljaLiniju(k);
+  var chip = '';
+  if(k.status==='otkazan') chip = '<span class="k grey">Otkazan</span>';
+  else if(otvoren){
+    if(k.prioritet==='hitno') chip += '<span class="k red">Hitno</span> ';
+    if(k.ceka_dio) chip += '<span class="k yel">Čeka dio</span> ';
+    /* Čeka servis zadržava POSTOJEĆU plavu chip.servis (spec: "plava postojeća") */
+    if(k.ceka_servis) chip += '<span class="chip servis">Čeka servis</span> ';
+    if(k.status==='u_radu') chip += '<span class="k acc">U radu</span>';
+  } else if(k.status==='rijesen'){
+    chip = k.privremeni ? '<span class="k yel">Privremeno</span>' : '<span class="k grn">Riješen</span>';
+  }
+  var dioTxt = k.zam ? (' · '+esc(k.zam)) : '';
+  var s1 = relDatumKratak(k.date)+' · '+esc(k.opis)+(otvoren ? '' : ' · '+H(k.sati))+dioTxt;
+  var s2 = '';
+  if(otvoren){
+    var bits = [trajanjeKvara(k) || 'u tijeku'];
+    if(k.dodijeljen) bits.push(esc(k.dodijeljen));
+    var narudzba = (DATA.nabava||[]).filter(function(x){ return x.kvar_id===k.id && !x.primljeno; })[0];
+    if(narudzba && narudzba.ocekivano){
+      var dioP = narudzba.dio_id ? (DATA.dijelovi.filter(function(p){ return p.id===narudzba.dio_id; })[0]||{}) : {};
+      bits.push(esc(dioP.naziv||'dio')+' stiže '+DANI_KR[new Date(narudzba.ocekivano+'T00:00:00').getDay()]+'.');
+    }
+    var sig = kvarSig(k);
+    if(sig && REPS[sig] >= 2) bits.push(REPS[sig]+'× u 3 mj.');
+    s2 = bits.join(' &middot; ');
+  }
+  var eur = '';
+  if(vidiFinancije()){
+    if(otvoren){
+      var p = pocetakKvara(k);
+      var sati = p ? Math.max(0,(Date.now()-p.getTime())/3600000) : null;
+      if(sati !== null) eur = '<div class="stoji-cijena">'+EUR(sati*(m.rate||350))+'<span>do sada</span></div>';
+    } else {
+      eur = '<div class="eur">'+EUR(kvarCost(k))+'</div>';
+    }
+  }
+  var brzeAkcije = '';
+  if(otvoren && !k.dodijeljen){
+    brzeAkcije = '<div class="kvar-brzo role-write" onclick="event.stopPropagation()">'+
+      (MAJSTORI.length===1
+        ? '<button class="rasp-cip puni" onclick="app.brzoDodijeli(\''+k.id+'\',\''+esc(MAJSTORI[0])+'\')">→ '+esc(MAJSTORI[0])+'</button>'
+        : '<select onchange="app.brzoDodijeli(\''+k.id+'\',this.value)" aria-label="Dodijeli tehničaru">'+
+          '<option value="">Dodijeli…</option>'+
+          MAJSTORI.map(function(mj){ return '<option>'+esc(mj)+'</option>'; }).join('')+'</select>')+
+    '</div>';
+  }
+  var stil = stoji ? ' style="border-left-color:var(--red)'+(k.status==='otkazan'?';opacity:.55':'')+'"'
+                    : (k.status==='otkazan' ? ' style="opacity:.55"' : '');
+  return '<div class="li kvar-item click"'+stil+' onclick="app.detaljKvara(\''+k.id+'\')">'+
+    '<div class="grow"><div><span class="t">'+esc(m.name)+'</span>'+(chip?' '+chip:'')+'</div>'+
+    '<div class="s kvar-meta">'+s1+'</div>'+
+    (s2 ? '<div class="s" style="color:var(--text-2);font-weight:600">'+s2+'</div>' : '')+
+    '</div>'+eur+brzeAkcije+'</div>';
+}
+/* Grupiranje popisa "Svi" po mjesecu prijave — najnoviji mjesec na vrhu */
+function kvGrupePoMjesecu(list){
+  var mj = {}, redoslijed = [];
+  list.forEach(function(k){
+    var key = k.date.slice(0,7);
+    if(!mj[key]){ mj[key]=[]; redoslijed.push(key); }
+    mj[key].push(k);
+  });
+  redoslijed.sort().reverse();
+  return redoslijed.map(function(key){
+    var p = key.split('-');
+    var lbl = MJESECI[parseInt(p[1],10)-1]+' '+p[0];
+    return '<div class="sec"><span>'+esc(lbl)+'</span><span>'+mj[key].length+'</span></div>'+
+      mj[key].map(kvRedak).join('');
+  }).join('');
+}
+
 /* =====================  render: Kvarovi — samo prijave problema  =====================
    Zadaci (kupiti, dogovoriti…) su organizacija i žive na Rasporedu — miješati ih
    među kvarove nije imalo logike ni za brojku na kartici ni za majstora u hali. */
@@ -2505,7 +2591,14 @@ function ucitajZapamceneFiltere(){
 }
 ucitajZapamceneFiltere();
 var KV_FILTRI_OTVORENI = false;
-var KV_RIJESENI_OTVOREN = false;   /* §16 P2: povijest je sklopljena dok se ne zatraži */
+var KV_CIP = 'otvoreni';   /* SMJER-B: 'otvoreni' | 'rijeseni30' | 'svi' — jedini izvor istine za prikaz popisa */
+function relDatumKratak(iso){
+  if(iso===todayISO()) return 'danas';
+  if(iso===isoShift(-1)) return 'jučer';
+  if(iso>isoShift(-6) && iso<todayISO()){ return DANI_KR[new Date(iso+'T00:00:00').getDay()]; }
+  var p = iso.split('-');
+  return parseInt(p[2],10)+'. '+parseInt(p[1],10)+'.';
+}
 var PENDING_FOTO = '';
 var PENDING_DOK = null;   /* {dataUrl, mime, naziv, velicina} — dokument uz stroj čeka spremanje */
 var PENDING_LOGO = '';
@@ -2521,7 +2614,9 @@ function brojAktivnihFiltera(){
 function renderKvarovi(){
   var list = DATA.kvarovi.filter(function(k){
     if((k.tip||'kvar')!=='kvar') return false;   /* zadaci su na Rasporedu */
-    if(FILTER.status==='svi' && k.status==='otkazan') return false;  /* otkazane samo na izričit zahtjev */
+    /* otkazane modal (FILTER) skriva dok se izričito ne zatraže — ali čip "Svi" (SMJER-B)
+       je deklarirani izuzetak: on po specifikaciji uvijek uključuje i otkazane. */
+    if(KV_CIP!=='svi' && FILTER.status==='svi' && k.status==='otkazan') return false;
     if(FILTER.stroj!=='svi' && k.m!==FILTER.stroj) return false;
     /* "aktivni" = otvoren + u radu — isto što broji kartica "Otvoreni kvarovi" na Pregledu */
     if(FILTER.status==='aktivni'){ if(!jeOtvoren(k)) return false; }
@@ -2561,9 +2656,28 @@ function renderKvarovi(){
     }).join('')+
     '<option value="nedodijeljeno"'+(FILTER.majstor==='nedodijeljeno'?' selected':'')+'>Nedodijeljeni</option>';
 
-  /* miran ekran: stalno su vidljivi samo pretraga i gumb "Filtri" —
-     pet padajućih polja i dva datuma otvore se tek na dodir */
+  /* miran ekran: stalno su vidljivi samo pretraga i red čipova —
+     pet padajućih polja i dva datuma otvore se tek na dodir gumba "Filtri" */
   var nAkt = brojAktivnihFiltera();
+  var mj30 = isoShift(-30);
+  var otvoreniL = list.filter(function(k){ return jeOtvoren(k); });
+  var rijeseniL = list.filter(function(k){ return k.status==='rijesen' && k.date>=mj30; });
+
+  var telo;
+  if(KV_CIP==='rijeseni30'){
+    telo = rijeseniL.length
+      ? '<div class="sec"><span>Riješeni · zadnjih 30 dana</span><span>'+rijeseniL.length+'</span></div>'+
+        rijeseniL.map(kvRedak).join('')
+      : '<div class="empty">Nema riješenih u zadnjih 30 dana.</div>';
+  } else if(KV_CIP==='svi'){
+    telo = list.length ? kvGrupePoMjesecu(list) : '<div class="empty">Još nema prijava.</div>';
+  } else {
+    telo = otvoreniL.length
+      ? '<div class="sec'+(otvoreniL.length?' crv':'')+'"><span>Otvoreni</span><span>'+otvoreniL.length+'</span></div>'+
+        otvoreniL.map(kvRedak).join('')
+      : '<div class="empty">Nema otvorenih kvarova — sve radi.</div>';
+  }
+
   $('#screen-kvarovi').innerHTML =
     /* AUDIT-FIX (UX): oba gumba su nekad bila jednake težine iako "Detaljna prijava"
        otvara obrazac s ~3x više polja za identičnu svrhu (prijaviti kvar) — slučajan
@@ -2573,9 +2687,14 @@ function renderKvarovi(){
        svim ekranima gdje ima smisla) — u tijelu Kvarova više nema velikog gumba za nju.
        "Detaljno" (voditeljev alat za povijesni/potpuni unos) ostaje, ali diskretno, ispod trake
        s pretragom — nije više ravnopravan par uz brzu prijavu. */
-    '<div style="display:flex;gap:var(--r2);margin-bottom:6px">'+
-      '<input type="search" value="'+esc(FILTER.q)+'" placeholder="Pretraži opis…" oninput="app.setFilterTiho(\'q\',this.value)" style="flex:1">'+
-      '<button class="btn sec" style="flex-shrink:0" onclick="app.prekidacFiltre()">Filtri'+(nAkt?' ('+nAkt+')':'')+'</button>'+
+    '<div style="margin-bottom:8px">'+
+      '<input type="search" value="'+esc(FILTER.q)+'" placeholder="Pretraži opis, stroj…" oninput="app.setFilterTiho(\'q\',this.value)" style="width:100%;box-sizing:border-box">'+
+    '</div>'+
+    '<div class="f-trak" style="margin-bottom:8px">'+
+      '<span class="f'+(KV_CIP==='otvoreni'?' on':'')+'" onclick="app.setKvCip(\'otvoreni\')">Otvoreni · '+otvoreniL.length+'</span>'+
+      '<span class="f'+(KV_CIP==='rijeseni30'?' on':'')+'" onclick="app.setKvCip(\'rijeseni30\')">Riješeni 30 d · '+rijeseniL.length+'</span>'+
+      '<span class="f'+(KV_CIP==='svi'?' on':'')+'" onclick="app.setKvCip(\'svi\')">Svi</span>'+
+      '<span class="f" onclick="app.prekidacFiltre()">Filtri'+(nAkt?' ('+nAkt+')':'')+'</span>'+
     '</div>'+
     '<div style="margin-bottom:var(--r3)"><a class="role-voditelj" href="javascript:void(0)" onclick="app.noviKvar()" style="font-size:13px;color:var(--accent);text-decoration:none">Detaljno</a></div>'+
     (KV_FILTRI_OTVORENI
@@ -2592,30 +2711,7 @@ function renderKvarovi(){
       : '')+
     ((FILTER.q||nAkt)
       ? '<button class="btn-mini" style="margin-bottom:10px" onclick="app.resetFiltere()">✕ Poništi filtere ('+list.length+' rezultata)</button>' : '')+
-    (function(){
-      /* §16 P2 (vlasnikova primjedba): "samo ono što je aktualno" — dok se ništa ne
-         traži/filtrira, aktivni kvarovi su gore, povijest je sklopljena ispod. Čim netko
-         pretraži ili postavi filtar, prikaz se vraća na jednu ravnu listu (najbolje
-         rješenje = ono što je zatraženo, ne umjetna podjela). */
-      var zadano = !nAkt && !FILTER.q;
-      if(!zadano){
-        return '<div class="card">'+
-          (list.length ? list.map(function(k){ return kvarItem(k,true); }).join('')
-                       : '<div class="empty">Nema kvarova za odabrani filter.</div>')+
-          '</div>';
-      }
-      var aktivniL = list.filter(function(k){ return jeOtvoren(k); });
-      var mj30 = isoShift(-30);
-      var rijeseniL = list.filter(function(k){ return !jeOtvoren(k) && k.date>=mj30; });
-      return (aktivniL.length ? '<div class="card">'+aktivniL.map(function(k){ return kvarItem(k,true); }).join('')+'</div>'
-                : '<div class="card"><div class="empty">Nema prijavljenih kvarova. Prvi prijavi gumbom Brza prijava.</div></div>')+
-        (rijeseniL.length
-          ? '<div class="rasp-kal-traka" style="margin-top:10px" onclick="app.kvRijeseniToggle()">'+
-              '<span>Riješeni — zadnjih 30 dana ('+rijeseniL.length+')</span>'+
-              '<span class="chev" style="transform:rotate('+(KV_RIJESENI_OTVOREN?90:0)+'deg)">›</span></div>'+
-            (KV_RIJESENI_OTVOREN ? '<div class="card" style="margin-top:6px">'+rijeseniL.map(function(k){ return kvarItem(k,true); }).join('')+'</div>' : '')
-          : '');
-    })();
+    '<div class="card">'+telo+'</div>';
 }
 
 /* =====================  render: Dijelovi  ===================== */
@@ -5510,6 +5606,7 @@ var app = {
      kartica prebrojala, a gumb "Poništi filtere" se ni ne pojavi. */
   goKvaroviOtvoreni: function(){
     FILTER = { stroj:'svi', status:'aktivni', majstor:'svi', od:'', do:'', q:'' };
+    KV_CIP = 'otvoreni';
     showScreen('kvarovi');
   },
   pregledFinToggle: function(){ PREGLED_FIN_OTVOREN = !PREGLED_FIN_OTVOREN; renderPregled(); },
@@ -5530,16 +5627,15 @@ var app = {
   setFilterTiho: function(key,val){
     /* pretraga bez re-rendera inputa (fokus ostaje) — osvježi samo listu */
     FILTER[key]=val; zapamtiFiltere();
-    var card = document.querySelector('#screen-kvarovi .card:last-of-type');
-    if(card){
-      var stara = card.outerHTML; renderKvarovi();
+    if($('#screen-kvarovi')){
+      renderKvarovi();
       var inp = document.querySelector('#screen-kvarovi input[type="search"]');
       if(inp){ inp.focus(); var v=inp.value; inp.setSelectionRange(v.length,v.length); }
     }
   },
   resetFiltere: function(){ FILTER = { stroj:'svi', status:'svi', majstor:'svi', od:'', do:'', q:'' }; zapamtiFiltere(); renderKvarovi(); },
   prekidacFiltre: function(){ KV_FILTRI_OTVORENI = !KV_FILTRI_OTVORENI; renderKvarovi(); },
-  kvRijeseniToggle: function(){ KV_RIJESENI_OTVOREN = !KV_RIJESENI_OTVOREN; renderKvarovi(); },
+  setKvCip: function(c){ KV_CIP = c; renderKvarovi(); },
   qty: async function(id, delta){
     var p = DATA.dijelovi.filter(function(x){ return x.id===id; })[0];
     if(!p) return;
