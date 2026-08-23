@@ -209,10 +209,17 @@ async function testovi(W, D){
   ok('modal Uredi kvar ima gumb "+ Dodatno"', !!btnD);
   ok('prije klika na "+ Dodatno" Prioritet je vidljiv', !!fD.elements.prioritet && fD.elements.prioritet.offsetParent !== null);
   ok('prije klika na "+ Dodatno" Opis i Datum su vidljivi', fD.elements.opis.offsetParent !== null && fD.elements.date.offsetParent !== null);
-  ok('prije klika na "+ Dodatno" Stroj/Dodijeljen su SAKRIVENI', fD.elements.m.offsetParent === null && fD.elements.dodijeljen.offsetParent === null);
+  /* VLASNIK-1 (TOČKA 4): Stroj/Dodijeljen su sad app.odabir gumbi — skriveni select ispod
+     njih (name="m"/"dodijeljen") je TRAJNO display:none (to je sama komponenta), pa se
+     vidljivost provjerava na omotu "+ Dodatno" (isti DOM-trik kao dosad) preko gumba. */
+  var dodatnoWrap = btnD ? btnD.nextElementSibling : null;
+  ok('prije klika na "+ Dodatno" Stroj/Dodijeljen su SAKRIVENI (omot "+ Dodatno" nema display)',
+     !!dodatnoWrap && dodatnoWrap.style.display === 'none' &&
+     fD.elements.m.offsetParent === null && fD.elements.dodijeljen.offsetParent === null);
   if(btnD) btnD.click();
-  ok('nakon klika na "+ Dodatno" Stroj i Dodijeljen postaju vidljivi',
-     fD.elements.m.offsetParent !== null && fD.elements.dodijeljen.offsetParent !== null);
+  ok('nakon klika na "+ Dodatno" gumbi za Stroj i Dodijeljen postaju vidljivi',
+     !!dodatnoWrap && dodatnoWrap.style.display === 'block' &&
+     !!dodatnoWrap.querySelectorAll('.odabir-btn').length);
   app.closeModal();
 
   grupa('§16.7: "Nije riješeno — vrati u rad" (E)');
@@ -2214,9 +2221,11 @@ async function testovi(W, D){
   app.resetFiltere(); await cekaj(80);
   ok('prazno stanje čipa "Otvoreni" ima objašnjavajući tekst',
      D.querySelector('#screen-kvarovi').textContent.indexOf('Nema otvorenih kvarova') > -1);
+  /* VLASNIK-1 (TOČKA 2): pretraga sad ide preko SVIH kvarova (ne samo unutar čipa), pa
+     prazan rezultat pretrage prikazuje svoju poruku "Nema rezultata…", ne poruku čipa. */
   app.setFilterTiho('q','xyz-ne-postoji'); await cekaj(80);
-  ok('prazan REZULTAT pretrage i dalje prikazuje prazno stanje čipa',
-     D.querySelector('#screen-kvarovi').textContent.indexOf('Nema otvorenih kvarova') > -1);
+  ok('prazan REZULTAT pretrage prikazuje "Nema rezultata"',
+     D.querySelector('#screen-kvarovi').textContent.indexOf('Nema rezultata') > -1);
   app.resetFiltere();
   W.DATA.kvarovi = sviKvarovi;
   app.go('kvarovi'); await cekaj(100); app.resetFiltere();
@@ -2911,9 +2920,14 @@ async function testovi(W, D){
   jednako('odlazak s QR ekrana čisti print stil (ne kvari ispis IFS-a/analitike)',
      D.getElementById('qr-print-stil').textContent, '');
 
-  /* U5: put do uređivanja sektora vidljiv na Strojevima */
-  ok('Strojevi nude gumb "Sektori" (otvara postavke tvrtke)',
-     !!D.querySelector('#screen-strojevi button[onclick*="urediTvrtku"]'));
+  /* VLASNIK-1 (TOČKA 7): gumb "Sektori" premješten sa Strojeva u Sustav → "Tvrtka i
+     postavke" — Strojevi ostaju bez njega (samo + Novi stroj / QR naljepnice). */
+  ok('Strojevi VIŠE nemaju gumb "Sektori" (premješten u Sustav)',
+     !Array.prototype.some.call(D.querySelectorAll('#screen-strojevi button'), function(b){ return b.textContent.trim()==='Sektori'; }));
+  app.go('sustav'); await cekaj(100);
+  ok('Sustav → Tvrtka i postavke nudi gumb "Sektori" (otvara postavke tvrtke)',
+     Array.prototype.some.call(D.querySelectorAll('#screen-sustav button[onclick*="urediTvrtku"]'), function(b){ return b.textContent.trim()==='Sektori'; }));
+  app.go('strojevi'); await cekaj(100);
 
   /* U7: Sustav → Korisnici u demo načinu objašnjava, ne vrti "Učitavanje…" zauvijek */
   var susPrije = W.SUS_KORISNICI;
@@ -2964,13 +2978,11 @@ async function testovi(W, D){
      D.querySelector('#modal-root input[name="sku"]').getAttribute('list') === 'dio-sku-dl');
   app.closeModal();
   W.DATA.dijelovi = W.DATA.dijelovi.filter(function(p){ return p.id !== 'dTestDL'; });
+  /* VLASNIK-1 (TOČKA 5): brzi čipovi s predloženim tekstom su uklonjeni iz brze prijave —
+     obrazac je namjerno svedeniji; "+ Više" (voditelj) nudi ostatak polja umjesto njih. */
   app.brzaPrijava(); await cekaj(100);
-  var chipovi = D.querySelectorAll('#modal-root textarea[name="opis"] ~ div button.btn-mini');
-  ok('brza prijava nudi brze čipove za česte opise kvara', chipovi.length >= 4);
-  app.dodajBrziOpis('stoji');
-  jednako('dodir na čip upisuje tekst u opis', D.getElementById('brza-opis').value, 'stoji');
-  app.dodajBrziOpis('buka');
-  jednako('drugi čip se dodaje uz postojeći tekst (razmakom)', D.getElementById('brza-opis').value, 'stoji buka');
+  ok('brza prijava VIŠE ne nudi čipove s predloženim opisom kvara',
+     D.querySelectorAll('#modal-root textarea[name="opis"] ~ div button.btn-mini').length === 0);
   app.closeModal();
 
   grupa('Sustav — naslov ekrana + sklopljeno "Napredno" (veća stavka: gustoća)');
@@ -3736,14 +3748,16 @@ async function testovi(W, D){
   app.brzaPrijava(); await cekaj(100);
   ok('modal brze prijave nosi klasu .sheet (donji list)',
      !!D.querySelector('#modal-root .modal.sheet'));
+  /* VLASNIK-1 (TOČKA 4): stroj se sad bira kroz app.odabir (skriveni select + vidljivi
+     gumb) — skriveni select i dalje nosi name="m" i placeholder opciju. */
   var selStroj = D.querySelector('#modal-root form select[name="m"]');
-  ok('select stroja ima prvu opciju "— odaberi stroj —"',
+  ok('skriveni select stroja ima prvu opciju "— odaberi stroj —"',
      !!selStroj && selStroj.options[0].textContent === '— odaberi stroj —');
-  var cipoviB = D.querySelectorAll('#modal-root textarea[name="opis"] ~ div button.btn-mini');
-  ok('čipovi simptoma postoje uz textarea', cipoviB.length >= 4);
-  app.dodajBrziOpis('buka');
-  jednako('klik na čip upisuje tekst u textarea (postojeće ponašanje)',
-     D.getElementById('brza-opis').value, 'buka');
+  ok('gumb za odabir stroja je vidljiv umjesto native selecta',
+     !!D.querySelector('#modal-root .odabir-btn') && W.getComputedStyle(selStroj).display === 'none');
+  /* VLASNIK-1 (TOČKA 5): čipovi s predloženim opisom su uklonjeni iz brze prijave */
+  ok('brza prijava nema čipove simptoma uz textarea',
+     D.querySelectorAll('#modal-root textarea[name="opis"] ~ div button.btn-mini').length === 0);
   var hitnoLbl = D.querySelector('#modal-root label.hitno-prekidac');
   var hitnoChk = hitnoLbl ? hitnoLbl.querySelector('input[name="hitno"]') : null;
   ok('checkbox HITNO je unutar labela koji pokriva cijeli crveni blok', !!hitnoLbl && !!hitnoChk);
@@ -3764,6 +3778,114 @@ async function testovi(W, D){
   var kvSmjB = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST SMJER-B hitna prijava sheet'; })[0];
   ok('spremanje s hitno=true daje prioritet "hitno"', !!kvSmjB && kvSmjB.prioritet==='hitno');
   W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k !== kvSmjB; });
+
+  grupa('VLASNIK-1 (23.8.) — sedam popravaka pred nalaz vlasnika');
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+
+  /* 1) zumiranje na mobitelu — 16px na poljima za unos */
+  ok('viewport meta ima maximum-scale=1', D.querySelector('meta[name="viewport"]').content.indexOf('maximum-scale=1') > -1);
+  app.brzaPrijava(); await cekaj(80);
+  var opisTa = D.getElementById('brza-opis');
+  ok('textarea opisa u brzoj prijavi je 16px (nema iOS auto-zoom)', W.getComputedStyle(opisTa).fontSize === '16px');
+  app.closeModal();
+
+  /* 2) pretraga kvarova preko svih čipova */
+  var rijesenZaPretragu = { id:'kvVL1', m:'e1', date:W.todayISO(), opis:'TEST vlasnik pretraga čeka', sati:1,
+    status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo', prioritet:'normalno',
+    created_at:new Date().toISOString() };
+  W.DATA.kvarovi.push(rijesenZaPretragu);
+  app.setKvCip('otvoreni'); W.showScreen('kvarovi'); await cekaj(100);
+  app.setFilterTiho('q','ceka');
+  await cekaj(100);
+  ok('pretraga "ceka" nalazi "čeka" (dijakritike) preko svih kvarova dok je čip Otvoreni aktivan',
+     D.querySelector('#screen-kvarovi').textContent.indexOf('TEST vlasnik pretraga čeka') > -1 &&
+     W.KV_CIP === 'otvoreni');
+  ok('sekcija se zove "Rezultati" tijekom pretrage',
+     D.querySelector('#screen-kvarovi').textContent.indexOf('Rezultati') > -1);
+  app.setFilterTiho('q','');
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k !== rijesenZaPretragu; });
+
+  /* 3) brzi izbori raspona datuma */
+  var pm = W.datumBrzoRaspon('prm');
+  var dNow = new Date();
+  ok('"Prošli mjesec" postavlja raspon na 1. i zadnji dan prošlog mjeseca',
+     !!pm.od && !!pm.do && pm.od.slice(8,10)==='01');
+  app.setDatumBrzo('sve');
+  ok('"Sve" briše od/do', W.FILTER.od === '' && W.FILTER.do === '');
+
+  /* 4) app.odabir — donji list umjesto native select */
+  app.brzaPrijava(); await cekaj(80);
+  var strojBtn = D.querySelector('#modal-root .odabir-btn');
+  ok('polje Stroj u brzoj prijavi je gumb (app.odabir), ne native select', !!strojBtn);
+  strojBtn.click(); await cekaj(80);
+  var prviRedak = D.querySelector('#sheet-root .odabir-li');
+  ok('app.odabir otvara donji list s barem jednom stavkom', !!prviRedak);
+  if(prviRedak) prviRedak.click();
+  await cekaj(80);
+  ok('odabir u sheetu postavlja vrijednost skrivenog polja i tekst gumba',
+     D.querySelector('#modal-root select[name="m"]').value !== '' &&
+     strojBtn.textContent.trim() !== '— odaberi stroj —');
+  var bfOdabir = D.querySelector('#modal-root form');
+  bfOdabir.elements.opis.value = 'TEST odabir stroja preko sheeta';
+  posalji(bfOdabir); await cekaj(200);
+  var kvOdabir = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST odabir stroja preko sheeta'; })[0];
+  ok('saveBrza s odabranim strojem kroz sheet sprema ispravan k.m', !!kvOdabir && !!kvOdabir.m);
+  if(kvOdabir) W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k !== kvOdabir; });
+
+  /* 5) "+ Više" u brzoj prijavi — samo voditelj */
+  W.SESSION = { ime:'Tehničar', role:'majstor' }; D.body.dataset.role = 'majstor';
+  app.brzaPrijava(); await cekaj(80);
+  ok('tehničar ne vidi "+ Više"',
+     W.getComputedStyle(Array.prototype.filter.call(D.querySelectorAll('#modal-root button'), function(b){ return b.textContent.indexOf('+ Više')>-1; })[0] || D.body).display === 'none');
+  app.closeModal();
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  app.brzaPrijava(); await cekaj(80);
+  var viseBtn = Array.prototype.filter.call(D.querySelectorAll('#modal-root button'), function(b){ return b.textContent.indexOf('+ Više')>-1; })[0];
+  ok('voditelj vidi "+ Više"', !!viseBtn && W.getComputedStyle(viseBtn).display !== 'none');
+  if(viseBtn) viseBtn.click();
+  var fVise = D.querySelector('#modal-root form');
+  fVise.elements.m.value = 'e1'; fVise.elements.opis.value = 'TEST prijava unatrag';
+  var datumUnatrag = W.isoShift(-3);
+  var dateInp = D.querySelector('#modal-root input[name="date"]');
+  if(dateInp) dateInp.value = datumUnatrag;
+  posalji(fVise); await cekaj(200);
+  var kvUnatrag = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST prijava unatrag'; })[0];
+  ok('prijava s datumom unatrag sprema taj datum', !!kvUnatrag && kvUnatrag.date === datumUnatrag);
+  if(kvUnatrag) W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k !== kvUnatrag; });
+
+  /* 6) FAB na Rasporedu otvara "Dodaj" */
+  W.showScreen('raspored'); await cekaj(120);
+  var fab6 = D.getElementById('fab');
+  ok('#fab na Rasporedu ima aria-label "Dodaj"', !!fab6 && fab6.getAttribute('aria-label')==='Dodaj');
+  fab6.click(); await cekaj(80);
+  var opcijeDodaj = D.querySelectorAll('#sheet-root .li');
+  ok('klik #fab na Rasporedu otvara sheet s tri opcije (Zadatak/Bilješka/Podsjetnik)',
+     opcijeDodaj.length === 3);
+  app.odabirZatvori();
+  var brZadPrije = W.DATA.kvarovi.length;
+  app.novaBiljeska(); await cekaj(80);
+  var fBiljeska = D.querySelector('#modal-root form');
+  fBiljeska.elements.opis.value = 'TEST bilješka bez roka';
+  posalji(fBiljeska); await cekaj(200);
+  var biljeska = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST bilješka bez roka'; })[0];
+  ok('"Bilješka" sprema zadatak bez roka', !!biljeska && biljeska.tip==='zadatak' && !biljeska.rok);
+  if(biljeska) W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k !== biljeska; });
+
+  /* 7) Sektori premješteni sa Strojeva u Sustav — provjereno u gornjoj grupi (U5) */
+
+  /* TEHNIČAR: "Moj dan" umjesto "Raspored" u donjoj traci (data-tab ostaje 'raspored';
+     oba teksta postoje u DOM-u, CSS po ulozi prikazuje samo jedan — textContent bi
+     spojio oba pa se provjerava computed display svakog spana posebno). */
+  D.body.dataset.role = 'majstor';
+  var lblMojDan = D.querySelector('.tab[data-tab="raspored"] .tab-lbl-mojdan');
+  var lblRaspored = D.querySelector('.tab[data-tab="raspored"] .tab-lbl-raspored');
+  ok('majstor vidi "Moj dan" (i ne vidi "Raspored") na kartici Rasporeda',
+     !!lblMojDan && W.getComputedStyle(lblMojDan).display !== 'none' &&
+     !!lblRaspored && W.getComputedStyle(lblRaspored).display === 'none');
+  D.body.dataset.role = 'voditelj';
+  ok('voditelj vidi "Raspored" (i ne vidi "Moj dan") na istoj kartici',
+     !!lblRaspored && W.getComputedStyle(lblRaspored).display !== 'none' &&
+     !!lblMojDan && W.getComputedStyle(lblMojDan).display === 'none');
 
   grupa('SUSTAV — tokeni (KORAK 2: tipografija/razmaci/boje)');
   try{
