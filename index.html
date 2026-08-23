@@ -3149,7 +3149,6 @@ function renderKvarovi(){
 
 /* =====================  render: Dijelovi  ===================== */
 var PART_Q = '';
-var PART_OPEN = '';   /* id dijela čiji su detalji rastvoreni — jedan po jedan */
 function partRow(p){
   var low = p.stanje < p.min;
   /* "naručeno" se izvodi iz stvarne narudžbe u Nabavi — ne drži se drugi put na dijelu */
@@ -3165,58 +3164,80 @@ function partRow(p){
       : ' <span class="chip upoz">U dolasku</span>';
   }
   else if(low) chip = ' <span class="chip kvar">'+(p.stanje===0?'Naruči odmah':'Naruči')+'</span>';
-  var otvoren = PART_OPEN === p.id;
-  /* SMJER-B: sklopljen redak sad ide kroz .li/.t/.s (isti obrazac kao Raspored) —
-     naziv, strojevi/dobavljač/lokacija u podnaslovu, stanje desno. Dobavljač, cijena
-     i gumbi i dalje otvore se dodirom na redak (dio-detalj ispod, netaknuto). */
-  var preostaloNar = nar ? nar.kolicina - (nar.primljena_kolicina||0) : 0;
-  var glava = '<div class="li click" onclick="app.otvoriDio(\''+p.id+'\')">'+
+  /* VLASNIK-3A: redak je opet "miran ekran" — samo naziv/oznaka/stanje; dodir na redak
+     otvara karticu dijela kao donji list (app.otvoriDio), sve radnje su ondje. */
+  return '<div class="li click" onclick="app.otvoriDio(\''+p.id+'\')">'+
     '<div class="grow"><div class="t">'+esc(p.naziv)+chip+'</div>'+
     '<div class="s">'+esc(p.stroj)+' &middot; '+esc(p.dob)+
-       (p.lokacija ? ' &middot; '+esc(p.lokacija) : '')+
-       (otvoren && vidiFinancije() ? ' &middot; '+EUR(p.cijena) : '')+
-       (otvoren && nar ? ' &middot; u dolasku &times;'+preostaloNar+(nar.ocekivano ? ' do '+fmtDate(nar.ocekivano) : '') : '')+'</div>'+
+       (p.lokacija ? ' &middot; '+esc(p.lokacija) : '')+'</div>'+
     '</div>'+
     '<span class="qval'+(low?' low':'')+'">'+p.stanje+'<span>min '+p.min+'</span></span>'+
-    '<span class="chev" style="transform:rotate('+(otvoren?'90':'0')+'deg)">›</span></div>';
-  if(!otvoren) return glava;
-  /* S8.2/S8.3: potrošnja kroz vrijeme i zadnje narudžbe — samo u rastvorenom retku,
-     da sklopljeni popis ostane miran (brojevi koje netko traži, ne brojevi koje gleda uvijek) */
-  var potr = potrosnjaDijela(p, 180);
-  var povijestN = (DATA.nabava||[]).filter(function(n){ return n.dio_id===p.id; })
-    .sort(function(a,b){ return String(b.narucen).localeCompare(String(a.narucen)); }).slice(0,3);
-  var infoHtml = (potr.komada
-      ? '<div class="row-sub" style="margin-top:var(--r2)">Potrošeno zadnjih 6 mj.: <b style="color:var(--text)">'+
-        potr.komada+' kom</b> (u '+potr.zahvata+(potr.zahvata===1?' kvaru':' kvarova')+')</div>'
-      : '')+
-    (povijestN.length
-      ? '<div class="row-sub" style="margin-top:6px"><b style="color:var(--text)">Zadnje narudžbe:</b>'+
-        povijestN.map(function(n){
-          return '<br>'+fmtDate(n.narucen)+' &middot; ×'+n.kolicina+
-            (vidiFinancije() && n.cijena ? ' &middot; '+EUR(n.cijena)+'/kom' : '')+
-            (n.primljeno ? ' &middot; stiglo' : ' &middot; u dolasku');
-        }).join('')+'</div>'
-      : '');
-  return glava +
-    (infoHtml ? '<div class="dio-info" onclick="event.stopPropagation()">'+infoHtml+'</div>' : '')+
-    '<div class="dio-detalj" onclick="event.stopPropagation()">'+
-      (nar
-        /* SIM-FIX M2: otvoriti Nabavu (i tamo zaprimiti) smije i tehničar — RLS mu to već
-           dopušta; samo "Naruči" (odluka o trošku) ostaje voditeljev, ispod. */
-        ? '<button class="btn-mini role-write" onclick="app.go(\'nabava\')">Otvori u Nabavi</button> '
-        : '<button class="btn-mini role-voditelj" onclick="app.naruciDio(\''+p.id+'\')">Naruči</button> ')+
-      '<button class="btn-mini role-voditelj" onclick="app.urediDio(\''+p.id+'\')">Uredi</button>'+
-      /* AUDIT-FIX (UX): +/- mijenja stanje samo za 1 po dodiru — kod veće isporuke ili
-         ispravka nakon inventure to je deseci dodira. Izravan upis broja bio je dostupan
-         SAMO kroz "Uredi" (voditelj, uz cijenu/dobavljača) — ovo je lagana radnja
-         dostupna svima koji smiju pisati (role-write), bez diranja ostalih polja dijela. */
-      '<button class="btn-mini role-write" onclick="app.postaviKolicinu(\''+p.id+'\')">Upiši broj</button>'+
+    '<span class="chev">›</span></div>';
+}
+/* VLASNIK-3A: potrošnja iz slobodnog teksta "Zamijenjeno" — S8.2, i dalje korisno
+   za "otprilike koliko trošimo" ali sad se ne prikazuje u kartici (samo povijest poruka
+   je tražena); funkcija ostaje jer je koristi drugdje (npr. buduće izvještaje). */
+/* VLASNIK-3A: kartica dijela kao donji list. */
+function dioKarticaHtml(p){
+  var nar = narudzbaZaDio(p.id);
+  var ispodMin = p.stanje < p.min;
+  var meta = [];
+  var strojeviImena = (p.strojevi||[]).map(function(mid){
+    var m = machineById(mid); return m ? m.name : '';
+  }).filter(Boolean).join(', ');
+  if(strojeviImena) meta.push(esc(strojeviImena));
+  if(p.dob) meta.push(esc(p.dob));
+  if(p.lokacija) meta.push(esc(p.lokacija));
+  if(vidiFinancije()) meta.push(EUR(p.cijena));
+  var primarni = nar
+    ? '<button class="btn primary block role-write" style="min-height:52px" onclick="app.closeModal();app.primiNabavu(\''+nar.id+'\')">Stiglo</button>'
+    : '<button class="btn primary block role-voditelj" style="min-height:52px" onclick="app.closeModal();app.naruciDio(\''+p.id+'\')">Naruči</button>';
+  var yellowHtml = '';
+  if(nar){
+    var preostalo = nar.kolicina - (nar.primljena_kolicina||0);
+    yellowHtml = '<div style="background:var(--yellow-bg);border:1px solid var(--yellow-border);'+
+      'border-radius:8px;min-height:56px;display:flex;align-items:center;padding:0 12px;'+
+      'margin:0 0 var(--r2);font-size:var(--t-meta);font-weight:600;color:var(--yellow)">'+
+      'U dolasku &middot; '+preostalo+' kom &middot; '+esc(nar.dobavljac||'—')+
+      ' &middot; stiže '+(nar.ocekivano ? fmtDate(nar.ocekivano) : '—')+'</div>';
+  }
+  return '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal sheet">'+
+    '<div class="modal-head sheet-glava"><h3 style="font-size:var(--t-title);font-weight:700">'+esc(p.naziv)+'</h3>'+
+      '<button class="x" type="button" onclick="app.closeModal()" aria-label="Zatvori" style="width:44px;height:44px">'+
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>'+
+      '</button></div>'+
+    (meta.length ? '<div class="s" style="margin:-2px 0 var(--r3)">'+meta.join(' &middot; ')+'</div>' : '')+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
+      '<div><span style="font-size:var(--t-hero);font-weight:800" class="dio-kart-stanje">'+p.stanje+'</span>'+
+        '<span style="font-size:var(--t-sub);color:var(--text-2);margin-left:6px">min '+p.min+'</span></div>'+
       '<span class="dio-qty role-write">'+
-        '<button class="qbtn" onclick="app.qty(\''+p.id+'\',-1)">−</button>'+
-        '<span class="qval" style="min-width:0">'+p.stanje+'</span>'+
-        '<button class="qbtn" onclick="app.qty(\''+p.id+'\',1)">+</button>'+
+        '<button class="qbtn" onclick="app.dioKartQty(\''+p.id+'\',-1)" aria-label="Manje">&minus;</button> '+
+        '<button class="qbtn" onclick="app.dioKartQty(\''+p.id+'\',1)" aria-label="Više">+</button>'+
       '</span>'+
-    '</div>';
+    '</div>'+
+    (ispodMin ? '<div style="color:var(--red);font-weight:600;font-size:var(--t-meta);margin-bottom:var(--r2)">Ispod minimuma — naručiti</div>' : '')+
+    yellowHtml+
+    primarni+
+    '<button class="btn sec block role-voditelj" style="min-height:44px;margin-top:8px" onclick="app.viseDio(\''+p.id+'\')">Više</button>'+
+    povijestDijelaHtml(p)+
+  '</div></div>';
+}
+/* povijest kretanja dijela — iz DATA.poruke po podudaranju naziva u tekstu (case-insensitive) */
+function povijestDijelaHtml(p){
+  var q = p.naziv.toLowerCase();
+  var stavke = (DATA.poruke||[]).filter(function(m){
+    return String(m.tekst||'').toLowerCase().indexOf(q) > -1;
+  }).sort(function(a,b){ return String(b.created_at||'').localeCompare(String(a.created_at||'')); }).slice(0,20);
+  var danas = todayISO();
+  var redak = function(m){
+    var dt = localDT(m.created_at);
+    var vrijeme = dt.d === danas ? dt.t : (dt.d ? fmtDate(dt.d) : '');
+    var tekst = String(m.tekst||'').replace(/^[^\p{L}\p{N}]+/u, '').trim();
+    return '<div class="li"><div style="width:44px;flex-shrink:0;font-size:var(--t-sub);color:var(--text-2)">'+esc(vrijeme)+'</div>'+
+      '<div class="grow" style="font-size:var(--t-sub)">'+esc(tekst)+'</div></div>';
+  };
+  return '<h2 style="margin-top:var(--r3)">Povijest &middot; '+stavke.length+'</h2>'+
+    '<div class="card">'+(stavke.length ? stavke.map(redak).join('') : '<div class="empty">Još nema kretanja.</div>')+'</div>';
 }
 /* S8.2: procjena potrošnje iz slobodnog teksta "Zamijenjeno" — dio nema strukturiranu
    vezu na kvar (namjerno, F3 je odbila tablicu veza za rijedak scenarij više dijelova
@@ -6631,10 +6652,31 @@ var app = {
     var el = $('#parts-list');
     if(el) el.innerHTML = partsListHtml();
   },
+  /* VLASNIK-3A: kartica dijela je sad donji list (modal.sheet) u #modal-root — ne inline
+     rastvaranje retka. Logika spremanja/naručivanja/primitka je netaknuta, kartica ih
+     samo zove; osvježi se pozivom iste funkcije nakon svake radnje (bez zatvaranja). */
   otvoriDio: function(id){
-    PART_OPEN = PART_OPEN === id ? '' : id;
-    var el = $('#parts-list');
-    if(el) el.innerHTML = partsListHtml();
+    var p = dioPoId(id);
+    if(!p){ app.closeModal(); return; }
+    $('#modal-root').innerHTML = dioKarticaHtml(p);
+  },
+  /* stepper u kartici: mijenja stanje kroz postojeći app.qty, pa samo osvježi karticu
+     (app.qty sam po sebi dira #parts-list, ne #modal-root) */
+  dioKartQty: function(id, delta){
+    app.qty(id, delta);
+    app.otvoriDio(id);
+  },
+  /* "Više": uredi dio / povijest narudžbi — sve što nije svakodnevna radnja */
+  viseDio: function(id){
+    $('#sheet-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.viseZatvori()"><div class="modal sheet">'+
+      '<div class="modal-head sheet-glava"><h3>Više</h3><button class="x" type="button" onclick="app.viseZatvori()" aria-label="Zatvori">'+
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>'+
+      '</button></div>'+
+      '<div class="card" style="padding:4px 0">'+
+      '<div class="li click" onclick="app.viseZatvori();app.urediDio(\''+id+'\')"><div class="t">Uredi dio</div></div>'+
+      '<div class="li click" onclick="app.viseZatvori();app.closeModal();showScreen(\'nabava\')"><div class="t">Narudžbe (povijest)</div></div>'+
+      '</div></div></div>';
   },
   noviDio: function(){
     var dobOpts = DATA.partneri.map(function(p){ return '<option>'+esc(p.naziv)+'</option>'; }).join('');

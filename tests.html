@@ -839,9 +839,10 @@ async function testovi(W, D){
   posalji(flok); await cekaj(150);
   jednako('lokacija je spremljena', dioZaLok.lokacija, 'Polica B2');
   app.go('dijelovi'); await cekaj(80);
+  /* VLASNIK-3A: kartica dijela je sad donji list u #modal-root, ne rastvoren redak */
   app.otvoriDio(dioZaLok.id); await cekaj(80);
-  ok('lokacija se vidi u rastvorenom retku', D.querySelector('#parts-list').innerHTML.indexOf('Polica B2') > -1);
-  app.otvoriDio(dioZaLok.id);
+  ok('lokacija se vidi u kartici dijela', D.querySelector('#modal-root').innerHTML.indexOf('Polica B2') > -1);
+  app.closeModal();
   app.traziDio('remen');
   /* SMJER-B: redak dijela je sad .li (obrazac Rasporeda), ne .row */
   ok('pretraga dijelova filtrira', D.querySelectorAll('#parts-list .li').length < W.DATA.dijelovi.length);
@@ -1172,12 +1173,14 @@ async function testovi(W, D){
   ok('narudžba se zatvara kad kumulativno dosegne naručeno', !!narDjel.primljeno);
   jednako('ukupno stanje raslo za svih 5 kroz dva primitka', dioZaDjel.stanje, stanjeZaDjel + 5);
 
-  /* S8.2/S8.3: potrošnja kroz vrijeme i povijest narudžbi — samo u rastvorenom retku */
+  /* VLASNIK-3A: kartica dijela prikazuje "Povijest" iz DATA.poruke (npr. sysPoruka
+     "Primljeno: ..." koju je upravo upisao gornji primitak), ne popis DATA.nabava */
   app.go('dijelovi'); await cekaj(120);
   app.otvoriDio(dioZaDjel.id); await cekaj(120);
-  ok('rastvoren dio prikazuje zadnje narudžbe',
-     D.querySelector('#parts-list').innerHTML.indexOf('Zadnje narudžbe') > -1);
-  app.otvoriDio(dioZaDjel.id); await cekaj(80);
+  ok('kartica dijela prikazuje sekciju Povijest', D.querySelector('#modal-root').innerHTML.indexOf('Povijest') > -1);
+  ok('povijest sadrži poruku o primitku ovog dijela',
+     D.querySelector('#modal-root').innerHTML.indexOf('Primljeno') > -1);
+  app.closeModal();
 
   /* K-3: narudžba iz konteksta kvara nosi vezu; primitak zna ciljano javiti baš tom kvaru */
   var kvarCekaDio = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; })[0];
@@ -1981,27 +1984,26 @@ async function testovi(W, D){
      D.querySelector('#kontakti-list .row.click') === null);
   W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
 
-  /* Dijelovi: sklopljen redak nosi samo naziv, oznaku i stanje; dodir otvara ostalo */
+  /* Dijelovi: sklopljen redak nosi samo naziv, oznaku i stanje; dodir otvara karticu */
   app.go('dijelovi'); await cekaj(150);
-  /* SMJER-B: sklopljen redak dijela je .li; kategorijski redak (partRow) nema gumbe dok
-     se ne rastvori — retci u sekcijama Ispod minimuma/U dolasku smiju imati svoj gumb
-     (Naruči/Stiglo), to je namjerno (miran ekran = jedna jasna radnja po retku ondje). */
+  /* VLASNIK-3A: kartica dijela je sad donji list (modal.sheet) u #modal-root, ne
+     inline rastvoren redak — sklopljen redak u kategoriji ostaje bez gumba i bez
+     dio-detalj/dio-info bloka (miran ekran); retci u Ispod minimuma/U dolasku i
+     dalje smiju imati svoj gumb (Naruči/Stiglo), to je namjerno. */
   ok('sklopljen redak dijela u kategoriji nema gumbe',
      D.querySelector('#parts-list .card:not([style*="red"]):not([style*="yellow"]) .li .btn-mini') === null &&
      D.querySelector('#parts-list .dio-detalj') === null);
   var prviDio = W.DATA.dijelovi[0];
   app.otvoriDio(prviDio.id); await cekaj(120);
-  ok('dodir rastvara detalje s radnjama',
-     !!D.querySelector('#parts-list .dio-detalj') &&
-     D.querySelector('#parts-list .dio-detalj').innerHTML.indexOf('qbtn') > -1);
-  ok('rastvoren je točno jedan dio', D.querySelectorAll('#parts-list .dio-detalj').length === 1);
+  ok('dodir otvara karticu dijela kao donji list', !!D.querySelector('#modal-root .modal.sheet'));
+  ok('kartica ima radnje (stepper)', D.querySelector('#modal-root').innerHTML.indexOf('qbtn') > -1);
   var stanjeR = prviDio.stanje;
-  await app.qty(prviDio.id, 1); await cekaj(120);
-  jednako('korekcija stanja radi iz rastvorenog retka', prviDio.stanje, stanjeR + 1);
-  ok('redak ostaje rastvoren nakon korekcije', !!D.querySelector('#parts-list .dio-detalj'));
-  await app.qty(prviDio.id, -1); await cekaj(80);
-  app.otvoriDio(prviDio.id); await cekaj(80);   /* sklopi natrag */
-  ok('drugi dodir sklapa detalje', D.querySelector('#parts-list .dio-detalj') === null);
+  app.dioKartQty(prviDio.id, 1); await cekaj(120);
+  jednako('korekcija stanja radi iz kartice', prviDio.stanje, stanjeR + 1);
+  ok('kartica ostaje otvorena nakon korekcije', !!D.querySelector('#modal-root .modal.sheet'));
+  app.dioKartQty(prviDio.id, -1); await cekaj(80);
+  app.closeModal();
+  ok('kartica se zatvara', D.querySelector('#modal-root .modal.sheet') === null);
 
   /* Poruke: mrtva opcija push obavijesti se ne prikazuje kad se ništa ne može napraviti */
   app.go('poruke'); await cekaj(250);
@@ -2238,14 +2240,14 @@ async function testovi(W, D){
   app.resetFiltere();
   W.DATA.kvarovi = sviKvarovi;
   app.go('kvarovi'); await cekaj(100); app.resetFiltere();
-  /* #15: brojka stanja vidljiva između +/- gumba u rastvorenom retku dijela */
+  /* #15/VLASNIK-3A: brojka stanja vidljiva uz +/- gumbe u kartici dijela */
   app.go('dijelovi'); await cekaj(100);
   var dioZaQval = W.DATA.dijelovi[0];
   app.otvoriDio(dioZaQval.id); await cekaj(100);
-  ok('rastvoreni redak dijela ima brojku stanja između +/- gumba',
-     D.querySelector('#parts-list .dio-detalj .qval') !== null &&
-     D.querySelector('#parts-list .dio-detalj .qval').textContent === String(dioZaQval.stanje));
-  app.otvoriDio(dioZaQval.id);
+  ok('kartica dijela ima brojku stanja uz +/- gumbe',
+     D.querySelector('#modal-root .dio-kart-stanje') !== null &&
+     D.querySelector('#modal-root .dio-kart-stanje').textContent === String(dioZaQval.stanje));
+  app.closeModal();
   /* #21 (SMJER-B redizajn, KvaroviB maketa): podnaslov retka sad izričito traži
      "dio ako ga ima" — kartica SADA prikazuje zamijenjeni dio (obrnuto od starog
      audit-fixa koji ga je skrivao); detalj ga i dalje prikazuje. */
@@ -3906,6 +3908,60 @@ async function testovi(W, D){
   ok('voditelj vidi "Raspored" (i ne vidi "Moj dan") na istoj kartici',
      !!lblRaspored && W.getComputedStyle(lblRaspored).display !== 'none' &&
      !!lblMojDan && W.getComputedStyle(lblMojDan).display === 'none');
+
+  grupa('VLASNIK-3A kartica dijela');
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  var dioK1 = W.DATA.dijelovi[0];
+  app.go('dijelovi'); await cekaj(100);
+  app.otvoriDio(dioK1.id); await cekaj(100);
+  ok('kartica dijela ima klasu .sheet', !!D.querySelector('#modal-root .modal.sheet'));
+  ok('kartica prikazuje stanje i "min"', D.querySelector('#modal-root').innerHTML.indexOf('min '+dioK1.min) > -1);
+  var stanjeK1 = dioK1.stanje;
+  app.dioKartQty(dioK1.id, 1); await cekaj(100);
+  jednako('stepper "+" povećava stanje za 1', dioK1.stanje, stanjeK1 + 1);
+  jednako('stepper "+" osvježava brojku u kartici', D.querySelector('#modal-root .dio-kart-stanje').textContent, String(dioK1.stanje));
+  app.dioKartQty(dioK1.id, -1); await cekaj(80);
+  app.closeModal();
+
+  /* dio ispod minimuma bez otvorene narudžbe: voditelj vidi primarni "Naruči", majstor ne vidi */
+  var dioIspodMin = W.DATA.dijelovi.filter(function(p){ return p.stanje < p.min && !W.narudzbaZaDio(p.id); })[0];
+  if(!dioIspodMin){
+    dioIspodMin = W.DATA.dijelovi[0];
+    dioIspodMin.min = dioIspodMin.stanje + 5;
+  }
+  app.otvoriDio(dioIspodMin.id); await cekaj(100);
+  ok('dio ispod minimuma bez narudžbe: voditelj vidi primarni "Naruči"',
+     D.querySelector('#modal-root .btn.primary.role-voditelj') !== null &&
+     D.querySelector('#modal-root .btn.primary.role-voditelj').textContent.trim() === 'Naruči');
+  D.body.dataset.role = 'majstor';
+  ok('majstor ne vidi "Naruči" (role-voditelj sakriven)',
+     W.getComputedStyle(D.querySelector('#modal-root .btn.primary.role-voditelj')).display === 'none');
+  D.body.dataset.role = 'voditelj';
+  app.closeModal();
+
+  /* dio s otvorenom narudžbom: primarni je "Stiglo" i majstor ga vidi (role-write) */
+  var dioZaStiglo = W.DATA.dijelovi[0];
+  var narTestK = { id:'nbVL3A', dio_id:dioZaStiglo.id, kolicina:2, dobavljac:'Tokić', narucen:W.todayISO(),
+    ocekivano:W.isoShift(2), primljeno:null, primljena_kolicina:null, cijena:5, tko:'Voditelj' };
+  W.DATA.nabava.push(narTestK);
+  app.otvoriDio(dioZaStiglo.id); await cekaj(100);
+  ok('dio s otvorenom narudžbom: primarni gumb je "Stiglo"',
+     D.querySelector('#modal-root .btn.primary.role-write') !== null &&
+     D.querySelector('#modal-root .btn.primary.role-write').textContent.trim() === 'Stiglo');
+  D.body.dataset.role = 'majstor';
+  ok('majstor vidi "Stiglo" (role-write nije sakriven za majstora)',
+     W.getComputedStyle(D.querySelector('#modal-root .btn.primary.role-write')).display !== 'none');
+  D.body.dataset.role = 'voditelj';
+  app.closeModal();
+  W.DATA.nabava = W.DATA.nabava.filter(function(n){ return n !== narTestK; });
+
+  /* povijest sadrži poruku "Primljeno" za dio zaprimljen u seedu — dodana sysPoruka za test */
+  var dioZaPovijest = W.DATA.dijelovi[0];
+  W.sysPoruka('📦 Primljeno: '+dioZaPovijest.naziv+' ×3 — TEST VLASNIK-3A');
+  app.otvoriDio(dioZaPovijest.id); await cekaj(100);
+  ok('povijest u kartici sadrži poruku "Primljeno" za dio',
+     D.querySelector('#modal-root').innerHTML.indexOf('Primljeno') > -1);
+  app.closeModal();
 
   grupa('SUSTAV — tokeni (KORAK 2: tipografija/razmaci/boje)');
   try{
