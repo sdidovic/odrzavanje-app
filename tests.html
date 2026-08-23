@@ -3623,6 +3623,40 @@ async function testovi(W, D){
     app.closeModal();
   }
 
+  grupa('SMJER-B Prijava');
+  W.SESSION = { ime:'Tehničar', role:'majstor' }; D.body.dataset.role = 'majstor';
+  app.brzaPrijava(); await cekaj(100);
+  ok('modal brze prijave nosi klasu .sheet (donji list)',
+     !!D.querySelector('#modal-root .modal.sheet'));
+  var selStroj = D.querySelector('#modal-root form select[name="m"]');
+  ok('select stroja ima prvu opciju "— odaberi stroj —"',
+     !!selStroj && selStroj.options[0].textContent === '— odaberi stroj —');
+  var cipoviB = D.querySelectorAll('#modal-root textarea[name="opis"] ~ div button.btn-mini');
+  ok('čipovi simptoma postoje uz textarea', cipoviB.length >= 4);
+  app.dodajBrziOpis('buka');
+  jednako('klik na čip upisuje tekst u textarea (postojeće ponašanje)',
+     D.getElementById('brza-opis').value, 'buka');
+  var hitnoLbl = D.querySelector('#modal-root label.hitno-prekidac');
+  var hitnoChk = hitnoLbl ? hitnoLbl.querySelector('input[name="hitno"]') : null;
+  ok('checkbox HITNO je unutar labela koji pokriva cijeli crveni blok', !!hitnoLbl && !!hitnoChk);
+  var naslovHitno = hitnoLbl ? hitnoLbl.querySelector('.h-t') : null;
+  ok('naslov "HITNO — stoji linija" je unutar tog istog labela',
+     !!naslovHitno && naslovHitno.textContent.indexOf('HITNO') > -1);
+  if(hitnoChk && naslovHitno){
+    var prijeChk = hitnoChk.checked;
+    naslovHitno.click();
+    jednako('dodir na naslov (unutar labela) mijenja checked', hitnoChk.checked, !prijeChk);
+    naslovHitno.click();   /* vrati kako je bilo */
+  }
+  var bB = D.querySelector('#modal-root form');
+  bB.elements.m.value = 'e1';
+  bB.elements.opis.value = 'TEST SMJER-B hitna prijava sheet';
+  bB.elements.hitno.checked = true;
+  posalji(bB); await cekaj(250);
+  var kvSmjB = W.DATA.kvarovi.filter(function(k){ return k.opis==='TEST SMJER-B hitna prijava sheet'; })[0];
+  ok('spremanje s hitno=true daje prioritet "hitno"', !!kvSmjB && kvSmjB.prioritet==='hitno');
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k !== kvSmjB; });
+
   grupa('SUSTAV — tokeni (KORAK 2: tipografija/razmaci/boje)');
   try{
     var izvor = await (await fetch('index.html?tok=' + Date.now())).text();
