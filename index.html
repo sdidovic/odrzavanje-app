@@ -90,11 +90,11 @@ h1{font-size:var(--t-body);font-weight:700;letter-spacing:-.2px;line-height:1.15
 .hdr-sub{font-size:var(--t-label);opacity:.7;margin-top:2px;letter-spacing:.3px;text-transform:uppercase;font-weight:600}
 .hdr-akcije{display:flex;align-items:center;gap:6px;flex-shrink:0}
 #hdr-badges{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.hdr-badge{font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px;white-space:nowrap;
+.hdr-badge{font-size:var(--t-label);font-weight:700;padding:4px 8px;border-radius:6px;white-space:nowrap;
   background:var(--btn-audit-bg);border:1px solid var(--btn-audit-rub);color:var(--card)}
 .hdr-badge.crveno{background:var(--red);border-color:var(--red)}
 .btn-audit{background:var(--btn-audit-bg);border:1px solid var(--btn-audit-rub);color:var(--card);
-  font-size:11px;font-weight:700;line-height:1.25;padding:4px 8px;border-radius:6px;
+  font-size:var(--t-label);font-weight:700;line-height:1.25;padding:4px 8px;border-radius:6px;
   text-align:center;cursor:pointer;flex-shrink:0;white-space:nowrap;backdrop-filter:blur(2px);
   transition:background .14s ease}   /* dodirna meta ≥44px — hala, rukavice */
 .btn-audit:active{background:var(--btn-audit-active)}
@@ -205,6 +205,33 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
 .act .got-cip{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
 .act .got-cip button{min-height:44px;padding:0 12px;border-radius:18px;border:1.5px solid var(--accent-rub);
   background:var(--card);color:var(--accent);font-size:var(--t-sub);font-weight:600;cursor:pointer}
+/* VLASNIK-2: kvar/zadatak = radni nalog — traka od 4 (2) koraka umjesto rečenice o statusu */
+.koraci{display:flex;justify-content:space-between;padding:14px var(--r4) 10px;background:var(--card);
+  margin:0 calc(-1*var(--r4));border-bottom:1px solid var(--border)}
+.korak{display:flex;flex-direction:column;align-items:center;flex:1;position:relative;min-width:0}
+.korak:not(:last-child)::after{content:'';position:absolute;top:5px;left:calc(50% + 9px);right:calc(-50% + 9px);
+  height:2px;background:var(--border);z-index:0}
+.korak.proslo:not(:last-child)::after{background:var(--green)}
+.korak-tocka{width:12px;height:12px;border-radius:50%;background:var(--border);z-index:1;flex:none}
+.korak.aktivno .korak-tocka{background:var(--accent)}
+.korak.proslo .korak-tocka{background:var(--green)}
+.korak-txt{margin-top:6px;text-align:center;max-width:100%}
+.korak-n{font-size:var(--t-label);font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.korak.aktivno .korak-n{color:var(--accent)}
+.korak.proslo .korak-n{color:var(--green)}
+.korak-v{font-size:var(--t-label);color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.koraci-off{padding:12px var(--r4);background:var(--card);margin:0 calc(-1*var(--r4));
+  border-bottom:1px solid var(--border);text-align:center}
+.koraci-off span{font-size:var(--t-label);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+/* redak stanja: čipovi "čeka dio / čeka servis / gotovo do" — stanje unutar koraka "U radu",
+   ne posebne radnje uz bok */
+.stanje{display:flex;gap:8px;flex-wrap:wrap;padding:10px var(--r4);margin:0 calc(-1*var(--r4));
+  border-bottom:1px solid var(--border);background:var(--card)}
+.stanje .f.zut-akt{background:var(--yellow-bg);color:var(--yellow);border-color:var(--yellow-border)}
+.stanje .f.plava-akt{background:var(--plava-bg);color:var(--plava-tekst);border-color:var(--plava-rub)}
+.stanje .f.acc-akt{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.nalog-primarni{min-height:52px;font-size:var(--t-body)}
+.nalog-vise{min-height:44px;flex:none;padding:0 16px}
 /* SMJER-B Kvarovi: red filter-čipova iznad popisa — vodoravno skrolabilan, bez vidljive trake */
 .f-trak{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;-ms-overflow-style:none;scrollbar-width:none}
 .f-trak::-webkit-scrollbar{display:none}
@@ -220,7 +247,7 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
 .ring.ring-crv{border-color:var(--red-border)}
 .ring.ring-on{background:var(--green);border-color:var(--green)}
 .ring.ring-on::before{content:'✓';position:absolute;inset:0;display:flex;align-items:center;
-  justify-content:center;color:#fff;font-size:12px;font-weight:800;line-height:1}
+  justify-content:center;color:#fff;font-size:var(--t-sub);font-weight:800;line-height:1}
 .toast-akcija{background:none;border:none;color:var(--gold);font-weight:700;
   font-size:var(--t-sub);text-transform:uppercase;letter-spacing:.4px;padding:2px 0 2px 8px;cursor:pointer}
 
@@ -1417,6 +1444,35 @@ function esc(s){
   return String(s==null?'':s).replace(/[&<>"']/g,function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
   });
+}
+/* VLASNIK-2: kvar/zadatak je radni nalog s 4 (odn. 2) koraka — traka pokazuje gdje je
+   nalog SADA, umjesto rečenice ili gomile gumba. otkazan nema korake, samo "Stornirano". */
+function korakTraka(k, zadatak){
+  if(k.status==='otkazan')
+    return '<div class="koraci-off"><span>Stornirano</span></div>';
+  var koraci, aktivnoIdx;
+  if(zadatak){
+    koraci = [
+      {n:'Otvoren', v:localDT(k.created_at).t},
+      {n:'Obavljen', v:localDT(k.closed_at).t}
+    ];
+    aktivnoIdx = k.status==='rijesen' ? 1 : 0;
+  } else {
+    koraci = [
+      {n:'Prijavljen', v:localDT(k.created_at).t},
+      {n:'Preuzet', v:localDT(k.poceo_at).t},
+      {n:'U radu', v: jeOtvoren(k) ? (trajanjeKvara(k)||'') : ''},
+      {n:'Riješen', v:localDT(k.closed_at).t}
+    ];
+    aktivnoIdx = (k.status==='otvoren' ? 1 : (k.status==='u_radu' ? 3 : 4)) - 1;
+  }
+  return '<div class="koraci">'+koraci.map(function(kr,i){
+    var cls = i<aktivnoIdx ? 'proslo' : (i===aktivnoIdx ? 'aktivno' : 'buduce');
+    return '<div class="korak '+cls+'"><div class="korak-tocka"></div>'+
+      '<div class="korak-txt"><div class="korak-n">'+esc(kr.n)+'</div>'+
+      (kr.v ? '<div class="korak-v">'+esc(kr.v)+'</div>' : '')+
+      '</div></div>';
+  }).join('')+'</div>';
 }
 /* VLASNIK-1: pretraga bez osjetljivosti na dijakritike (č/ć→c, š→s, ž→z, đ→d) i velika/mala slova */
 function normTxt(s){
@@ -5323,11 +5379,11 @@ var app = {
       if(kontaktZ) mc('Kontakt', esc(kontaktZ.naziv)+(kontaktZ.tel ?
         ' &middot; <a class="clink" href="tel:'+esc(String(kontaktZ.tel).replace(/[\s\/]/g,''))+'">'+esc(kontaktZ.tel)+'</a>' : ''));
     } else {
-      mc(jeOtvoren(k) ? 'Traje' : 'Trajalo', jeOtvoren(k) ? (trajanjeKvara(k) || 'u tijeku') : H(k.sati));
+      /* VLASNIK-2: "Traje" je preselio u traku koraka, "Gotovo do" u redak stanja —
+         meta mreža ostaje kompaktnija: samo Trošak · Radi/Riješio · Dio */
       if(vidiFinancije()) mc(jeOtvoren(k) ? 'Trošak do sada' : 'Trošak', EUR(kvarCost(k)), 'role-fin');
       if(jeOtvoren(k)) mc('Radi', k.tko ? (esc(k.tko)+(localDT(k.poceo_at).t ? ' · od '+localDT(k.poceo_at).t : '')) : (k.dodijeljen ? esc(k.dodijeljen) : ''));
       else mc('Riješio', k.tko ? esc(k.tko) : '—');
-      mc('Gotovo do', jeOtvoren(k) ? (k.procjena_gotovo ? esc(k.procjena_gotovo.replace('T',' ')) : '—') : '');
       var dioZaMeta = narudzbaZaKvar ? dioPoId(narudzbaZaKvar.dio_id) : null;
       mc('Dio', narudzbaZaKvar ? (esc(dioZaMeta ? dioZaMeta.naziv : 'naručeno')+(narudzbaZaKvar.ocekivano ? ' · stiže '+fmtDate(narudzbaZaKvar.ocekivano) : '')) : '—');
     }
@@ -5336,7 +5392,7 @@ var app = {
       var inic = String(c.tko||'?').trim().split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase();
       return '<div class="li" style="align-items:flex-start">'+
         '<div style="width:26px;height:26px;border-radius:50%;background:var(--accent-soft);color:var(--accent);'+
-        'font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">'+esc(inic)+'</div>'+
+        'font-size:var(--t-label);font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">'+esc(inic)+'</div>'+
         '<div style="flex:1;min-width:0"><div class="s" style="color:var(--text-2);font-weight:600">'+esc(c.tko)+' · '+fmtDateTime(c.created_at)+'</div>'+
         '<div style="font-size:var(--t-body);margin-top:2px;line-height:1.4">'+esc(c.tekst)+'</div></div></div>';
     }).join('') : '<div class="empty" style="padding:var(--r3)">Još nema komentara.</div>';
@@ -5349,50 +5405,53 @@ var app = {
         '<div class="s" style="width:44px;flex:none">'+esc(localDT(p.created_at).t)+'</div>'+
         '<div class="s" style="color:var(--text-2)">'+esc(t)+'</div></div>';
     }).join('') : '';
-    /* ---- Radnje: popis .act redaka umjesto stupca gumba (ZADATAK 4/5) ---- */
-    var akcije = '';
-    var act = function(cls, ikona, tekst, onclick){
-      return '<button type="button" class="act'+(cls?' '+cls:'')+'" onclick="'+onclick+'">'+actIkona(ikona)+'<span>'+tekst+'</span></button>';
-    };
-    /* Radni tok je preuzmi → radi → riješi (PLAN-KAIZEN S3) — prvi (primarni) red je uvijek
-       sljedeći logičan korak dok je kvar/zadatak otvoren. */
-    if(jeOtvoren(k)){
-      /* zadatak nema "preuzimanje" kao poseban korak (dodjela je dovoljna) — primarna radnja
-         mu je uvijek "Označi obavljeno", isto kao što je u starom stupcu .btn "Označi obavljeno"
-         uvijek nosio primary stil za zadatak, bez obzira na status */
-      if(!zadatak && k.status==='otvoren')
-        akcije += act('prim role-write', 'check', 'Preuzimam — radim na ovome', 'app.preuzmiKvar(\''+kId+'\')');
-      else
-        akcije += act('prim role-write', 'check', zadatak ? 'Označi obavljeno' : 'Riješi kvar', 'app.rijesiKvar(\''+kId+'\')');
+    /* ---- VLASNIK-2: kvar/zadatak = radni nalog — 1 primarna radnja + "Više", umjesto
+       popisa .act redaka. "Čeka dio/servis/gotovo do" su STANJE u koraku "U radu", ne
+       radnje uz bok. Sve rjeđe potrebno (uredi, storniraj, dodaj dio, naruči dio, zovi
+       servis, vrati u rad) živi iza "Više". */
+    var koraciHtml = korakTraka(k, zadatak);
+    var stanjeHtml = '';
+    if(jeOtvoren(k) && !zadatak){
+      stanjeHtml = '<div class="stanje role-write">'+
+        '<button type="button" class="f'+(k.ceka_dio?' zut-akt':'')+'" onclick="app.cekaDioIzDetalja(\''+kId+'\')">Čeka dio</button>'+
+        '<button type="button" class="f'+(k.ceka_servis?' plava-akt':'')+'" onclick="'+
+          (k.ceka_servis ? 'app.cekaServisToggle(\''+kId+'\')' : 'app.zoviServis(\''+kId+'\')')+'">Čeka servis</button>'+
+        '<button type="button" class="f'+(k.procjena_gotovo?' acc-akt':'')+'" onclick="app.gotovoDoSheet(\''+kId+'\')">'+
+          (k.procjena_gotovo ? 'Gotovo do: '+esc(localDT(k.procjena_gotovo).t||k.procjena_gotovo.replace('T',' ')) : 'Gotovo do…')+
+        '</button>'+
+        '</div>';
     }
-    if(jeOtvoren(k) && !zadatak)
-      akcije += act('role-write', 'box', '+ Ugrađen dio', 'app.ugradiDioZaKvar(\''+kId+'\')');
-    if(jeOtvoren(k) && !zadatak)
-      /* §16 P3: "Treba dio" je tehničarova strana — nabava je voditeljev posao (§2) */
-      akcije += act(k.ceka_dio ? 'upoz role-write' : 'role-write', 'alert', k.ceka_dio ? 'Čeka dio — makni oznaku' : 'Treba dio — javi voditelju', 'app.cekaDioIzDetalja(\''+kId+'\')');
-    if(jeOtvoren(k) && !zadatak)
-      /* §15 #5: vanjski izvođač (rashlada, elektro, garancija) */
-      akcije += act('role-write', 'phone', k.ceka_servis ? 'Čeka servis — makni oznaku' : 'Zovi servis (vanjski izvođač)',
-        k.ceka_servis ? 'app.cekaServisToggle(\''+kId+'\')' : 'app.zoviServis(\''+kId+'\')');
-    /* §16 P3: čipovi "Gotovo do" — samo dok je kvar u radu i još nema procjene */
-    if(!zadatak && k.status==='u_radu' && !k.procjena_gotovo)
-      akcije += '<div class="act role-write">'+actIkona('clock')+'<span>Gotovo do:</span>'+
-        '<div class="got-cip">'+
-        '<button type="button" onclick="app.postaviGotovoDo(\''+kId+'\',1)">+1 h</button>'+
-        '<button type="button" onclick="app.postaviGotovoDo(\''+kId+'\',2)">+2 h</button>'+
-        '<button type="button" onclick="app.postaviGotovoDo(\''+kId+'\',\'smjena\')">kraj smjene</button>'+
-        '</div></div>';
-    if(jeOtvoren(k) && !zadatak && !narudzbaZaKvar)
-      /* K-3: veza narudžba->kvar se upiše sama; naručivanje je voditeljev/nabava posao (§16 P1) */
-      akcije += act('role-voditelj', 'cart', 'Naruči dio za ovaj kvar', 'app.naruciZaKvar(\''+kId+'\')');
-    /* E: "Riješen" nije slijepa ulica — vraća u tijek bez brisanja traga (analitika/MTTR) */
-    if(k.status==='rijesen')
-      akcije += act('role-write', 'undo', 'Nije riješeno — vrati u rad', 'app.vratiURad(\''+kId+'\')');
-    if(!zadatak && k.status!=='otkazan')
-      /* najčešći zadatak iz kvara je narudžba dijela — veza se upiše sama, ne bira se */
-      akcije += act('role-write', 'plus', '+ Zadatak iz ovog kvara', 'app.noviZadatak(null,\''+kId+'\')');
-    if(k.status!=='otkazan')
-      akcije += act('role-voditelj opasno', 'x', 'Storniraj (pogrešan unos)', 'app.stornirajKvar(\''+kId+'\')');
+    /* jedna primarna radnja — uvijek sljedeći logičan korak dok je nalog otvoren */
+    var primarnoHtml = '';
+    if(jeOtvoren(k)){
+      var primFn = (!zadatak && k.status==='otvoren') ? 'preuzmiKvar' : 'rijesiKvar';
+      var primTekst = (!zadatak && k.status==='otvoren') ? 'Preuzimam — radim na ovome' : (zadatak ? 'Označi obavljeno' : 'Riješi kvar');
+      primarnoHtml = '<button type="button" class="btn primary nalog-primarni role-write" style="flex:1" '+
+        'onclick="app.'+primFn+'(\''+kId+'\')">'+primTekst+'</button>';
+    } else if(k.status==='rijesen'){
+      primarnoHtml = '<div class="row-sub role-write" style="font-weight:700;color:var(--text)">Riješio '+
+        esc(k.tko||'—')+' · '+fmtDateTime(k.closed_at)+' · '+H(k.sati)+'</div>';
+    } else if(k.status==='otkazan'){
+      primarnoHtml = '<div class="row-sub" style="font-weight:700;color:var(--text)">Stornirano · '+esc(k.storno_razlog||'')+'</div>';
+    }
+    /* "Više" — sheet sa svime što nije svakodnevna radnja; isti uvjeti kao dosadašnji .act redci */
+    var viseStavke = [];
+    if(jeOtvoren(k) && !zadatak) viseStavke.push({t:'+ Ugrađen dio', fn:'ugradiDioZaKvar'});
+    if(jeOtvoren(k) && !zadatak && !narudzbaZaKvar) viseStavke.push({t:'Naruči dio za ovaj kvar', fn:'naruciZaKvar', cls:'role-voditelj'});
+    if(jeOtvoren(k) && !zadatak && !k.ceka_servis) viseStavke.push({t:'Zovi servis', fn:'zoviServis'});
+    if(k.status==='rijesen') viseStavke.push({t:'Nije riješeno — vrati u rad', fn:'vratiURad'});
+    if(k.status!=='otkazan') viseStavke.push({t:'Uredi', fn:'urediKvar'});
+    if(k.status!=='otkazan') viseStavke.push({t:'Storniraj', fn:'stornirajKvar', cls:'role-voditelj opasno', zadnji:true});
+    var viseHtml = viseStavke.length
+      ? '<button type="button" class="btn sec nalog-vise role-write" onclick="app.viseKvar(\''+kId+'\')">Više</button>'
+      : '';
+    var akcijeHtml = (primarnoHtml || viseHtml)
+      ? '<div style="display:flex;gap:8px;margin-top:var(--r3)'+(primarnoHtml?'':';justify-content:flex-start')+'">'+primarnoHtml+viseHtml+'</div>'
+      : '';
+    /* podaci za "Više" sheet — spremljeni na window da ih app.viseKvar/otvoriVise pokupi bez
+       ponovnog računanja uvjeta (viseStavke već sadrži samo dopuštene retke) */
+    window._VISE_STAVKE = window._VISE_STAVKE || {};
+    window._VISE_STAVKE[kId] = viseStavke;
     var zadaciUzKvarHtml = zadaciUzKvar.length
       ? '<h2 style="margin-top:var(--r4)">Zadaci uz ovaj kvar ('+zadaciUzKvar.length+')</h2><div class="card">'+
         zadaciUzKvar.map(zadatakRedak).join('')+'</div>'
@@ -5401,21 +5460,21 @@ var app = {
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="det-glava"><button type="button" class="nazad" onclick="app.closeModal()">'+actIkona('back')+'</button>'+
       '<div class="naslov"><div class="t">'+esc(m.name)+'</div><div class="s">'+esc(podnaslov)+'</div></div>'+
-      (k.status!=='otkazan' ? '<button type="button" class="uredi" onclick="app.urediKvar(\''+kId+'\')">Uredi</button>' : '')+
       '</div>'+
       '<div class="det-opis'+(zaustavljaLiniju(k) ? ' stoji' : '')+'">'+
       '<div>'+chips+'</div>'+
       '<div class="opis-tekst">'+esc(k.opis)+'</div>'+
-      '</div>'+
       (k.foto ? '<img src="'+esc(k.foto)+'" alt="fotografija kvara" onclick="app.viewFoto(\''+kId+'\')" '+
         'style="margin-top:10px;max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--border);cursor:pointer;display:block">' : '')+
       (k.foto_rijeseno ? '<div class="row-sub" style="margin-top:var(--r2)">Fotografija popravka:</div>'+
         '<img src="'+esc(k.foto_rijeseno)+'" alt="fotografija popravka" onclick="app.viewFotoRijeseno(\''+kId+'\')" '+
         'style="margin-top:var(--r1);max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--border);cursor:pointer;display:block">' : '')+
-      '<div class="meta">'+metaCells.join('')+'</div>'+
+      '</div>'+
+      koraciHtml+
+      stanjeHtml+
+      akcijeHtml+
+      '<div class="meta" style="margin-top:var(--r3)">'+metaCells.join('')+'</div>'+
       dodatnoHtml+
-      '<div class="sec"><span>Radnje</span></div>'+
-      akcije+
       zadaciUzKvarHtml+
       '<div class="sec"><span>Komentari</span><span>'+kom.length+'</span></div>'+
       komHtml+
@@ -7346,6 +7405,38 @@ var app = {
     rerender();
     await apiUpdate('kvarovi', kId, { procjena_gotovo:k.procjena_gotovo });
   },
+  /* VLASNIK-2: "Gotovo do" iz retka stanja — mali donji list s +1h/+2h/kraj smjene,
+     isti izbor koji je prije bio .act redak "Gotovo do:" */
+  gotovoDoSheet: function(kId){
+    $('#sheet-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.viseZatvori()"><div class="modal sheet">'+
+      '<div class="modal-head sheet-glava"><h3>Gotovo do</h3><button class="x" type="button" onclick="app.viseZatvori()" aria-label="Zatvori">'+
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>'+
+      '</button></div>'+
+      '<div class="card" style="padding:4px 0">'+
+      '<div class="li click" onclick="app.viseZatvori();app.postaviGotovoDo(\''+kId+'\',1)"><div class="t">+1 h</div></div>'+
+      '<div class="li click" onclick="app.viseZatvori();app.postaviGotovoDo(\''+kId+'\',2)"><div class="t">+2 h</div></div>'+
+      '<div class="li click" onclick="app.viseZatvori();app.postaviGotovoDo(\''+kId+'\',\'smjena\')"><div class="t">Kraj smjene</div></div>'+
+      '</div></div></div>';
+  },
+  /* VLASNIK-2: "Više" — sve što nije svakodnevna radnja (uredi, storniraj, naruči/ugradi dio,
+     zovi servis, vrati u rad) živi ovdje, umjesto gomile .act redaka u samom detalju. Stavke su
+     već filtrirane u detaljKvara (isti uvjeti kao dosadašnji .act redci). */
+  viseKvar: function(kId){
+    var stavke = (window._VISE_STAVKE && window._VISE_STAVKE[kId]) || [];
+    $('#sheet-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.viseZatvori()"><div class="modal sheet">'+
+      '<div class="modal-head sheet-glava"><h3>Više</h3><button class="x" type="button" onclick="app.viseZatvori()" aria-label="Zatvori">'+
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>'+
+      '</button></div>'+
+      '<div class="card" style="padding:4px 0">'+
+      stavke.map(function(s){
+        return '<div class="li click '+(s.cls||'')+'" onclick="app.viseZatvori();app.'+s.fn+'(\''+kId+'\')">'+
+          '<div class="t"'+(s.cls&&s.cls.indexOf('opasno')>-1?' style="color:var(--red)"':'')+'>'+esc(s.t)+'</div></div>';
+      }).join('')+
+      '</div></div></div>';
+  },
+  viseZatvori: function(){ $('#sheet-root').innerHTML=''; },
   /* ---------- §15 #5: vanjski izvođač ("zovi servis") ----------
      Model: kvar.ceka_servis + ZADATAK s vezom (izvor_kvar, kontakt_id) — ništa novo osim
      jednog boola. Mali CMMS-i to rade isto (docs/izvodjaci-uzori-2026-08.md): 3 stanja
