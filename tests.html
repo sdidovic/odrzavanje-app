@@ -1086,7 +1086,11 @@ async function testovi(W, D){
   var narK3 = W.DATA.nabava[W.DATA.nabava.length-1];
   jednako('narudžba iz kvara nosi kvar_id', narK3.kvar_id, kvarCekaDio.id);
   app.detaljKvara(kvarCekaDio.id); await cekaj(120);
-  ok('detalj kvara prikazuje da je dio naručen', D.querySelector('#modal-root').textContent.indexOf('Narudžba dijela') > -1);
+  /* SMJER-B Detalj (ZADATAK 4/5): meta redak "Narudžba dijela" je postao "Dio" u novoj
+     .meta mreži (naziv dijela + "stiže <datum>"), isti podatak (narudzbaZaKvar), novi tekst */
+  ok('detalj kvara prikazuje da je dio naručen', (function(){
+     var m = D.querySelector('#modal-root .meta'); return !!m && m.textContent.indexOf('Dio') > -1;
+  })());
   app.closeModal();
   /* K-2/K-3: primitak javlja baš dodijeljenom majstoru — mock jer se u demo načinu ništa ne šalje */
   var obavijesti = [];
@@ -2004,15 +2008,19 @@ async function testovi(W, D){
   var otvZaTok = W.DATA.kvarovi.filter(function(k){
     return k.status==='otvoren' && (k.tip||'kvar')==='kvar'; })[0];
   app.detaljKvara(otvZaTok.id); await cekaj(120);
-  ok('na otvorenom kvaru je "Preuzimam" primarni gumb', (function(){
-     var b = Array.prototype.filter.call(D.querySelectorAll('#modal-root .btn'),
+  /* SMJER-B Detalj (ZADATAK 4/5): stupac .btn zamijenjen popisom .act redaka — PRVI .act je
+     primarni ("prim") i jedini je vidljiv na otvorenom, još nepreuzetom kvaru; "Riješi kvar"
+     se više ne prikazuje usporedno kao sekundaran, pojavljuje se tek kad kvar postane primarna
+     radnja (status u_radu). */
+  ok('na otvorenom kvaru je "Preuzimam" primarni redak radnje', (function(){
+     var b = Array.prototype.filter.call(D.querySelectorAll('#modal-root .act'),
        function(x){ return x.textContent.indexOf('Preuzimam') > -1; })[0];
-     return !!b && b.className.indexOf('primary') > -1;
+     return !!b && b.className.indexOf('prim') > -1;
   })());
-  ok('"Riješi kvar" je sekundarni dok kvar nije preuzet', (function(){
-     var b = Array.prototype.filter.call(D.querySelectorAll('#modal-root .btn'),
+  ok('"Riješi kvar" se ne prikazuje dok kvar nije preuzet', (function(){
+     var b = Array.prototype.filter.call(D.querySelectorAll('#modal-root .act'),
        function(x){ return x.textContent.indexOf('Riješi kvar') > -1; })[0];
-     return !!b && b.className.indexOf('primary') === -1;
+     return !b;
   })());
   app.closeModal();
   var uRaduZaTok = W.DATA.kvarovi.filter(function(k){
@@ -2020,9 +2028,9 @@ async function testovi(W, D){
   if(uRaduZaTok){
     app.detaljKvara(uRaduZaTok.id); await cekaj(120);
     ok('na kvaru u radu je "Riješi kvar" primarni', (function(){
-       var b = Array.prototype.filter.call(D.querySelectorAll('#modal-root .btn'),
+       var b = Array.prototype.filter.call(D.querySelectorAll('#modal-root .act'),
          function(x){ return x.textContent.indexOf('Riješi kvar') > -1; })[0];
-       return !!b && b.className.indexOf('primary') > -1;
+       return !!b && b.className.indexOf('prim') > -1;
     })());
     app.closeModal();
   }
@@ -2168,10 +2176,10 @@ async function testovi(W, D){
   await app.preuzmiKvar(otvZaPreuzmi.id); await cekaj(150);
   W.confirm = stariConfirmPreuzmi2;
   ok('"Preuzimam" ne zatvara prozor', !!D.querySelector('#modal-root .modal'));
-  ok('prozor se osvježio — "Riješi kvar" je sad primarni gumb', (function(){
-     var b = Array.prototype.filter.call(D.querySelectorAll('#modal-root .btn'),
+  ok('prozor se osvježio — "Riješi kvar" je sad primarni redak radnje', (function(){
+     var b = Array.prototype.filter.call(D.querySelectorAll('#modal-root .act'),
        function(x){ return x.textContent.indexOf('Riješi kvar') > -1; })[0];
-     return !!b && b.className.indexOf('primary') > -1;
+     return !!b && b.className.indexOf('prim') > -1;
   })());
   app.closeModal();
 
@@ -2273,8 +2281,11 @@ async function testovi(W, D){
   posalji(fUrKvar); await cekaj(120);
   jednako('procjena gotovosti je spremljena', otvKvarZaProcjenu.procjena_gotovo, '2026-08-20T14:00');
   app.detaljKvara(otvKvarZaProcjenu.id); await cekaj(100);
-  ok('detalj kvara prikazuje procijenjeno gotovo',
-     D.querySelector('#modal-root').textContent.indexOf('Procijenjeno gotovo') > -1);
+  /* SMJER-B Detalj (ZADATAK 4/5): "Procijenjeno gotovo" red-retka je postao meta ćelija
+     "Gotovo do" s upisanom vrijednošću — isti podatak (k.procjena_gotovo), novi naziv */
+  ok('detalj kvara prikazuje procijenjeno gotovo (meta "Gotovo do")', (function(){
+     var m = D.querySelector('#modal-root .meta'); return !!m && m.textContent.indexOf('Gotovo do') > -1 && m.textContent.indexOf('14:00') > -1;
+  })());
   app.closeModal();
 
   /* fotografija uz zatvaranje kvara (dokaz gotovog popravka, odvojeno od foto prijave) */
@@ -3209,17 +3220,20 @@ async function testovi(W, D){
     kvarGotovo.status = 'u_radu'; kvarGotovo.procjena_gotovo = null;
   }
   app.detaljKvara(kvarGotovo.id); await cekaj(100);
-  ok('kvar u radu bez procjene nudi čipove "Gotovo do?"',
-     D.querySelector('#modal-root').textContent.indexOf('Gotovo do?') > -1);
+  /* SMJER-B Detalj (ZADATAK 4/5): red "Gotovo do?" je postao .act redak "Gotovo do:" s
+     čipovima +1 h/+2 h/kraj smjene u istom retku (maketa DetaljB.dc.html, radnja 4) */
+  ok('kvar u radu bez procjene nudi redak "Gotovo do:" s čipovima',
+     D.querySelector('#modal-root').textContent.indexOf('Gotovo do:') > -1);
   await app.postaviGotovoDo(kvarGotovo.id, 2); await cekaj(100);
   ok('"+2 h" upisuje procjenu ~2h unaprijed', (function(){
      var d = new Date(kvarGotovo.procjena_gotovo);
      return Math.abs(d.getTime() - (Date.now()+2*3600000)) < 5*60000;
   })());
-  ok('nakon upisa čipovi "Gotovo do" nestaju (procjena već postoji)',
-     D.querySelector('#modal-root').textContent.indexOf('Gotovo do?') === -1);
-  ok('detalj sad prikazuje "Procijenjeno gotovo"',
-     D.querySelector('#modal-root').textContent.indexOf('Procijenjeno gotovo') > -1);
+  ok('nakon upisa redak "Gotovo do:" nestaje (procjena već postoji)',
+     D.querySelector('#modal-root').textContent.indexOf('Gotovo do:') === -1);
+  ok('detalj sad prikazuje procjenu u meta ćeliji "Gotovo do"', (function(){
+     var m = D.querySelector('#modal-root .meta'); return !!m && m.textContent.indexOf('Gotovo do') > -1;
+  })());
   kvarGotovo.procjena_gotovo = null; app.closeModal();
 
   var kvarDio = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar' && k.m; })[0];
@@ -3541,6 +3555,73 @@ async function testovi(W, D){
   ok('za ulogu readonly (Direktor) #fab je skriven', W.getComputedStyle(D.getElementById('fab')).display === 'none');
   app.demoUloga('Voditelj'); await cekaj(100);
   D.body.dataset.role = 'voditelj';
+
+  grupa('SMJER-B Detalj (ZADATAK 4/5) — novi oblik detaljKvara');
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  var otvSmjB = W.DATA.kvarovi.filter(function(k){ return k.status==='otvoren' && (k.tip||'kvar')==='kvar'; })[0];
+  app.detaljKvara(otvSmjB.id); await cekaj(100);
+  ok('otvoren kvar ima primarnu radnju "Preuzimam…"', (function(){
+     var b = D.querySelector('#modal-root .act.prim');
+     return !!b && b.textContent.indexOf('Preuzimam') > -1;
+  })());
+  ok('meta mreža sadrži "Traje"', D.querySelector('#modal-root .meta').textContent.indexOf('Traje') > -1);
+  app.closeModal();
+
+  var uRaduSmjB = W.DATA.kvarovi.filter(function(k){ return k.status==='u_radu' && (k.tip||'kvar')==='kvar'; })[0];
+  if(uRaduSmjB){
+    app.detaljKvara(uRaduSmjB.id); await cekaj(100);
+    ok('preuzet (u radu) kvar ima primarnu radnju "Riješi kvar"', (function(){
+       var b = D.querySelector('#modal-root .act.prim');
+       return !!b && b.textContent.indexOf('Riješi kvar') > -1;
+    })());
+    app.closeModal();
+  }
+
+  W.SESSION = { ime:'Vod. proizvodnje', role:'proizvodnja' }; D.body.dataset.role = 'proizvodnja';
+  app.detaljKvara(otvSmjB.id); await cekaj(100);
+  ok('proizvodnja ne vidi "Trošak" u detalju kvara', D.querySelector('#modal-root .meta').textContent.indexOf('Trošak') === -1);
+  app.closeModal();
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+
+  var rijesenSmjB = W.DATA.kvarovi.filter(function(k){ return k.status==='rijesen' && (k.tip||'kvar')==='kvar'; })[0];
+  var rijesenSmjBTest = false;
+  if(!rijesenSmjB){
+    rijesenSmjB = { id:'smjBrij'+Date.now(), m:W.DATA.machines[0].id, date:W.todayISO(), opis:'TEST riješen za SMJER-B',
+      sati:1, status:'rijesen', upoz:false, tip:'kvar', kategorija:'Ostalo', dodijeljen:'Tehničar', tko:'Tehničar',
+      ceka_dio:false, ceka_servis:false, prioritet:'normalno', otpusteno:false, privremeni:false, rok_sanacije:null };
+    W.DATA.kvarovi.push(rijesenSmjB); rijesenSmjBTest = true;
+  }
+  app.detaljKvara(rijesenSmjB.id); await cekaj(100);
+  ok('riješen kvar ima "Nije riješeno — vrati u rad"',
+     D.querySelector('#modal-root').textContent.indexOf('Nije riješeno — vrati u rad') > -1);
+  ok('riješen kvar nema "+ Ugrađen dio"', D.querySelector('#modal-root').textContent.indexOf('Ugrađen dio') === -1);
+  app.closeModal();
+  if(rijesenSmjBTest) W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== rijesenSmjB.id; });
+
+  /* Tijek: kronologija sysPoruka vezanih uz kvar — koristi kvar koji sigurno ima poruku (prijava) */
+  var kvarSaPorukom = W.DATA.kvarovi.filter(function(k){
+    return (k.tip||'kvar')==='kvar' && k.status!=='otkazan' &&
+      W.DATA.poruke.some(function(p){ return p.kvar_id===k.id; });
+  })[0];
+  if(kvarSaPorukom){
+    var porukaOcekivana = W.DATA.poruke.filter(function(p){ return p.kvar_id===kvarSaPorukom.id; })[0];
+    app.detaljKvara(kvarSaPorukom.id); await cekaj(100);
+    ok('sekcija "Tijek" sadrži tekst sysPoruke tog kvara', (function(){
+       var m = D.querySelector('#modal-root');
+       if(!m || m.textContent.indexOf('Tijek') === -1) return false;
+       var jezgra = porukaOcekivana.tekst.replace(/^[^\wČĆŽŠĐčćžšđ]+\s*/u,'').slice(0,20);
+       return m.textContent.indexOf(jezgra) > -1;
+    })());
+    app.closeModal();
+  }
+
+  var zadSmjB = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='zadatak'; })[0];
+  if(zadSmjB){
+    app.detaljKvara(zadSmjB.id); await cekaj(100);
+    ok('zadatak ima "Označi obavljeno"', D.querySelector('#modal-root').textContent.indexOf('Označi obavljeno') > -1);
+    ok('zadatak nema "Ugrađen dio"', D.querySelector('#modal-root').textContent.indexOf('Ugrađen dio') === -1);
+    app.closeModal();
+  }
 
   grupa('SUSTAV — tokeni (KORAK 2: tipografija/razmaci/boje)');
   try{
