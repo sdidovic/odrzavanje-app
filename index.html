@@ -26,6 +26,15 @@
   --green:#1c6b3a; --green-bg:#e9f4ed; --green-border:#c7e1d1;
   /* --- razmaci (4px ljestvica) --- */
   --r1:4px; --r2:8px; --r3:12px; --r4:16px; --r5:24px; --r6:32px;
+  /* SIM-FIX: tipografski tokeni (KORAK 2) */
+  --t-tab:10px;      /* najmanji tekst: tabovi */
+  --t-label:11px;    /* oznake sekcija, cipovi, velika slova */
+  --t-sub:12px;      /* podnaslov retka */
+  --t-meta:13px;     /* meta, brojke u retku */
+  --t-body:15px;     /* tekst, naslov retka, gumb */
+  --t-title:17px;    /* naslov ekrana/modala */
+  --t-stat:22px;     /* stat kartice */
+  --t-hero:28px;     /* jedna velika brojka po ekranu */
   /* --- oblik i dubina --- */
   --radius:12px; --radius-s:9px; --radius-xs:7px;
   --sjena-1:0 1px 2px rgba(16,24,40,.05);
@@ -33,13 +42,12 @@
   --sjena-3:0 10px 28px rgba(16,24,40,.14);
   /* --- ostale boje (dodano refaktorom §16.8 — imenovane po ulozi, ne po tonu) --- */
   --text-3:#1b2430;
-  --hover-bg:#f6f7f9; --hover-bg-2:#f7f8fa; --panel-bg:#f8f9fb; --rub-svijetli:#e3e6eb;
+  --hover-bg:#f6f7f9; --panel-bg:#f8f9fb;
   --chip-bg:#eef0f3; --chip-tekst-rijesen:#4a545f; --chip-tekst-otkazan:#7c8894;
   --plava-bg:#e8f0fb; --plava-tekst:#1f4f8f; --plava-rub:#c5d8f2;
   --chevron:#aab1bd;
   --trend-gore:#ffb4ad; --trend-dolje:#96e6b0;
-  --traka-pozadina:#edf0f4;
-  --av1-bg:#e3eefb; --av1-tekst:#1e4f8c;
+  --av1-bg:#e3eefb;
   --av2-bg:#e4f3ea;
   --av3-bg:#fdeee0; --av3-tekst:#9a4d06;
   --av4-bg:#f3e5f5; --av4-tekst:#6a1b9a;
@@ -62,7 +70,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  background:var(--bg);color:var(--text);font-size:var(--t-body);line-height:1.5;-webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;font-variant-numeric:tabular-nums}
 button{font-family:inherit;-webkit-tap-highlight-color:transparent}
 ::selection{background:var(--accent-soft)}
@@ -76,11 +84,11 @@ header{position:sticky;top:0;z-index:30;color:var(--card);padding-top:env(safe-a
 .hdr-brand{display:flex;align-items:center;gap:11px;min-width:0}
 .hdr-logo{height:38px;width:auto;display:block;border-radius:6px;
   filter:drop-shadow(0 1px 3px var(--logo-sjena))}
-h1{font-size:17px;font-weight:700;letter-spacing:-.2px;line-height:1.15}
-.hdr-sub{font-size:11px;opacity:.7;margin-top:2px;letter-spacing:.3px;text-transform:uppercase;font-weight:600}
+h1{font-size:var(--t-title);font-weight:700;letter-spacing:-.2px;line-height:1.15}
+.hdr-sub{font-size:var(--t-label);opacity:.7;margin-top:2px;letter-spacing:.3px;text-transform:uppercase;font-weight:600}
 .hdr-akcije{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .btn-audit{background:var(--btn-audit-bg);border:1px solid var(--btn-audit-rub);color:var(--card);
-  font-size:12px;font-weight:600;line-height:1.25;padding:12px;border-radius:var(--radius-xs);
+  font-size:var(--t-sub);font-weight:600;line-height:1.25;padding:var(--r3);border-radius:var(--radius-xs);
   text-align:center;cursor:pointer;flex-shrink:0;white-space:nowrap;backdrop-filter:blur(2px);
   transition:background .14s ease}   /* dodirna meta ≥44px — hala, rukavice */
 .btn-audit:active{background:var(--btn-audit-active)}
@@ -89,7 +97,7 @@ h1{font-size:17px;font-weight:700;letter-spacing:-.2px;line-height:1.15}
 main{max-width:760px;margin:0 auto;padding:16px 16px calc(86px + env(safe-area-inset-bottom))}
 .screen.hidden{display:none}
 /* --text-2, ne --muted: 11.5px se ne broji kao "veliki tekst", a radi se u hali na suncu */
-h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--text-2);
+h2{font-size:var(--t-label);text-transform:uppercase;letter-spacing:.9px;color:var(--text-2);
   font-weight:700;margin:var(--r5) 0 var(--r2);display:flex;align-items:center;gap:var(--r2)}
 h2:first-child{margin-top:var(--r3)}
 .screen>.card:first-child{margin-top:var(--r3)}   /* zrak ispod zaglavlja i kad ekran ne počinje s h2 (npr. kalendar) */
@@ -98,17 +106,17 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
 /* ---------- kartice i redovi ---------- */
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
   overflow:hidden;box-shadow:var(--sjena-1)}
-.row{display:flex;justify-content:space-between;align-items:center;gap:12px;
+.row{display:flex;justify-content:space-between;align-items:center;gap:var(--r3);
   padding:13px 14px;border-bottom:1px solid var(--border);transition:background .12s ease}
 .row:last-child{border-bottom:none}
 .row.click{cursor:pointer}
 .row.click:active{background:var(--hover-bg)}
-.row-title{font-weight:650;font-size:14.5px;letter-spacing:-.1px;color:var(--text)}
-.row-sub{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45}
-.row-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.chev{color:var(--chevron);font-size:19px;line-height:1}
+.row-title{font-weight:650;font-size:var(--t-body);letter-spacing:-.1px;color:var(--text)}
+.row-sub{font-size:var(--t-sub);color:var(--muted);margin-top:3px;line-height:1.45}
+.row-right{display:flex;align-items:center;gap:var(--r2);flex-shrink:0}
+.chev{color:var(--chevron);font-size:var(--t-stat);line-height:1}
 .grow{min-width:0;flex:1}
-.empty{padding:26px 16px;text-align:center;color:var(--muted);font-size:13.5px;line-height:1.55}
+.empty{padding:26px 16px;text-align:center;color:var(--muted);font-size:var(--t-meta);line-height:1.55}
 /* §15 #2: mirna ikona iznad praznog stanja — "ovdje je prazno" a ne "nešto se pokvarilo";
    samo na velikim praznim karticama (>= 26px padding), ne u sitnim inline "Nema komentara" */
 .empty:not([style*="padding"])::before{content:'';display:block;width:34px;height:34px;margin:0 auto 10px;
@@ -116,7 +124,7 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
   opacity:.75}
 
 /* ---------- chips ---------- */
-.chip{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.6px;
+.chip{display:inline-block;font-size:var(--t-label);font-weight:700;letter-spacing:.6px;
   padding:4px 9px;border-radius:20px;text-transform:uppercase;white-space:nowrap;vertical-align:1px;
   line-height:1.15}   /* HITNO/Čeka dio nose najvažniju informaciju — ne smiju biti najsitniji tekst */
 .chip.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
@@ -142,10 +150,10 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
 .big-card:active{transform:scale(.995)}
 .big-card:after{content:'';position:absolute;right:-40px;top:-40px;width:150px;height:150px;
   border-radius:50%;background:var(--bijela-tint-05)}
-.big-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;opacity:.72;font-weight:700}
-.big-num{font-size:42px;font-weight:800;letter-spacing:-1.4px;margin:5px 0 3px;line-height:1.05;
+.big-label{font-size:var(--t-label);text-transform:uppercase;letter-spacing:1px;opacity:.72;font-weight:700}
+.big-num{font-size:var(--t-hero);font-weight:800;letter-spacing:-1.4px;margin:5px 0 3px;line-height:1.05;
   font-variant-numeric:tabular-nums}
-.big-sub{font-size:12.5px;opacity:.78;position:relative}
+.big-sub{font-size:var(--t-sub);opacity:.78;position:relative}
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--r2);margin-top:var(--r3)}
 .stat{border-radius:var(--radius-s);padding:13px 8px 11px;text-align:center;cursor:pointer;
   border:1px solid var(--border);background:var(--card);box-shadow:var(--sjena-1);
@@ -153,19 +161,19 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
 .stat:active{transform:scale(.97)}
 .stat.static{cursor:default}
 .stat.static:active{transform:none}   /* KPI kartice na Analitici ne rade ništa na dodir — ne smiju izgledati klikabilno */
-.stat-num{display:block;font-size:26px;font-weight:800;line-height:1.1;letter-spacing:-.7px;
+.stat-num{display:block;font-size:var(--t-hero);font-weight:800;line-height:1.1;letter-spacing:-.7px;
   font-variant-numeric:tabular-nums}
-.stat-label{display:block;font-size:11px;color:var(--text-2);margin-top:4px;line-height:1.3;
+.stat-label{display:block;font-size:var(--t-label);color:var(--text-2);margin-top:var(--r1);line-height:1.3;
   font-weight:600;letter-spacing:.1px}   /* kontrast na obojenoj podlozi — hala, sunce */
 /* 4 KPI broja na Analitici — ista veličina, jer su jednako važni. 2×2 mreža daje dovoljno
    prostora da broj stane u jedan red — overflow-wrap:anywhere je prije lomio brojku usred znamenke */
-.stat-num.kpi{font-size:21px;letter-spacing:-.3px;white-space:nowrap}   /* SIM-FIX: 17px je bilo presitno za glavne brojke Analitike */
+.stat-num.kpi{font-size:var(--t-stat);letter-spacing:-.3px;white-space:nowrap}   /* SIM-FIX: 17px je bilo presitno za glavne brojke Analitike */
 .stat.red{background:var(--red-bg);border-color:var(--red-border)}   .stat.red .stat-num{color:var(--red)}
 .stat.yellow{background:var(--yellow-bg);border-color:var(--yellow-border)} .stat.yellow .stat-num{color:var(--yellow)}
 .stat.green{background:var(--green-bg);border-color:var(--green-border)} .stat.green .stat-num{color:var(--green)}
 
 /* ---------- trend na velikoj kartici ---------- */
-.trend{display:block;font-size:12px;font-weight:700;background:var(--bijela-tint-14);
+.trend{display:block;font-size:var(--t-sub);font-weight:700;background:var(--bijela-tint-14);
   width:fit-content;padding:3px 9px;border-radius:20px;margin:2px 0 0;vertical-align:0;letter-spacing:.2px}
 .trend.up{color:var(--trend-gore)}
 .trend.down{color:var(--trend-dolje)}
@@ -173,34 +181,34 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
 /* ---------- najskuplji strojevi (barovi) ---------- */
 .bar-row{display:flex;align-items:center;gap:9px;padding:10px 13px;border-bottom:1px solid var(--border);cursor:pointer}
 .bar-row:last-child{border-bottom:none}
-.bar-row:active{background:var(--hover-bg-2)}
-.bar-name{width:98px;flex-shrink:0;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bar-track{flex:1;height:13px;background:var(--traka-pozadina);border-radius:4px;overflow:hidden}
+.bar-row:active{background:var(--hover-bg)}
+.bar-name{width:98px;flex-shrink:0;font-size:var(--t-sub);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{flex:1;height:13px;background:var(--chip-bg);border-radius:4px;overflow:hidden}
 .bar-fill{height:100%;background:var(--accent);border-radius:0 4px 4px 0}
 /* mjesec koji još traje — stupac je nepotpun i ne smije se čitati kao pad */
 .bar-fill.u-tijeku{background:repeating-linear-gradient(135deg,
   var(--accent) 0 5px, var(--accent-rub) 5px 10px)}
-.nepotpun{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
-.bar-val{width:58px;text-align:right;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.nepotpun{font-size:var(--t-tab);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.bar-val{width:58px;text-align:right;font-size:var(--t-sub);font-weight:700;font-variant-numeric:tabular-nums}
 
 /* ---------- ponovljeni kvar ---------- */
-.rep{color:var(--red);font-size:11px;font-weight:700;white-space:nowrap}
+.rep{color:var(--red);font-size:var(--t-label);font-weight:700;white-space:nowrap}
 
 /* ---------- "Trenutno stoji" ---------- */
-.stoji-cijena{text-align:right;font-size:14px;font-weight:800;color:var(--red);
+.stoji-cijena{text-align:right;font-size:var(--t-meta);font-weight:800;color:var(--red);
   font-variant-numeric:tabular-nums;line-height:1.15}
-.stoji-cijena span{display:block;font-size:9.5px;font-weight:700;color:var(--muted);
+.stoji-cijena span{display:block;font-size:var(--t-tab);font-weight:700;color:var(--muted);
   text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
 
 /* ---------- usporedba razdoblja ---------- */
-.delta{display:block;font-size:10px;font-weight:700;margin-top:3px;letter-spacing:.2px}
+.delta{display:block;font-size:var(--t-tab);font-weight:700;margin-top:3px;letter-spacing:.2px}
 .delta.dobro{color:var(--green)}
 .delta.lose{color:var(--red)}
 .delta.jednako{color:var(--muted);font-weight:600}
 
 /* ---------- analitika tablice ---------- */
-.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
-.tbl th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;
+.tbl{width:100%;border-collapse:collapse;font-size:var(--t-sub)}
+.tbl th{text-align:left;font-size:var(--t-tab);text-transform:uppercase;letter-spacing:.4px;
   color:var(--muted);padding:8px 10px;border-bottom:2px solid var(--border);white-space:nowrap}
 .tbl td{padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
 .tbl-ukupno td{border-top:2px solid var(--border-jaci);border-bottom:none;background:var(--panel-bg)}
@@ -212,10 +220,10 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
 .qr-kart{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;
   break-inside:avoid;page-break-inside:avoid}
 .qr-logo img{height:26px}
-.qr-naziv{font-size:14px;font-weight:700;margin:5px 0 7px;line-height:1.2}
+.qr-naziv{font-size:var(--t-meta);font-weight:700;margin:5px 0 7px;line-height:1.2}
 .qr-slika{display:flex;justify-content:center}
 .qr-slika img,.qr-slika canvas{display:block}
-.qr-upute{font-size:10.5px;color:var(--muted);margin-top:7px;line-height:1.35}
+.qr-upute{font-size:var(--t-tab);color:var(--muted);margin-top:7px;line-height:1.35}
 
 /* ---------- Raspored: agenda po hitnosti + kalendar na dodir ----------
    Kalendar je sklopiv ulaz za grubo planiranje (zatvoren po defaultu), ne stalno
@@ -223,16 +231,16 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
    tjedan/Kasnije/Bez roka) — svaka stavka postoji točno jednom, nikad dvaput. */
 .rasp-kal-traka{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;
   border:1.5px solid var(--border);border-radius:10px;background:var(--card);margin-bottom:10px;
-  font-size:13.5px;font-weight:650;color:var(--text);cursor:pointer}
+  font-size:var(--t-meta);font-weight:650;color:var(--text);cursor:pointer}
 .rasp-kal-traka:active{background:var(--hover-bg)}
-.rasp-nav{display:flex;align-items:center;justify-content:space-between;margin:6px 0 8px;gap:8px}
-.rasp-naslov{font-size:14.5px;font-weight:700;flex:1;text-align:center}
-.rasp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.rasp-h{text-align:center;font-size:10px;font-weight:700;color:var(--muted);
+.rasp-nav{display:flex;align-items:center;justify-content:space-between;margin:6px 0 8px;gap:var(--r2)}
+.rasp-naslov{font-size:var(--t-body);font-weight:700;flex:1;text-align:center}
+.rasp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--r1)}
+.rasp-h{text-align:center;font-size:var(--t-tab);font-weight:700;color:var(--muted);
   text-transform:uppercase;padding:2px 0 5px}
 .rasp-d{min-height:50px;border-radius:9px;border:1.5px solid var(--border);background:var(--card);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
-  cursor:pointer;font-size:14px;font-weight:700;color:var(--text);padding:2px}
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--r1);
+  cursor:pointer;font-size:var(--t-meta);font-weight:700;color:var(--text);padding:2px}
 .rasp-d:active{transform:scale(.96)}
 .rasp-d.prosli{color:var(--muted);border-color:transparent}
 .rasp-d.izvan{opacity:.42}   /* dan susjednog mjeseca — vidljiv i živ, ali prigušen */
@@ -249,12 +257,12 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
 .rasp-premjesti .row-sub:first-child{color:var(--accent);font-weight:700}
 /* skupine agende: sklopive nose chevron, ostale trajno otvorene; desna zona za brojku/gumb */
 .rasp-grupa-head{cursor:pointer}
-h2 .h2-desno{order:2;display:flex;align-items:center;gap:8px;flex-shrink:0}
+h2 .h2-desno{order:2;display:flex;align-items:center;gap:var(--r2);flex-shrink:0}
 h2 .h2-n{color:var(--muted);font-weight:600;text-transform:none;letter-spacing:0}
-h2 .btn-mini{min-height:34px;padding:6px 11px;font-size:12px;text-transform:none;letter-spacing:0}
-.rasp-dan-sub{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;
+h2 .btn-mini{min-height:34px;padding:6px 11px;font-size:var(--t-sub);text-transform:none;letter-spacing:0}
+.rasp-dan-sub{font-size:var(--t-label);font-weight:700;color:var(--muted);text-transform:uppercase;
   letter-spacing:.4px;padding:9px 13px 2px}
-.grupa-tiho .row-title{font-size:12.5px;color:var(--muted)}
+.grupa-tiho .row-title{font-size:var(--t-sub);color:var(--muted)}
 .grupa-tiho .rasp-traj{display:none}
 .flash{animation:rasp-flash .9s ease}
 @keyframes rasp-flash{0%{background:var(--accent-soft)}100%{background:transparent}}
@@ -268,22 +276,22 @@ h2 .btn-mini{min-height:34px;padding:6px 11px;font-size:12px;text-transform:none
 #screen-raspored{padding-bottom:84px}
 /* zona 1: tjedni trak */
 .rasp-tj{margin:2px 0 12px}
-.rasp-tj-nav{display:flex;align-items:center;height:36px;margin-bottom:8px}
-.rasp-tj-naslov{flex:1;display:flex;align-items:center;gap:8px;background:none;border:none;padding:0;
-  text-align:left;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;min-height:36px}
+.rasp-tj-nav{display:flex;align-items:center;height:36px;margin-bottom:var(--r2)}
+.rasp-tj-naslov{flex:1;display:flex;align-items:center;gap:var(--r2);background:none;border:none;padding:0;
+  text-align:left;font-size:var(--t-meta);font-weight:700;color:var(--text);cursor:pointer;min-height:36px}
 .rasp-tj-naslov:active{opacity:.6}
-.rasp-tj-kal{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
-.rasp-tj-naslov .chev{font-size:17px}
-.rasp-tj-nav-btn.qbtn{width:44px;height:36px;border:none;background:transparent;color:var(--text-2);font-size:20px;border-radius:8px}
+.rasp-tj-kal{font-size:var(--t-tab);font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.rasp-tj-naslov .chev{font-size:var(--t-title)}
+.rasp-tj-nav-btn.qbtn{width:44px;height:36px;border:none;background:transparent;color:var(--text-2);font-size:var(--t-stat);border-radius:8px}
 .rasp-tj-nav-btn.qbtn:active{background:var(--accent-soft)}
-.rasp-tj-dani{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.rasp-tj-dani{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--r1)}
 .rasp-tj-d{position:relative;min-height:56px;border-radius:var(--radius-s);background:var(--card);
   border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:3px;padding:7px 0 6px;cursor:pointer;
   transition:background .15s,border-color .15s,color .15s,transform .12s}
 .rasp-tj-d:active{transform:scale(.96)}
-.rasp-tj-ime{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.3px}
-.rasp-tj-br{font-size:15px;font-weight:700;color:var(--text);line-height:1.1}
+.rasp-tj-ime{font-size:var(--t-tab);font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.3px}
+.rasp-tj-br{font-size:var(--t-body);font-weight:700;color:var(--text);line-height:1.1}
 .rasp-tj-load{width:22px;height:3px;border-radius:2px;background:var(--border);overflow:hidden}
 .rasp-tj-load i{display:block;height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
 .rasp-tj-load i.crv{background:var(--red)}
@@ -295,26 +303,26 @@ h2 .btn-mini{min-height:34px;padding:6px 11px;font-size:12px;text-transform:none
 .rasp-tj-d.proslo .rasp-tj-load{opacity:.5}
 .rasp-tj-d.cilj{border:1.5px dashed var(--accent)}
 /* zona 2: hero dana */
-.rasp-hero{padding:14px 16px 12px;margin-bottom:12px}
-.rasp-hero-r1{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px;gap:10px}
-.rasp-dan-h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
-.rasp-dan-h1{font-size:22px;font-weight:800;letter-spacing:-.4px;line-height:1.15;color:var(--text);margin-top:2px}
-.rasp-smjena{font-size:12.5px;font-weight:600;color:var(--text-2);text-align:right;white-space:nowrap}
-.rasp-smjena-jos{font-size:11px;color:var(--muted);text-align:right;margin-top:1px}
+.rasp-hero{padding:14px 16px 12px;margin-bottom:var(--r3)}
+.rasp-hero-r1{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:var(--r3);gap:10px}
+.rasp-dan-h2{font-size:var(--t-label);font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.rasp-dan-h1{font-size:var(--t-stat);font-weight:800;letter-spacing:-.4px;line-height:1.15;color:var(--text);margin-top:2px}
+.rasp-smjena{font-size:var(--t-sub);font-weight:600;color:var(--text-2);text-align:right;white-space:nowrap}
+.rasp-smjena-jos{font-size:var(--t-label);color:var(--muted);text-align:right;margin-top:1px}
 .rasp-skok{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--accent-rub);background:var(--accent-soft);
-  color:var(--accent);font-size:12.5px;font-weight:700;cursor:pointer;flex-shrink:0}
+  color:var(--accent);font-size:var(--t-sub);font-weight:700;cursor:pointer;flex-shrink:0}
 .rasp-skok:active{background:var(--accent-rub)}
-.rasp-hero-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.rasp-hero-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--r2);margin-bottom:10px}
 .rasp-stat{text-align:left;cursor:pointer;min-width:0}
-.rasp-stat .stat-num{font-size:24px}
+.rasp-stat .stat-num{font-size:var(--t-stat)}
 .rasp-stat .stat-num.crv{color:var(--red)}
 .rasp-stat .stat-num.nista{color:var(--border-jaci)}
-.rasp-stat .stat-label{text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--muted)}
+.rasp-stat .stat-label{text-transform:uppercase;font-size:var(--t-tab);letter-spacing:.5px;color:var(--muted)}
 .rasp-prog{display:flex;gap:2px;height:6px;border-radius:3px;overflow:hidden}
 .rasp-prog i{flex:1;display:block;height:100%}
 .rasp-prog .seg-on{background:var(--accent);transition:background .3s}
 .rasp-prog .seg-off{background:var(--accent-soft)}
-.rasp-prog-txt{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px;gap:8px}
+.rasp-prog-txt{display:flex;justify-content:space-between;font-size:var(--t-sub);color:var(--muted);margin-top:6px;gap:var(--r2)}
 .rasp-link{color:var(--accent);cursor:pointer;font-weight:600}
 .rasp-hero.gotovo{border-color:var(--green-border);background:var(--green-bg)}
 .rasp-hero.gotovo .stat-num{color:var(--green)}
@@ -322,22 +330,22 @@ h2 .btn-mini{min-height:34px;padding:6px 11px;font-size:12px;text-transform:none
 .rasp-hero.gotovo .rasp-tim{border-top-color:var(--green-border)}
 /* §15 direktorov hero na Pregledu — isti vizualni jezik kao Raspored hero: 1 velika brojka
    (€ ovaj mjesec) + trend, 3 statistike, i JEDAN redak "sada stoji / sve radi" */
-.dir-hero .rasp-dan-h1{font-size:34px;letter-spacing:-.8px;margin-top:4px}
-.dir-hero .rasp-dan-h1 .trend{display:block;font-size:12px;letter-spacing:0;margin-top:4px}
+.dir-hero .rasp-dan-h1{font-size:var(--t-hero);letter-spacing:-.8px;margin-top:var(--r1)}
+.dir-hero .rasp-dan-h1 .trend{display:block;font-size:var(--t-sub);letter-spacing:0;margin-top:var(--r1)}
 /* SIM-FIX: .trend (:144) je pisan za tamnu podlogu (big-card) — na direktorovoj bijeloj
    hero kartici je kontrast ~1,7:1. Ista varijabla paleta (--red/--green), svijetla podloga. */
 .dir-hero .trend.up{background:var(--red-bg);color:var(--red)}
 .dir-hero .trend.down{background:var(--green-bg);color:var(--green)}
 .dir-hero .rasp-hero-r1{align-items:flex-start}
-.dir-stoji{display:flex;align-items:center;gap:9px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);
-  font-size:13.5px;font-weight:600;color:var(--text);cursor:pointer;min-height:44px}
+.dir-stoji{display:flex;align-items:center;gap:9px;margin-top:var(--r3);padding-top:var(--r3);border-top:1px solid var(--border);
+  font-size:var(--t-meta);font-weight:600;color:var(--text);cursor:pointer;min-height:44px}
 .dir-stoji .tocka{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--green)}
 .dir-stoji.stoji .tocka{background:var(--red);animation:puls 1.4s ease-in-out infinite}
 .dir-stoji .row-sub{font-weight:400}
 .dir-stoji .chev{margin-left:auto;color:var(--muted)}
 .rasp-hero.gotovo .dir-stoji{border-top-color:var(--green-border)}
 .rasp-kv-ok{display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--green);color:var(--card);
-  align-items:center;justify-content:center;margin-right:8px;vertical-align:-6px}
+  align-items:center;justify-content:center;margin-right:var(--r2);vertical-align:-6px}
 .rasp-kv-ok svg{width:16px;height:16px}
 /* pilule tima */
 .rasp-tim-wrap{position:relative}
@@ -347,9 +355,9 @@ h2 .btn-mini{min-height:34px;padding:6px 11px;font-size:12px;text-transform:none
   overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .rasp-tim::-webkit-scrollbar{display:none}
 .rasp-os{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px 0 4px;
-  border-radius:999px;border:1px solid var(--border);background:var(--card);font-size:11.5px;font-weight:700;
+  border-radius:999px;border:1px solid var(--border);background:var(--card);font-size:var(--t-label);font-weight:700;
   color:var(--text);cursor:pointer;transition:background .15s,color .15s,border-color .15s;font-family:inherit}
-.rasp-os .av{width:22px;height:22px;font-size:9.5px;cursor:pointer}
+.rasp-os .av{width:22px;height:22px;font-size:var(--t-tab);cursor:pointer}
 .rasp-os.slobodan{color:var(--muted)}
 .rasp-os.preko{color:var(--red);border-color:var(--red-border)}
 .rasp-os.nitko{border:1px dashed var(--border-jaci);color:var(--text-2);padding-left:10px}
@@ -364,64 +372,64 @@ h2 .btn-mini{min-height:34px;padding:6px 11px;font-size:12px;text-transform:none
   vertical-align:1px;animation:puls 2s ease-in-out infinite}
 .puls.pauza{animation-play-state:paused;opacity:.5}
 @keyframes puls{0%,100%{opacity:1}50%{opacity:.35}}
-.rasp-do{font-size:12px;font-weight:700;color:var(--text-2);flex-shrink:0;white-space:nowrap}
+.rasp-do{font-size:var(--t-sub);font-weight:700;color:var(--text-2);flex-shrink:0;white-space:nowrap}
 .rasp-do.kasni{color:var(--red)}
 .rasp-smj-traka{position:relative;flex-basis:100%;height:4px;border-radius:2px;background:var(--border);margin:10px 0 14px}
 .rasp-smj-traka i{position:absolute;top:0;height:100%;border-radius:2px}
 .rasp-smj-traka .fill{background:var(--accent)}
 .rasp-smj-traka .proc{background:transparent;border-top:2px dashed var(--accent-rub);height:0;top:1px}
 .rasp-smj-traka .proc.kasni{border-color:var(--red-border)}
-.rasp-smj-traka .oz{position:absolute;top:7px;font-size:10px;color:var(--muted);line-height:1}
+.rasp-smj-traka .oz{position:absolute;top:7px;font-size:var(--t-tab);color:var(--muted);line-height:1}
 .rasp-smj-traka .oz.l{left:0}
 .rasp-smj-traka .oz.r{right:0}
 /* redak agende */
-.rasp-st{border-left:3px solid transparent;align-items:center;gap:12px}
+.rasp-st{border-left:3px solid transparent;align-items:center;gap:var(--r3)}
 .rasp-st.st-kasni{border-left-color:var(--red)}
 .rasp-st.st-sanacija{border-left:3px dashed var(--yellow-border)}
 .rasp-st.st-gotov{background:var(--panel-bg)}
 .rasp-st.st-gotov .row-title{color:var(--muted)}
 .rasp-st.click:active{background:var(--hover-bg);transform:scale(.992);transition:transform .12s cubic-bezier(.2,.8,.2,1)}
-.rasp-st .row-title{font-size:14.5px}
+.rasp-st .row-title{font-size:var(--t-body)}
 .kasni-txt{color:var(--red);font-weight:700}
-.av{width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:10.5px;
+.av{width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:var(--t-tab);
   font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:0;
   cursor:pointer;user-select:none;-webkit-user-select:none;line-height:1}
-.av.velik{width:28px;height:28px;font-size:11px}
+.av.velik{width:28px;height:28px;font-size:var(--t-label)}
 /* boja po osobi (avatarBoja) — 6 tonova koji drže kontrast ≥4.5 na svojoj podlozi */
 .av.ab0{background:var(--accent-soft);color:var(--accent)}
-.av.ab1{background:var(--av1-bg);color:var(--av1-tekst)}
+.av.ab1{background:var(--av1-bg);color:var(--plava-tekst)}
 .av.ab2{background:var(--av2-bg);color:var(--green)}
 .av.ab3{background:var(--av3-bg);color:var(--av3-tekst)}
 .av.ab4{background:var(--av4-bg);color:var(--av4-tekst)}
 .av.ab5{background:var(--av5-bg);color:var(--av5-tekst)}
-.av.prazan{background:transparent;border:1.5px dashed var(--border-jaci);color:var(--muted);font-size:14px;font-weight:600}
+.av.prazan{background:transparent;border:1.5px dashed var(--border-jaci);color:var(--muted);font-size:var(--t-meta);font-weight:600}
 .av.servis{background:var(--bg);color:var(--muted)}
 .av.ok{background:var(--green);color:var(--card);border:none;cursor:default}
-.rasp-traj{display:inline-block;font-size:12px;font-weight:600;color:var(--text-2);padding:1px 7px;border-radius:999px;
+.rasp-traj{display:inline-block;font-size:var(--t-sub);font-weight:600;color:var(--text-2);padding:1px 7px;border-radius:999px;
   border:1px solid var(--border);margin-left:2px;vertical-align:1px;line-height:1.4;white-space:nowrap}
 .rasp-traj.prazno{border:1px dashed var(--border-jaci);color:var(--muted)}
 .rasp-gotovo-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;
-  border-top:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+  border-top:1px solid var(--border);font-size:var(--t-label);font-weight:700;text-transform:uppercase;letter-spacing:.4px;
   color:var(--muted);cursor:pointer}
 .rasp-prazno{padding:16px 14px;text-align:left}
-.rasp-prazno .row-sub{margin-top:4px}
-.rasp-prazno .btn-mini{margin-top:12px;margin-right:8px}
+.rasp-prazno .row-sub{margin-top:var(--r1)}
+.rasp-prazno .btn-mini{margin-top:var(--r3);margin-right:var(--r2)}
 /* sheetovi planiranja */
-.rasp-sheet-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-top:12px}
-.rasp-cipovi{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}
+.rasp-sheet-lbl{font-size:var(--t-label);font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-top:var(--r3)}
+.rasp-cipovi{display:flex;flex-wrap:wrap;gap:var(--r2);margin:8px 0 4px}
 .rasp-cip{flex:1 1 calc(50% - 4px);min-height:46px;border-radius:var(--radius-xs);border:1px solid var(--accent-rub);
-  background:var(--card);color:var(--accent);font-size:13.5px;font-weight:650;cursor:pointer;display:flex;flex-direction:column;
+  background:var(--card);color:var(--accent);font-size:var(--t-meta);font-weight:650;cursor:pointer;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:1px;padding:6px 8px;font-family:inherit;line-height:1.2}
-.rasp-cip small{font-size:11px;font-weight:600;color:var(--muted)}
+.rasp-cip small{font-size:var(--t-label);font-weight:600;color:var(--muted)}
 .rasp-cip.preko small{color:var(--red)}
 .rasp-cip.aktivan{background:var(--accent-soft);border-color:var(--accent)}
 .rasp-cip:active{background:var(--accent-soft)}
 .rasp-cip.puni{flex-basis:100%}
 .rasp-cipovi.sati .rasp-cip{flex:1 1 calc(33.33% - 6px)}
-.rasp-plan-br{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-left:auto;padding:0 8px;white-space:nowrap}
+.rasp-plan-br{font-size:var(--t-label);font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-left:auto;padding:0 8px;white-space:nowrap}
 /* FAB */
 .rasp-fab{position:fixed;right:16px;bottom:calc(72px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;
-  background:var(--accent);color:var(--card);border:none;font-size:30px;font-weight:300;line-height:1;box-shadow:var(--sjena-3);
+  background:var(--accent);color:var(--card);border:none;font-size:var(--t-hero);font-weight:300;line-height:1;box-shadow:var(--sjena-3);
   z-index:29;cursor:pointer;transition:transform .12s cubic-bezier(.2,.8,.2,1);font-family:inherit;padding:0 0 3px}
 .rasp-fab:active{transform:scale(.94)}
 /* mikro-animacije */
@@ -437,37 +445,37 @@ h2 .btn-mini{min-height:34px;padding:6px 11px;font-size:12px;text-transform:none
 
 /* ---------- poruke (chat) ---------- */
 .msg{padding:7px 13px}
-.msg-meta{font-size:11px;color:var(--muted);font-weight:600}
-.msg-txt{font-size:14px;background:var(--msg-bg);border-radius:0 10px 10px 10px;padding:8px 11px;margin-top:3px;
+.msg-meta{font-size:var(--t-label);color:var(--muted);font-weight:600}
+.msg-txt{font-size:var(--t-meta);background:var(--msg-bg);border-radius:0 10px 10px 10px;padding:8px 11px;margin-top:3px;
   display:inline-block;max-width:88%;text-align:left}
 .msg.moja{text-align:right}
 .msg.moja .msg-txt{background:var(--accent-soft);border-radius:10px 0 10px 10px}
-.msg-dan{text-align:center;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;
+.msg-dan{text-align:center;font-size:var(--t-tab);font-weight:700;color:var(--muted);text-transform:uppercase;
   letter-spacing:.6px;margin:10px 0 4px}
-.msg-nove{display:flex;align-items:center;gap:8px;color:var(--red);font-size:10.5px;font-weight:700;
+.msg-nove{display:flex;align-items:center;gap:var(--r2);color:var(--red);font-size:var(--t-tab);font-weight:700;
   text-transform:uppercase;letter-spacing:.6px;margin:8px 12px 4px}
 .msg-nove:before,.msg-nove:after{content:'';flex:1;height:1px;background:var(--red-border)}
 .msg.sustav{text-align:center;padding:4px 13px}
-.msg.sustav .msg-txt{background:none;border:none;font-size:12px;color:var(--muted);padding:2px 0;max-width:100%}
+.msg.sustav .msg-txt{background:none;border:none;font-size:var(--t-sub);color:var(--muted);padding:2px 0;max-width:100%}
 .msg.sustav .msg-meta{display:none}
 /* S9: chat-layout — tanka traka umjesto kartice, unos zalijepljen za dno */
 .chat-traka{display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;
-  padding:2px 2px 8px;font-size:12px;color:var(--muted)}
+  padding:2px 2px 8px;font-size:var(--t-sub);color:var(--muted)}
 .chat-traka a{color:var(--accent);font-weight:600;cursor:pointer}
 /* segmented control Poruke│Kontakti — aktivna pilula izdignuta na kartici (iOS uzorak) */
 .seg{display:flex;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;
   padding:3px;gap:3px;margin:var(--r3) 0 10px}
 .seg button{flex:1;border:1px solid transparent;border-radius:9px;min-height:40px;padding:8px 0;
-  font-size:13.5px;font-weight:700;background:transparent;color:var(--muted);cursor:pointer;
+  font-size:var(--t-meta);font-weight:700;background:transparent;color:var(--muted);cursor:pointer;
   transition:background .12s ease,color .12s ease}
 .seg button.aktivan{background:var(--card);color:var(--accent);border-color:var(--accent-rub);
   box-shadow:0 1px 3px var(--tint-siva-10)}
 .msg-form{position:sticky;bottom:calc(78px + env(safe-area-inset-bottom));
-  background:var(--bg);padding-top:8px;margin-top:12px;z-index:5}
+  background:var(--bg);padding-top:var(--r2);margin-top:var(--r3);z-index:5}
 .chat-dolje{position:fixed;left:50%;transform:translateX(-50%);
   bottom:calc(148px + env(safe-area-inset-bottom));z-index:6;min-height:40px;
   background:var(--accent);color:var(--card);border:none;border-radius:20px;
-  padding:9px 18px;font-size:12.5px;font-weight:700;box-shadow:0 2px 8px var(--tint-siva-20);cursor:pointer}
+  padding:9px 18px;font-size:var(--t-sub);font-weight:700;box-shadow:0 2px 8px var(--tint-siva-20);cursor:pointer}
 body[data-role="majstor"] .btn-audit,body[data-role="proizvodnja"] .btn-audit{display:none}
 
 /* ---------- oznaka boje tvrtke ---------- */
@@ -479,11 +487,11 @@ body[data-role="majstor"] .btn-audit,body[data-role="proizvodnja"] .btn-audit{di
 
 /* ---------- loader i toast ---------- */
 #loader{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;
-  border:4px solid var(--rub-svijetli);border-top-color:var(--accent);border-radius:50%;
+  border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;
   animation:spin 1s linear infinite;z-index:90;display:none}
 @keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
 #toast{position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom));transform:translateX(-50%);
-  background:var(--text);color:var(--card);font-size:13.5px;font-weight:600;padding:9px 16px;border-radius:20px;
+  background:var(--text);color:var(--card);font-size:var(--t-meta);font-weight:600;padding:9px 16px;border-radius:20px;
   z-index:95;opacity:0;pointer-events:none;transition:opacity .25s}
 #toast.show{opacity:.94}
 
@@ -494,10 +502,10 @@ body[data-role="majstor"] .btn-audit,body[data-role="proizvodnja"] .btn-audit{di
 
 /* ---------- akcijski gumbi u listama ---------- */
 .okbtn{width:44px;height:44px;border-radius:8px;border:1px solid var(--green-border);background:var(--green-bg);
-  color:var(--green);font-size:16px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1}
+  color:var(--green);font-size:var(--t-body);font-weight:700;cursor:pointer;flex-shrink:0;line-height:1}
 .okbtn:active{background:var(--okbtn-active)}
 .btn-mini{border:1px solid var(--accent-rub);background:var(--card);color:var(--accent);border-radius:7px;
-  padding:11px 13px;min-height:44px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;
+  padding:11px 13px;min-height:44px;font-size:var(--t-sub);font-weight:600;cursor:pointer;white-space:nowrap;
   transition:background .12s ease}   /* dodirna meta 44px — dosljedno s ostatkom sustava (rukavice, žurba) */
 .btn-mini:active{background:var(--accent-soft)}
 .btn-mini.opasno{color:var(--red);border-color:var(--red-border)}
@@ -506,60 +514,60 @@ body[data-role="majstor"] .btn-audit,body[data-role="proizvodnja"] .btn-audit{di
 /* ---------- prekidač HITNO u brzoj prijavi (rukavice, hala, jedan dodir) ---------- */
 .hitno-prekidac{display:flex;align-items:center;gap:11px;margin-top:14px;padding:13px 14px;
   border:1.5px solid var(--red-border);background:var(--red-bg);border-radius:var(--radius-s);
-  font-size:15px;font-weight:700;color:var(--red);cursor:pointer;
+  font-size:var(--t-body);font-weight:700;color:var(--red);cursor:pointer;
   text-transform:none;letter-spacing:0}
 .hitno-prekidac input{width:24px;height:24px;flex-shrink:0;accent-color:var(--red);margin:0}
 /* neutralna inačica za manje dramatične prekidače (Čeka dio, Privremeni popravak,
    Linija otpuštena) — isti raspored i dodirna meta, bez crvenog naglaska HITNO gumba */
-.prekidac{display:flex;align-items:center;gap:11px;margin-top:12px;padding:12px 14px;
+.prekidac{display:flex;align-items:center;gap:11px;margin-top:var(--r3);padding:12px 14px;
   border:1.5px solid var(--border);background:var(--panel-bg);border-radius:var(--radius-s);
-  font-size:14px;font-weight:600;color:var(--text);cursor:pointer;
+  font-size:var(--t-meta);font-weight:600;color:var(--text);cursor:pointer;
   text-transform:none;letter-spacing:0}
 .prekidac input{width:24px;height:24px;flex-shrink:0;accent-color:var(--accent);margin:0}
 
 /* ---------- fotografije kvara ---------- */
 .kthumb{margin-top:7px;max-width:170px;max-height:120px;border-radius:6px;border:1px solid var(--border);display:block;cursor:pointer}
-.foto-prev{display:none;margin-top:8px;max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--border)}
+.foto-prev{display:none;margin-top:var(--r2);max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--border)}
 .foto-full{max-width:100%;border-radius:8px;display:block}
 
 /* ---------- prijava ---------- */
 #screen-login{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;
-  flex-direction:column;align-items:center;justify-content:center;padding:24px}
+  flex-direction:column;align-items:center;justify-content:center;padding:var(--r5)}
 #screen-login.show{display:flex}
 #screen-login{background:linear-gradient(180deg,var(--card) 0%,var(--bg) 55%)}
 .login-box{width:100%;max-width:370px;text-align:center}
 .login-logo{height:76px;margin-bottom:var(--r2)}
-.login-title{font-size:12px;font-weight:700;margin-bottom:var(--r5);color:var(--muted);
+.login-title{font-size:var(--t-sub);font-weight:700;margin-bottom:var(--r5);color:var(--muted);
   text-transform:uppercase;letter-spacing:1px}
-.login-opis{font-size:13px;color:var(--text-2);line-height:1.5;margin:-4px 0 var(--r4)}
+.login-opis{font-size:var(--t-meta);color:var(--text-2);line-height:1.5;margin:-4px 0 var(--r4)}
 /* jedan stupac, po hijerarhiji (vidi loginPrioritet) — direktor gore, tehničar dolje */
 .user-tiles{display:grid;grid-template-columns:1fr;gap:var(--r2);margin-bottom:var(--r4)}
 .user-tile{padding:16px 8px;background:var(--card);border:1.5px solid var(--border);
-  border-radius:var(--radius-s);font-size:15px;font-weight:650;cursor:pointer;box-shadow:var(--sjena-1);
+  border-radius:var(--radius-s);font-size:var(--t-body);font-weight:650;cursor:pointer;box-shadow:var(--sjena-1);
   transition:border-color .14s ease, background .14s ease, transform .1s ease}
 .user-tile:active{transform:scale(.97)}
 .user-tile.sel{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);
   box-shadow:0 0 0 3px var(--accent-soft)}
-.pin-input{text-align:center;font-size:24px;letter-spacing:10px;font-weight:700;padding:14px 12px}
+.pin-input{text-align:center;font-size:var(--t-stat);letter-spacing:10px;font-weight:700;padding:14px 12px}
 .pin-input::placeholder{letter-spacing:normal}
 .pin-wrap{position:relative}
 .pin-oko{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;
-  font-size:19px;cursor:pointer;padding:11px;color:var(--muted);min-width:44px;min-height:44px}   /* AUDIT-FIX: 44px dosljedno s ostatkom sustava (rukavice, žurba) */
-.login-err{color:var(--red);font-size:13px;margin-top:var(--r3);min-height:18px;font-weight:600}
-.login-noga{margin-top:var(--r5);font-size:12.5px;color:var(--text-2);letter-spacing:.3px;line-height:1.8}   /* AUDIT-FIX: --muted na --bg je ~4.43:1, ispod WCAG AA 4.5:1 — ista logika kao komentar iznad */
+  font-size:var(--t-stat);cursor:pointer;padding:11px;color:var(--muted);min-width:44px;min-height:44px}   /* AUDIT-FIX: 44px dosljedno s ostatkom sustava (rukavice, žurba) */
+.login-err{color:var(--red);font-size:var(--t-meta);margin-top:var(--r3);min-height:18px;font-weight:600}
+.login-noga{margin-top:var(--r5);font-size:var(--t-sub);color:var(--text-2);letter-spacing:.3px;line-height:1.8}   /* AUDIT-FIX: --muted na --bg je ~4.43:1, ispod WCAG AA 4.5:1 — ista logika kao komentar iznad */
 .login-noga a{color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline;
   display:inline-block;padding:4px 2px}   /* demo nije ravnopravan "Prijavi se" — tekstualni link, ne gumb */
 
 /* ---------- demo banner ---------- */
 .demo-banner{background:var(--yellow-bg);color:var(--yellow);border-bottom:1px solid var(--yellow-border);
-  font-size:11.5px;font-weight:600;padding:5px 10px;display:flex;align-items:center;
-  justify-content:space-between;gap:8px;flex-wrap:wrap}
+  font-size:var(--t-label);font-weight:600;padding:5px 10px;display:flex;align-items:center;
+  justify-content:space-between;gap:var(--r2);flex-wrap:wrap}
 .demo-uloga{display:flex;align-items:center;gap:5px;white-space:nowrap}
 .demo-uloga select{font:inherit;font-weight:700;padding:4px 6px;border-radius:6px;min-height:28px;
   border:1px solid var(--yellow-border);background:var(--card);color:var(--text)}
 
 /* ---------- offline traka ---------- */
-.off-traka{position:sticky;top:0;z-index:29;background:var(--off-traka-bg);color:var(--card);font-size:12px;font-weight:600;
+.off-traka{position:sticky;top:0;z-index:29;background:var(--off-traka-bg);color:var(--card);font-size:var(--t-sub);font-weight:600;
   text-align:center;padding:6px 10px}
 .off-traka.ceka{background:var(--yellow-bg);color:var(--yellow);border-bottom:1px solid var(--yellow-border)}
 .off-traka a{color:inherit;text-decoration:underline;cursor:pointer;font-weight:700}
@@ -581,7 +589,7 @@ body:not([data-role="voditelj"]) .kvar-akcije-grid{grid-template-columns:1fr !im
 body:not([data-role="voditelj"]) #screen-raspored .rasp-hero-grid{grid-template-columns:repeat(2,1fr) !important}
 
 /* ---------- sesija / izvoz ---------- */
-.session-row{margin-top:22px;text-align:center;font-size:12px;color:var(--muted)}
+.session-row{margin-top:22px;text-align:center;font-size:var(--t-sub);color:var(--muted)}
 .session-row a{color:var(--accent);font-weight:600;cursor:pointer;text-decoration:none}
 
 /* ---------- ispis IFS izvještaja ---------- */
@@ -621,20 +629,20 @@ body:not([data-role="voditelj"]) #screen-raspored .rasp-hero-grid{grid-template-
 .kvar-item{padding:11px 13px;border-bottom:1px solid var(--border)}
 .kvar-item:last-child{border-bottom:none}
 .kvar-item.click{cursor:pointer}
-.kvar-item.click:active{background:var(--hover-bg-2)}
-.kvar-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:12px;color:var(--muted)}
-.kvar-opis{font-size:14.5px;font-weight:650;margin-top:4px;line-height:1.35}   /* opis je glavna stvar na kartici — sve ostalo je prigušeno */
-.kvar-meta{font-size:12px;color:var(--muted);margin-top:4px}
+.kvar-item.click:active{background:var(--hover-bg)}
+.kvar-top{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--r2);font-size:var(--t-sub);color:var(--muted)}
+.kvar-opis{font-size:var(--t-body);font-weight:650;margin-top:var(--r1);line-height:1.35}   /* opis je glavna stvar na kartici — sve ostalo je prigušeno */
+.kvar-meta{font-size:var(--t-sub);color:var(--muted);margin-top:var(--r1)}
 .kvar-meta b{color:var(--text)}
 /* brze radnje na kartici: dodjela i "čeka dio" bez otvaranja punog obrasca */
-.kvar-brzo{display:flex;gap:7px;align-items:center;margin-top:8px}
-.kvar-brzo select{width:auto;flex:1;min-width:0;font-size:14px;padding:10px 26px 10px 9px;
+.kvar-brzo{display:flex;gap:7px;align-items:center;margin-top:var(--r2)}
+.kvar-brzo select{width:auto;flex:1;min-width:0;font-size:var(--t-meta);padding:10px 26px 10px 9px;
   min-height:42px;border-radius:7px;background-position:right 8px center}
 .kvar-brzo .btn-mini{flex-shrink:0}
 .kvar-brzo .btn-mini.aktivan{background:var(--yellow-bg);color:var(--yellow);border-color:var(--yellow-border)}
 
 /* ---------- filters / buttons ---------- */
-.filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:var(--r2);margin-bottom:10px}
 .filters select:first-child{grid-column:1 / -1}
 /* iOS: date input ima intrinzičnu širinu koja ignorira width:100% u gridu
    pa izlazi van ruba ekrana — min-width:0 na stavci grida + kapa na inputu */
@@ -642,48 +650,48 @@ body:not([data-role="voditelj"]) #screen-raspored .rasp-hero-grid{grid-template-
 .filters input[type="date"]{max-width:100%;min-width:0;min-height:46px;
   -webkit-appearance:none;appearance:none}
 select,input,textarea{width:100%;border:1.5px solid var(--border-jaci);border-radius:var(--radius-s);
-  background:var(--card);padding:11px 12px;font-size:16px;font-family:inherit;color:var(--text);
+  background:var(--card);padding:11px 12px;font-size:var(--t-body);font-family:inherit;color:var(--text);
   transition:border-color .14s ease, box-shadow .14s ease}  /* 16px: sprječava iOS auto-zoom */
 select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);
   box-shadow:0 0 0 3px var(--accent-soft)}
 select{appearance:none;-webkit-appearance:none;padding-right:34px;
   background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%2368727f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 12px center}
-.filters select{font-size:16px;padding:10px 8px}
-.filtar-oznaka{display:block;font-size:10.5px;font-weight:700;color:var(--muted);
+.filters select{font-size:var(--t-body);padding:10px 8px}
+.filtar-oznaka{display:block;font-size:var(--t-tab);font-weight:700;color:var(--muted);
   text-transform:uppercase;letter-spacing:.4px;margin:0 0 3px}
 /* ---------- jedinstven sustav gumba ---------- */
 .btn{border:1.5px solid transparent;border-radius:var(--radius-s);padding:12px 16px;min-height:46px;
-  font-size:15px;font-weight:650;line-height:1.2;cursor:pointer;letter-spacing:-.1px;
+  font-size:var(--t-body);font-weight:650;line-height:1.2;cursor:pointer;letter-spacing:-.1px;
   transition:background .14s ease, border-color .14s ease, transform .1s ease, box-shadow .14s ease}
 .btn:active{transform:scale(.985)}
 .btn.primary{background:var(--accent);color:var(--card);border-color:var(--accent);box-shadow:var(--sjena-1)}
 .btn.primary:active{background:var(--accent-dark);border-color:var(--accent-dark)}
 .btn.sec{background:var(--card);color:var(--accent);border-color:var(--accent-rub)}
 .btn.sec:active{background:var(--accent-soft)}
-.btn.sm{padding:10px 13px;min-height:44px;font-size:13.5px}
+.btn.sm{padding:10px 13px;min-height:44px;font-size:var(--t-meta)}
 .btn.block{display:block;width:100%}
-.btn.sec.block{margin-bottom:12px}
+.btn.sec.block{margin-bottom:var(--r3)}
 .btn:disabled{opacity:.55;cursor:default}
 .btn.opasno{color:var(--red);border-color:var(--red-border);background:var(--card)}
 .btn.opasno:active{background:var(--red-bg)}
 .btn.block{display:block;width:100%}
-.btn-new{margin-bottom:12px}
-.back{background:none;border:none;color:var(--accent);font-size:15px;font-weight:600;
-  cursor:pointer;padding:10px 12px 12px 0;min-height:44px;display:inline-flex;align-items:center;gap:4px}
+.btn-new{margin-bottom:var(--r3)}
+.back{background:none;border:none;color:var(--accent);font-size:var(--t-body);font-weight:600;
+  cursor:pointer;padding:10px 12px 12px 0;min-height:44px;display:inline-flex;align-items:center;gap:var(--r1)}
 
 /* ---------- machine detail ---------- */
 .detail-head{padding:14px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-.detail-name{font-size:18px;font-weight:700}
-.detail-sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+.detail-name{font-size:var(--t-title);font-weight:700}
+.detail-sub{font-size:var(--t-sub);color:var(--muted);margin-top:2px}
 
 /* ---------- parts qty ---------- */
 .qty{display:flex;align-items:center;gap:7px;flex-shrink:0}
 .qbtn{width:44px;height:44px;border-radius:8px;border:1px solid var(--qbtn-rub);background:var(--card);
-  font-size:18px;line-height:1;color:var(--accent);cursor:pointer;font-weight:700}
+  font-size:var(--t-title);line-height:1;color:var(--accent);cursor:pointer;font-weight:700}
 .qbtn:active{background:var(--accent-soft)}
-.qval{min-width:52px;text-align:center;font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
-.qval span{display:block;font-size:10px;color:var(--muted);font-weight:500}
+.qval{min-width:52px;text-align:center;font-weight:700;font-size:var(--t-body);font-variant-numeric:tabular-nums}
+.qval span{display:block;font-size:var(--t-tab);color:var(--muted);font-weight:500}
 .qval.low{color:var(--red)}
 /* rastvoreni detalji dijela — radnje se pojave tek na dodir retka */
 .dio-info{padding:0 13px 9px;border-bottom:1px solid var(--border)}
@@ -708,24 +716,24 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;
 .modal:before{content:'';display:block;width:38px;height:4px;border-radius:2px;background:var(--border-jaci);
   margin:-4px auto 12px}
 @keyframes slideup{from{transform:translateY(32px);opacity:0}to{transform:none;opacity:1}}
-@media(min-width:640px){.overlay{align-items:center;padding:24px}.modal{border-radius:14px}}
-.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.modal-head h3{font-size:17px;font-weight:700}
-.x{background:var(--rub-svijetli);border:none;width:44px;height:44px;border-radius:50%;font-size:19px;
+@media(min-width:640px){.overlay{align-items:center;padding:var(--r5)}.modal{border-radius:14px}}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--r3)}
+.modal-head h3{font-size:var(--t-title);font-weight:700}
+.x{background:var(--border);border:none;width:44px;height:44px;border-radius:50%;font-size:var(--t-stat);
   color:var(--muted);cursor:pointer;line-height:1}
-form label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin:14px 0 5px;
+form label{display:block;font-size:var(--t-label);font-weight:700;color:var(--muted);margin:14px 0 5px;
   text-transform:uppercase;letter-spacing:.5px}
 form .btn{margin-top:20px}
-.modal-head h3{font-size:17px;font-weight:700;letter-spacing:-.2px}
+.modal-head h3{font-size:var(--t-title);font-weight:700;letter-spacing:-.2px}
 
 /* ---------- audit ---------- */
-.audit{font-size:13.5px}
-.audit .a-meta{color:var(--muted);font-size:12px;margin:-6px 0 12px}
-.audit h4{font-size:13px;margin:16px 0 6px;padding-bottom:4px;border-bottom:2px solid var(--accent);color:var(--accent)}
+.audit{font-size:var(--t-meta)}
+.audit .a-meta{color:var(--muted);font-size:var(--t-sub);margin:-6px 0 12px}
+.audit h4{font-size:var(--t-meta);margin:16px 0 6px;padding-bottom:var(--r1);border-bottom:2px solid var(--accent);color:var(--accent)}
 .audit .a-item{padding:6px 0;border-bottom:1px solid var(--border)}
 .audit .a-item:last-child{border-bottom:none}
-.audit .a-m{font-weight:700;font-size:13px;margin-top:9px}
-.audit .a-sub{color:var(--muted);font-size:12.5px}
+.audit .a-m{font-weight:700;font-size:var(--t-meta);margin-top:9px}
+.audit .a-sub{color:var(--muted);font-size:var(--t-sub)}
 .audit .late{color:var(--red);font-weight:700}
 
 /* ---------- tab bar ---------- */
@@ -746,7 +754,7 @@ body[data-role="majstor"] #tabbar [data-tab="strojevi"],
 body[data-role="proizvodnja"] #tabbar [data-tab="strojevi"],
 body[data-role="proizvodnja"] #tabbar [data-tab="dijelovi"]{display:none}
 .tab{position:relative;background:none;border:none;padding:9px 1px 10px;display:flex;flex-direction:column;
-  align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;
+  align-items:center;gap:3px;font-size:var(--t-tab);font-weight:600;color:var(--muted);cursor:pointer;
   transition:color .14s ease}
 .tab svg{width:21px;height:21px;transition:transform .14s ease}
 .tab.active{color:var(--accent)}
@@ -754,7 +762,7 @@ body[data-role="proizvodnja"] #tabbar [data-tab="dijelovi"]{display:none}
 .tab.active:before{content:'';position:absolute;top:0;left:24%;right:24%;height:2.5px;
   border-radius:0 0 3px 3px;background:var(--accent)}
 .tab .dot{position:relative}
-.badge{position:absolute;top:-5px;right:-10px;background:var(--red);color:var(--card);font-size:10.5px;
+.badge{position:absolute;top:-5px;right:-10px;background:var(--red);color:var(--card);font-size:var(--t-tab);
   font-weight:700;min-width:17px;height:17px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px}
 </style>
 <style id="qr-print-stil"></style><!-- dinamički raspored naljepnica na A4 arku; puni ga renderQR, prazni showScreen -->
@@ -800,7 +808,7 @@ body[data-role="proizvodnja"] #tabbar [data-tab="dijelovi"]{display:none}
       onkeydown="if(event.key==='Enter')app.prijava()">
     <button type="button" class="pin-oko" onclick="app.pinOko('pin',this)" aria-label="Prikaži PIN"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
   </div>
-  <button class="btn primary block" style="margin-top:12px" onclick="app.prijava()">Prijavi se</button>
+  <button class="btn primary block" style="margin-top:var(--r3)" onclick="app.prijava()">Prijavi se</button>
   <div class="login-err" id="login-err"></div>
   <div class="login-noga">Sustav za upravljanje održavanjem<br>
     <a onclick="app.demoUlaz()">Pogledaj demo s probnim podacima</a></div>
@@ -985,10 +993,10 @@ if(TREBA_BAZU && !REMOTE){
   document.addEventListener('DOMContentLoaded', function(){
     document.body.innerHTML =
       '<div style="padding:28px;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;text-align:center">'+
-      '<h2 style="color:var(--red);font-size:19px;margin-bottom:10px">Aplikacija se nije mogla pokrenuti</h2>'+
-      '<p style="font-size:15px;line-height:1.5;color:var(--text-3)">Nedostaje dio programa (vendor/supabase-js.js).<br>'+
+      '<h2 style="color:var(--red);font-size:var(--t-stat);margin-bottom:10px">Aplikacija se nije mogla pokrenuti</h2>'+
+      '<p style="font-size:var(--t-body);line-height:1.5;color:var(--text-3)">Nedostaje dio programa (vendor/supabase-js.js).<br>'+
       'Osvježi stranicu. Ako se ponovi, javi voditelju — <b>ne unosi kvarove</b> jer se ne bi spremili.</p>'+
-      '<button onclick="location.reload()" style="margin-top:16px;padding:12px 18px;font-size:15px;font-weight:600;'+
+      '<button onclick="location.reload()" style="margin-top:var(--r4);padding:12px 18px;font-size:var(--t-body);font-weight:600;'+
       'background:var(--accent);color:var(--card);border:none;border-radius:9px">Pokušaj ponovno</button></div>';
   });
   throw new Error('supabase-js nije ucitan — prekidam pokretanje');
@@ -2028,7 +2036,7 @@ function renderPregled(){
           if(narudzba && narudzba.ocekivano) gotovo = ' &middot; dio stiže ~'+fmtDate(narudzba.ocekivano);
         }
         return '<div class="row click" onclick="app.detaljKvara(\''+k.id+'\')">'+
-          '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(sm.name)+
+          '<div class="grow"><div class="row-title" style="font-size:var(--t-meta)">'+esc(sm.name)+
             (k.prioritet==='hitno' ? ' <span class="chip kvar">HITNO</span>' : '')+
             (k.ceka_dio ? ' <span class="chip upoz">Čeka dio · stoji</span>' : '')+
             (k.ceka_servis ? ' <span class="chip servis">Čeka servis</span>' : '')+'</div>'+
@@ -2099,8 +2107,8 @@ function renderPregled(){
       if(c > najveciTrosak){ najveciTrosak = c; najveciK = k; }
     });
     var najveciRedak = najveciK && najveciTrosak > 0
-      ? '<div class="row click" onclick="app.detaljKvara(\''+najveciK.id+'\')" style="margin-top:8px">'+
-          '<div class="grow"><div class="row-title" style="font-size:13.5px">Najveći zastoj: '+
+      ? '<div class="row click" onclick="app.detaljKvara(\''+najveciK.id+'\')" style="margin-top:var(--r2)">'+
+          '<div class="grow"><div class="row-title" style="font-size:var(--t-meta)">Najveći zastoj: '+
             esc((machineById(najveciK.m)||{name:'—'}).name)+'</div>'+
           '<div class="row-sub">'+(trajanjeKvara(najveciK)||H(najveciK.sati))+' &middot; '+EUR(najveciTrosak)+
             (jeOtvoren(najveciK) ? ' &middot; u tijeku' : '')+'</div></div>'+
@@ -2127,7 +2135,7 @@ function renderPregled(){
         /* SIM-FIX (§16 rupa "Analitika" — tri slabe mete): iznos u eurima više nije dodir
            (tri mete za istu radnju svode se na jednu), a diskretni sivi tekst postaje prava
            pilula — isti uzorak (.rasp-skok) kao "Danas ›" na Rasporedu, min. 44px za dodir. */
-        '<button class="rasp-skok" style="margin-top:8px;min-height:44px" onclick="app.go(\'analitika\')">Analitika i izvoz ›</button>'+
+        '<button class="rasp-skok" style="margin-top:var(--r2);min-height:44px" onclick="app.go(\'analitika\')">Analitika i izvoz ›</button>'+
       '</div><div><div class="rasp-smjena">prvih '+danMj+' dana</div>'+
         (uTijekuCost > 0 ? '<div class="rasp-smjena-jos">+ '+EUR(uTijekuCost)+' još traje</div>' : '')+'</div></div>'+
       najveciRedak+
@@ -2224,12 +2232,12 @@ function renderStrojevi(){
   $('#screen-strojevi').innerHTML =
     /* "gdje dodajem sektore?" (korisnikov feedback) — sektori se uređuju u postavkama
        tvrtke, ali put do njih mora biti vidljiv baš ovdje gdje se sektori i koriste */
-    '<div class="role-voditelj" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">'+
+    '<div class="role-voditelj" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--r2);margin-bottom:var(--r3)">'+
     '<button class="btn sec" onclick="app.noviStroj()">+ Novi stroj</button>'+
     '<button class="btn sec" onclick="app.urediTvrtku()">Sektori</button>'+
     '<button class="btn sec" onclick="app.go(\'qr\')">QR naljepnice</button></div>'+
     '<input type="search" placeholder="Pretraži strojeve (naziv, sektor…)" value="'+esc(STROJ_Q)+'"'+
-      ' oninput="app.traziStroj(this.value)" style="margin-bottom:4px">'+
+      ' oninput="app.traziStroj(this.value)" style="margin-bottom:var(--r1)">'+
     '<div id="strojevi-lista">'+strojeviListaHtml()+'</div>';
 }
 function machineRow(m){
@@ -2271,7 +2279,7 @@ function renderStroj(){
        redak imao stalni gumb "Uredi" dok je Raspored za istu stavku nudio samo ✓ i
        klik-kroz izbornik; "Uredi" je sad među radnjama u zajedničkom akcijeStavke() listu. */
     return '<div class="row click" onclick="app.akcijeStavke(\'preventiva\',\''+p.id+'\')"><div class="grow">'+
-      '<div class="row-title" style="font-size:13.5px">'+esc(p.opis)+
+      '<div class="row-title" style="font-size:var(--t-meta)">'+esc(p.opis)+
         (p.zaustavlja_liniju ? ' <span class="chip upoz">Zaustavlja liniju</span>' : '')+'</div>'+
       '<div class="row-sub">'+esc(p.interval)+' &middot; sljedeće: '+fmtDate(p.next)+izv+dod+traj+'</div>'+zadnje+
       '</div>'+(late ? '<div class="row-right"><span class="chip upoz">Kasni</span></div>' : '')+'</div>';
@@ -2296,11 +2304,11 @@ function renderStroj(){
       (mttr ? ' &middot; prosj. trajanje popravka: <b>'+H(mttr)+'</b>' : '')+'</div>'+
       '<div style="margin-top:7px"><button class="btn-mini role-voditelj" onclick="app.urediStroj(\''+m.id+'\')">Uredi stroj</button></div></div>'+
       statusChip(machineStatus(m.id))+'</div></div>'+
-    '<button class="btn primary block role-write" style="margin-bottom:4px" onclick="app.prijaviZaStroj(\''+m.id+'\')">Prijavi kvar na ovom stroju</button>'+
+    '<button class="btn primary block role-write" style="margin-bottom:var(--r1)" onclick="app.prijaviZaStroj(\''+m.id+'\')">Prijavi kvar na ovom stroju</button>'+
     '<h2>Plan redovnih pregleda</h2><div class="card">'+prevHtml+'</div>'+
-    '<button class="btn sec sm block role-write" style="margin-top:8px" onclick="app.novaPreventiva(\''+m.id+'\')">+ Dodaj stavku redovnog pregleda</button>'+
+    '<button class="btn sec sm block role-write" style="margin-top:var(--r2)" onclick="app.novaPreventiva(\''+m.id+'\')">+ Dodaj stavku redovnog pregleda</button>'+
     '<h2>Bilješke o stroju</h2><div class="card"><div style="padding:11px 13px">'+
-      (m.bilj ? '<div style="font-size:13.5px;white-space:pre-wrap">'+esc(m.bilj)+'</div>'
+      (m.bilj ? '<div style="font-size:var(--t-meta);white-space:pre-wrap">'+esc(m.bilj)+'</div>'
               : '<div class="row-sub">Nema bilješki (manual, serijski broj, napomene o servisu…)</div>')+
       '<button class="btn sec sm role-voditelj" style="margin-top:9px" onclick="app.urediBiljeske(\''+m.id+'\')">Uredi bilješke</button>'+
     '</div></div>'+
@@ -2311,7 +2319,7 @@ function renderStroj(){
         .sort(function(a,b){ return String(b.created_at).localeCompare(String(a.created_at)); });
       var dokHtml = dok.length ? dok.map(function(d){
         return '<div class="row click" onclick="app.otvoriDokument(\''+d.id+'\')">'+
-          '<div class="grow"><div class="row-title" style="font-size:13.5px">'+dokIkona(d.tip)+' '+esc(d.naziv)+'</div>'+
+          '<div class="grow"><div class="row-title" style="font-size:var(--t-meta)">'+dokIkona(d.tip)+' '+esc(d.naziv)+'</div>'+
           '<div class="row-sub">'+dokTipLabel(d.tip)+(d.tko?' &middot; '+esc(d.tko):'')+
             ' &middot; '+fmtDate(localDT(d.created_at).d)+(velicinaTxt(d.velicina)?' &middot; '+velicinaTxt(d.velicina):'')+'</div></div>'+
           '<button class="btn-mini opasno role-voditelj" onclick="event.stopPropagation();app.obrisiDokument(\''+d.id+'\')">Obriši</button>'+
@@ -2319,8 +2327,8 @@ function renderStroj(){
       }).join('') : '<div class="empty">Nema dokumenata (manual, shema, zapisnik servisa…)</div>';
       return '<h2>Dokumenti</h2><div class="card">'+dokHtml+'</div>'+
         (naMrezi()
-          ? '<button class="btn sec sm block role-write" style="margin-top:8px" onclick="app.dodajDokument(\''+m.id+'\')">+ Dodaj dokument</button>'
-          : '<div class="row-sub role-write" style="margin-top:8px">Dokumenti se dodaju kad ima mreže.</div>');
+          ? '<button class="btn sec sm block role-write" style="margin-top:var(--r2)" onclick="app.dodajDokument(\''+m.id+'\')">+ Dodaj dokument</button>'
+          : '<div class="row-sub role-write" style="margin-top:var(--r2)">Dokumenti se dodaju kad ima mreže.</div>');
     })()+
     (function(){
       /* Kartica znanja: što se najčešće kvari na ovom stroju i čime je riješeno.
@@ -2341,7 +2349,7 @@ function renderStroj(){
         red.map(function(g){
           var rj = Object.keys(g.rjesenja).sort(function(a,b){ return g.rjesenja[b]-g.rjesenja[a]; });
           return '<div class="row"><div class="grow">'+
-            '<div class="row-title" style="font-size:13.5px">'+esc(g.primjer.opis)+
+            '<div class="row-title" style="font-size:var(--t-meta)">'+esc(g.primjer.opis)+
               ' <span class="rep">'+g.n+'×</span></div>'+
             '<div class="row-sub">prosječno '+H(g.sati/g.n)+' po zahvatu'+
               (rj.length ? ' &middot; rješenje: <b style="color:var(--text)">'+esc(rj[0])+'</b>' : '')+
@@ -2495,11 +2503,11 @@ function renderKvarovi(){
        §16 P1: "Detaljno" (10 polja: dodjela/prioritet/kategorija/status) je voditeljev alat za
        povijesni/potpuni unos — tehničaru i proizvodnji ostaje samo ⚡ Brza prijava, puna širina
        (.kvar-akcije-grid se sažima na 1 stupac kad Detaljno nije vidljivo, vidi CSS). */
-    '<div class="role-write role-prijava kvar-akcije-grid" style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:12px;align-items:stretch">'+
+    '<div class="role-write role-prijava kvar-akcije-grid" style="display:grid;grid-template-columns:2fr 1fr;gap:var(--r2);margin-bottom:var(--r3);align-items:stretch">'+
       '<button class="btn primary role-write role-prijava" onclick="app.brzaPrijava()">⚡ Brza prijava</button>'+
       '<button class="btn sec sm role-voditelj" onclick="app.noviKvar()">Detaljno</button>'+
     '</div>'+
-    '<div style="display:flex;gap:8px;margin-bottom:10px">'+
+    '<div style="display:flex;gap:var(--r2);margin-bottom:10px">'+
       '<input type="search" value="'+esc(FILTER.q)+'" placeholder="Pretraži opis…" oninput="app.setFilterTiho(\'q\',this.value)" style="flex:1">'+
       '<button class="btn sec" style="flex-shrink:0" onclick="app.prekidacFiltre()">Filtri'+(nAkt?' ('+nAkt+')':'')+'</button>'+
     '</div>'+
@@ -2566,7 +2574,7 @@ function partRow(p){
      Dobavljač, cijena, +/- i gumbi otvore se dodirom na redak. */
   var preostaloNar = nar ? nar.kolicina - (nar.primljena_kolicina||0) : 0;
   var glava = '<div class="row click" onclick="app.otvoriDio(\''+p.id+'\')">'+
-    '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(p.naziv)+chip+'</div>'+
+    '<div class="grow"><div class="row-title" style="font-size:var(--t-meta)">'+esc(p.naziv)+chip+'</div>'+
     (otvoren ? '<div class="row-sub">'+esc(p.stroj)+' &middot; '+esc(p.dob)+
        (p.lokacija ? ' &middot; '+esc(p.lokacija) : '')+
        (vidiFinancije() ? ' &middot; '+EUR(p.cijena) : '')+
@@ -2581,7 +2589,7 @@ function partRow(p){
   var povijestN = (DATA.nabava||[]).filter(function(n){ return n.dio_id===p.id; })
     .sort(function(a,b){ return String(b.narucen).localeCompare(String(a.narucen)); }).slice(0,3);
   var infoHtml = (potr.komada
-      ? '<div class="row-sub" style="margin-top:8px">Potrošeno zadnjih 6 mj.: <b style="color:var(--text)">'+
+      ? '<div class="row-sub" style="margin-top:var(--r2)">Potrošeno zadnjih 6 mj.: <b style="color:var(--text)">'+
         potr.komada+' kom</b> (u '+potr.zahvata+(potr.zahvata===1?' kvaru':' kvarova')+')</div>'
       : '')+
     (povijestN.length
@@ -2692,7 +2700,7 @@ function nabavaRedak(n){
   var d = dioPoId(n.dio_id) || { naziv:'—' };
   var kasni = n.ocekivano && n.ocekivano < todayISO();
   return '<div class="row"><div class="grow">'+
-    '<div class="row-title" style="font-size:13.5px">'+esc(d.naziv)+' &times;'+n.kolicina+
+    '<div class="row-title" style="font-size:var(--t-meta)">'+esc(d.naziv)+' &times;'+n.kolicina+
       (kasni ? ' <span class="chip kvar">Kasni isporuka</span>' : '')+'</div>'+
     '<div class="row-sub">'+esc(n.dobavljac||'—')+' &middot; naručeno '+fmtDate(n.narucen)+
       (n.ocekivano ? ' &middot; očekivano '+fmtDate(n.ocekivano) : '')+
@@ -2710,11 +2718,11 @@ function renderNabava(){
     '<button class="back" onclick="app.go(\'dijelovi\')">‹ Skladište</button>'+
     /* AUDIT-FIX (UX): korisnik koji stigne preko brojke "Za naručiti" s Pregleda nije
        nigdje vidio ime ekrana na kojem se nalazi — jedini orijentir bio je gumb "natrag". */
-    '<div style="font-size:18px;font-weight:700;margin:4px 0 10px">Nabava</div>'+
+    '<div style="font-size:var(--t-title);font-weight:700;margin:4px 0 10px">Nabava</div>'+
     '<h2>Za naručiti ('+zaNar.length+')</h2>'+
     '<div class="card">'+ (zaNar.length ? zaNar.map(function(p){
       return '<div class="row"><div class="grow">'+
-        '<div class="row-title" style="font-size:13.5px">'+esc(p.naziv)+'</div>'+
+        '<div class="row-title" style="font-size:var(--t-meta)">'+esc(p.naziv)+'</div>'+
         '<div class="row-sub">stanje <b style="color:var(--red)">'+p.stanje+'</b> / min '+p.min+
           ' &middot; '+esc(p.dob||'bez dobavljača')+
           (vidiFinancije() ? ' &middot; '+EUR(p.cijena) : '')+'</div>'+
@@ -2725,7 +2733,7 @@ function renderNabava(){
     '<div class="card">'+ (otv.length ? otv.map(nabavaRedak).join('')
       : '<div class="empty">Nema otvorenih narudžbi.</div>')+'</div>'+
     (vidiFinancije() && vrijednostNarudzbi
-      ? '<div class="row-sub" style="text-align:center;margin-top:8px">Vrijednost otvorenih narudžbi: <b style="color:var(--text)">'+EUR(vrijednostNarudzbi)+'</b></div>' : '')+
+      ? '<div class="row-sub" style="text-align:center;margin-top:var(--r2)">Vrijednost otvorenih narudžbi: <b style="color:var(--text)">'+EUR(vrijednostNarudzbi)+'</b></div>' : '')+
     (function(){
       var primljene = (DATA.nabava||[]).filter(function(n){ return n.primljeno; })
         .sort(function(a,b){ return String(b.primljeno).localeCompare(String(a.primljeno)); }).slice(0,10);
@@ -2733,7 +2741,7 @@ function renderNabava(){
       return '<h2>Zadnje primljeno</h2><div class="card">'+primljene.map(function(n){
         var d = dioPoId(n.dio_id) || {naziv:'—'};
         return '<div class="row"><div class="grow">'+
-          '<div class="row-title" style="font-size:13.5px">'+esc(d.naziv)+' &times;'+(n.primljena_kolicina||n.kolicina)+'</div>'+
+          '<div class="row-title" style="font-size:var(--t-meta)">'+esc(d.naziv)+' &times;'+(n.primljena_kolicina||n.kolicina)+'</div>'+
           '<div class="row-sub">'+esc(n.dobavljac||'—')+' &middot; primljeno '+fmtDate(n.primljeno)+
             (vidiFinancije() && n.cijena ? ' &middot; '+EUR(n.cijena*(n.primljena_kolicina||n.kolicina)) : '')+'</div>'+
         '</div></div>';
@@ -2749,7 +2757,7 @@ function renderDijelovi(){
        zaprimanje isporuke RLS već dopušta tehničaru — kombi dostavi kutiju, a tehničar dosad
        nije mogao ni otvoriti Nabavu da digne stepper. "Nabava" je zato role-write; "+ Novi dio"
        (šifrarnik/cijena) ostaje isključivo voditeljev. */
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--r2);margin-bottom:var(--r3)">'+
       '<button class="btn primary role-write" style="position:relative" onclick="app.go(\'nabava\')">Nabava'+
         (function(){
           var otv = otvoreneNarudzbe();
@@ -2761,8 +2769,8 @@ function renderDijelovi(){
       '<button class="btn sec role-voditelj" onclick="app.noviDio()">+ Novi dio</button>'+
     '</div>'+
     '<input type="search" placeholder="Pretraži skladište (naziv, stroj, dobavljač…)" value="'+esc(PART_Q)+'"'+
-      ' oninput="app.traziDio(this.value)" style="margin-bottom:4px">'+
-    '<div class="row-sub" style="margin-top:8px">'+
+      ' oninput="app.traziDio(this.value)" style="margin-bottom:var(--r1)">'+
+    '<div class="row-sub" style="margin-top:var(--r2)">'+
       (vidiFinancije() ? 'Vrijednost skladišta: <b style="color:var(--text)">'+EUR(vrijednost)+'</b> &middot; ' : '')+
       'ispod minimuma: <b style="color:'+(ispodMin?'var(--red)':'var(--green)')+'">'+ispodMin+'</b></div>'+
     '<div id="parts-list">'+partsListHtml()+'</div>';
@@ -2783,7 +2791,7 @@ function partnerRow(pt){
   var voditelj = SESSION.role === 'voditelj';
   return '<div class="row'+(voditelj?' click':'')+'"'+
     (voditelj ? ' onclick="app.urediPartnera(\''+pt.id+'\')"' : '')+'><div class="grow">'+
-    '<div class="row-title" style="font-size:13.5px">'+esc(pt.naziv)+'</div>'+
+    '<div class="row-title" style="font-size:var(--t-meta)">'+esc(pt.naziv)+'</div>'+
     '<div class="row-sub">'+esc(pt.usluga)+' &middot; '+esc(pt.mjesto)+(pt.nap?' &middot; '+esc(pt.nap):'')+'</div>'+
     kontakt+
   '</div>'+(voditelj ? '<span class="chev">›</span>' : '')+'</div>';
@@ -2824,9 +2832,9 @@ function renderKontakti(){
   $('#screen-kontakti').innerHTML =
     segmentPorukeKontakti('kontakti')+
     '<input type="search" placeholder="Pretraži kontakte (naziv, usluga, mjesto…)" value="'+esc(KONT_Q)+'"'+
-      ' oninput="app.traziKontakt(this.value)" style="margin-bottom:4px">'+
+      ' oninput="app.traziKontakt(this.value)" style="margin-bottom:var(--r1)">'+
     '<div id="kontakti-list">'+kontaktiListHtml()+'</div>'+
-    '<button class="btn sec sm block role-voditelj" style="margin-top:8px" onclick="app.noviPartner()">+ Novi dobavljač / servis</button>';
+    '<button class="btn sec sm block role-voditelj" style="margin-top:var(--r2)" onclick="app.noviPartner()">+ Novi dobavljač / servis</button>';
 }
 
 /* =====================  render: Analitika (voditelj/direktor)  ===================== */
@@ -3042,7 +3050,7 @@ function renderAnalitika(){
     (osobaRedovi.length ? '<h2>Sati po osobi</h2><div class="card" style="padding:4px 0">'+
       tbl(['Osoba','Kvarovi','Redovni pregledi','Ukupno'], osobaRedovi)+'</div>' : '')+
     '<button class="btn primary block" style="margin-top:14px" onclick="app.izvozAnalitika()">Izvoz CSV — odabrano razdoblje</button>'+
-    '<button class="btn sec block" style="margin-top:8px" onclick="app.analitikaIspis()">Ispis / PDF analitike</button>';
+    '<button class="btn sec block" style="margin-top:var(--r2)" onclick="app.analitikaIspis()">Ispis / PDF analitike</button>';
 }
 
 /* =====================  render: Raspored — organizacija tjedna  =====================
@@ -3075,7 +3083,7 @@ function sanacijaRedak(k){
   var m = machineById(k.m) || {name:'—'};
   var kasni = k.rok_sanacije < todayISO();
   return '<div class="row click" onclick="app.detaljKvara(\''+k.id+'\')">'+
-    '<div class="grow"><div class="row-title" style="font-size:13.5px">Sanacija: '+esc(k.opis)+'</div>'+
+    '<div class="grow"><div class="row-title" style="font-size:var(--t-meta)">Sanacija: '+esc(k.opis)+'</div>'+
     '<div class="row-sub">'+esc(m.name)+' &middot; rok '+fmtDate(k.rok_sanacije)+
       (kasni ? ' &middot; <b style="color:var(--red)">kasni</b>' : '')+'</div></div>'+
   '</div>';
@@ -3086,7 +3094,7 @@ function prevRedak(p){
   var m = machineById(p.m) || {name:'—'};
   var kasni = p.next < todayISO();
   return '<div class="row click" onclick="app.akcijeStavke(\'preventiva\',\''+p.id+'\')">'+
-    '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(p.opis)+
+    '<div class="grow"><div class="row-title" style="font-size:var(--t-meta)">'+esc(p.opis)+
       (p.zaustavlja_liniju ? ' <span class="chip upoz">Zaustavlja liniju</span>' : '')+'</div>'+
     '<div class="row-sub">'+esc(m.name)+' &middot; '+fmtDate(p.next)+
       ((p.izv && p.izv!=='interno') ? ' &middot; <b>'+esc(p.izv)+'</b>' : '')+
@@ -3101,7 +3109,7 @@ function zadatakRedak(z){
   var zm = z.m ? machineById(z.m) : null;
   var kont = z.kontakt_id ? DATA.partneri.filter(function(x){ return x.id===z.kontakt_id; })[0] : null;
   return '<div class="row click" onclick="app.akcijeStavke(\'zadatak\',\''+z.id+'\')">'+
-    '<div class="grow"><div class="row-title" style="font-size:13.5px">'+esc(z.opis)+'</div>'+
+    '<div class="grow"><div class="row-title" style="font-size:var(--t-meta)">'+esc(z.opis)+'</div>'+
     '<div class="row-sub"><span class="chip zadatak">Zadatak</span>'+
       (z.dodijeljen ? ' '+esc(z.dodijeljen) : '')+
       (z.rok ? ' &middot; rok '+fmtDate(z.rok) : '')+
@@ -3160,7 +3168,7 @@ function rasporedDanDetalj(iso){
     '<h3>'+naslov+'</h3>'+
     '<div class="empty">Slobodan dan — ništa nije planirano.</div>'+
     (iso >= danas
-      ? '<button class="btn sec sm block role-write" style="margin-top:8px" onclick="app.noviZadatak(\''+iso+'\')">+ Na ovaj dan</button>'
+      ? '<button class="btn sec sm block role-write" style="margin-top:var(--r2)" onclick="app.noviZadatak(\''+iso+'\')">+ Na ovaj dan</button>'
       : '')+
   '</div>';
 }
@@ -3181,7 +3189,7 @@ function renderKalendarskaMreza(){
   }
   var pomaknuto = RASP_MJESEC !== danas.slice(0,7);
   var naslov = MJESECI[parseInt(p[1],10)-1]+' '+p[0]+'.';
-  return '<div class="card" style="padding:8px">'+
+  return '<div class="card" style="padding:var(--r2)">'+
     '<div class="rasp-nav">'+
       '<button class="qbtn" onclick="app.rasporedMjesec(-1)" aria-label="Prethodni mjesec">‹</button>'+
       '<div class="rasp-naslov">'+naslov+'</div>'+
@@ -3196,7 +3204,7 @@ function renderKalendarskaMreza(){
 function brziPremjestaj(tip, id){
   /* §16 P1: premještanje termina je planiranje (voditeljev posao) — tehničaru je njegov dan
      već zadan, ne treba mu alat da ga sam pomiče. */
-  return '<div class="role-voditelj" style="display:flex;gap:8px;margin-top:8px">'+
+  return '<div class="role-voditelj" style="display:flex;gap:var(--r2);margin-top:var(--r2)">'+
     '<button class="btn sec" style="flex:1" onclick="app.premjestiNa(\''+tip+'\',\''+id+'\',\''+todayISO()+'\')">Danas</button>'+
     '<button class="btn sec" style="flex:1" onclick="app.premjestiNa(\''+tip+'\',\''+id+'\',\''+isoShift(1)+'\')">Sutra</button>'+
     '<button class="btn sec" style="flex:1" onclick="app.premjestiNa(\''+tip+'\',\''+id+'\',\''+isoShift(7)+'\')">+7 dana</button>'+
@@ -3461,7 +3469,7 @@ function renderTjedniTrak(sz){
     '</div>'+
     '<div class="rasp-tj-dani">'+dani+'</div>'+
   '</div>'+
-  (kalOtvoren ? '<div style="margin-bottom:12px">'+renderKalendarskaMreza()+'</div>' : '');
+  (kalOtvoren ? '<div style="margin-bottom:var(--r3)">'+renderKalendarskaMreza()+'</div>' : '');
 }
 
 /* ---------- ZONA 2: hero dana ---------- */
@@ -3782,7 +3790,7 @@ function timRedak(ime, role, aktivan, email, onclick){
   return '<div class="row"'+(onclick ? ' onclick="'+onclick+'"' : '')+' style="align-items:center">'+
     avatarHtml(ime, {velik:true})+
     '<div class="grow" style="margin-left:10px">'+
-      '<div class="row-title" style="font-size:13.5px">'+esc(ime)+
+      '<div class="row-title" style="font-size:var(--t-meta)">'+esc(ime)+
         (aktivan===false ? ' <span class="chip rijesen">Neaktivan</span>' : '')+'</div>'+
       '<div class="row-sub">'+esc(NAZIV_ULOGE[role]||role)+(email ? ' &middot; '+esc(email) : '')+'</div>'+
     '</div></div>';
@@ -3803,7 +3811,7 @@ function renderSustav(){
     ? (SUS_GRESKE.length ? SUS_GRESKE.map(function(g){
         return '<div class="kvar-item"><div class="kvar-top"><span>'+esc(g.korisnik||'—')+'</span>'+
           '<span>'+fmtDateTime(g.created_at)+'</span></div>'+
-          '<div class="kvar-opis" style="font-size:13px">'+esc(g.poruka)+'</div>'+
+          '<div class="kvar-opis" style="font-size:var(--t-meta)">'+esc(g.poruka)+'</div>'+
           (g.detalji ? '<div class="kvar-meta" style="word-break:break-word">'+esc(String(g.detalji).slice(0,220))+'</div>' : '')+
           '</div>';
       }).join('') : '<div class="empty">Nema zabilježenih grešaka ✓</div>')
@@ -3812,10 +3820,10 @@ function renderSustav(){
   var napredno = SUS_NAPREDNO_OTVOREN
     ? '<h2>Dnevnik grešaka</h2>'+
       '<div class="card">'+greskeHtml+'</div>'+
-      '<button class="btn sec sm block" style="margin-top:8px" onclick="app.ucitajGreske()">Učitaj greške</button>'+
+      '<button class="btn sec sm block" style="margin-top:var(--r2)" onclick="app.ucitajGreske()">Učitaj greške</button>'+
       '<h2 style="color:var(--red)">Opasna zona</h2>'+
       '<div class="card"><div class="row"><div class="grow">'+
-        '<div class="row-title" style="font-size:13.5px">Brisanje demo podataka</div>'+
+        '<div class="row-title" style="font-size:var(--t-meta)">Brisanje demo podataka</div>'+
         '<div class="row-sub">Prije prelaska na stvarne podatke: briše kvarove, redovne preglede, komentare i poruke. '+
           'Strojevi, dijelovi i kontakti ostaju (osim ako odabereš i njih).</div>'+
         '<div style="margin-top:6px"><button class="btn-mini opasno" onclick="app.obrisiDemo(false)">Obriši evidencije</button> '+
@@ -3824,20 +3832,20 @@ function renderSustav(){
     : '';
   $('#screen-sustav').innerHTML =
     '<button class="back" onclick="app.go(\'pregled\')">‹ Pregled</button>'+
-    '<div style="font-size:18px;font-weight:700;margin:4px 0 10px">Sustav</div>'+
+    '<div style="font-size:var(--t-title);font-weight:700;margin:4px 0 10px">Sustav</div>'+
     '<h2>Tim</h2>'+
     '<div class="card">'+korHtml+'</div>'+
-    '<button class="btn sec sm block" style="margin-top:8px" onclick="app.noviKorisnik()">+ Dodaj osobu</button>'+
+    '<button class="btn sec sm block" style="margin-top:var(--r2)" onclick="app.noviKorisnik()">+ Dodaj osobu</button>'+
     '<h2>Tvrtka i postavke</h2>'+
     '<div class="card"><div class="row"><div class="grow">'+
-      '<div class="row-title" style="font-size:13.5px">'+esc(TVRTKA.puni_naziv||TVRTKA.naziv)+'</div>'+
+      '<div class="row-title" style="font-size:var(--t-meta)">'+esc(TVRTKA.puni_naziv||TVRTKA.naziv)+'</div>'+
       '<div class="row-sub">'+(TVRTKA.programi||[]).length+' sektora &middot; '+
         (TVRTKA.smjene||[]).length+' smjene &middot; norma: '+esc(TVRTKA.audit_norma)+'</div>'+
       '<div style="margin-top:6px"><button class="btn-mini" onclick="app.urediTvrtku()">Uredi identitet i postavke</button></div>'+
     '</div><span class="marka" style="background:'+esc(TVRTKA.boja)+'"></span></div></div>'+
     '<h2>Podaci</h2>'+
     '<div class="card"><div class="row"><div class="grow">'+
-      '<div class="row-title" style="font-size:13.5px">Stanje</div>'+
+      '<div class="row-title" style="font-size:var(--t-meta)">Stanje</div>'+
       '<div class="row-sub">'+DATA.machines.length+' strojeva &middot; '+DATA.kvarovi.length+' kvarova'+
         (KV_SVE?' (cijela povijest)':' (zadnjih '+KV_LIMIT+')')+' &middot; '+DATA.dijelovi.length+' dijelova &middot; '+
         DATA.partneri.length+' kontakata</div>'+
@@ -3847,8 +3855,8 @@ function renderSustav(){
         '<button class="btn-mini" onclick="app.izvozCSV(0)">Izvoz CSV</button> '+
         '<button class="btn-mini role-voditelj" onclick="app.izvozSkladiste()">Izvoz skladišta (CSV)</button>'+
       '</div></div></div></div>'+
-    '<button class="btn sec sm block" style="margin-top:8px" onclick="app.uvozCSV()">Uvoz strojeva i dijelova (CSV)</button>'+
-    '<button class="btn sec sm block" style="margin-top:8px" onclick="app.go(\'qr\')">QR naljepnice za strojeve</button>'+
+    '<button class="btn sec sm block" style="margin-top:var(--r2)" onclick="app.uvozCSV()">Uvoz strojeva i dijelova (CSV)</button>'+
+    '<button class="btn sec sm block" style="margin-top:var(--r2)" onclick="app.go(\'qr\')">QR naljepnice za strojeve</button>'+
     /* AUDIT-FIX (UX): dnevnik grešaka i brisanje podataka su rijetke, admin-radnje —
        iza jednog dodatnog koraka, ne uvijek nametnute rame uz rame s rutinskim akcijama */
     '<div class="rasp-kal-traka" style="margin-top:14px" onclick="app.susNaprednoToggle()">'+
@@ -4053,7 +4061,7 @@ async function renderPoruke(){
     '<div class="card" id="poruke-lista" style="padding:5px 0">'+html+'</div>'+
     '<form class="msg-form" onsubmit="app.posaljiPoruku(event)">'+
       '<textarea name="tekst" rows="2" required placeholder="Poruka svima — primopredaja, obavijest, upozorenje…"></textarea>'+
-      '<button class="btn primary block" type="submit" style="margin-top:8px">Pošalji</button>'+
+      '<button class="btn primary block" type="submit" style="margin-top:var(--r2)">Pošalji</button>'+
     '</form>'+
     (prikaziDolje ? '<button type="button" class="chat-dolje" onclick="app.porukeNaDno()">↓ Nove poruke</button>' : '');
   oznaciProcitano();
@@ -4213,14 +4221,14 @@ var app = {
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal audit">'+
       '<div class="modal-head"><h3>Kako se koristi</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<div id="pomoc-kratki">'+kratkiHtml+
-        '<button class="btn primary block" style="margin-top:16px" onclick="app.closeModal()">Jasno</button>'+
-        '<button class="btn-mini block" style="margin-top:8px" onclick="document.getElementById(\'pomoc-kratki\').style.display=\'none\';document.getElementById(\'pomoc-sve\').style.display=\'block\'">Sve upute ›</button>'+
+        '<button class="btn primary block" style="margin-top:var(--r4)" onclick="app.closeModal()">Jasno</button>'+
+        '<button class="btn-mini block" style="margin-top:var(--r2)" onclick="document.getElementById(\'pomoc-kratki\').style.display=\'none\';document.getElementById(\'pomoc-sve\').style.display=\'block\'">Sve upute ›</button>'+
       '</div>'+
       '<div id="pomoc-sve" style="display:none">'+
         '<h4>Svakodnevni rad</h4>'+zaMajstora+
         (vidiFinancije() ? '<h4>Za voditelja</h4>'+zaVoditelja : '')+
         '<div class="a-sub" style="margin-top:10px">Pravilo: sve što se dogovori — dogovara se u alatu (komentar na kvaru ili Poruke), ne usmeno.</div>'+
-        '<button class="btn primary block" style="margin-top:16px" onclick="app.closeModal()">Jasno</button>'+
+        '<button class="btn primary block" style="margin-top:var(--r4)" onclick="app.closeModal()">Jasno</button>'+
       '</div>'+
       '</div></div>';
   },
@@ -4259,14 +4267,14 @@ var app = {
         '<label>Korisničko ime za prijavu</label><input name="user" required placeholder="npr. ivan">'+
         '<div class="row-sub" style="margin-top:3px">Prijava će biti: <b>ime</b>@odrzavanje.local</div>'+
         '<label>PIN (najmanje 8 znamenki)</label>'+
-        '<div class="pin-wrap"><input name="pin" type="password" required inputmode="numeric" minlength="8" id="nk-pin" style="text-align:left;font-size:16px;letter-spacing:normal;font-weight:400;padding:12px">'+
+        '<div class="pin-wrap"><input name="pin" type="password" required inputmode="numeric" minlength="8" id="nk-pin" style="text-align:left;font-size:var(--t-body);letter-spacing:normal;font-weight:400;padding:var(--r3)">'+
         '<button type="button" class="pin-oko" onclick="app.pinOko(\'nk-pin\',this)" aria-label="Prikaži PIN">'+ikonaOko(false)+'</button></div>'+
         '<label>Uloga</label><select name="role">'+
           '<option value="majstor">Tehničar održavanja</option><option value="voditelj">Voditelj održavanja</option>'+
           '<option value="proizvodnja">Voditelj proizvodnje (čita + prijavljuje kvar)</option>'+
           '<option value="readonly">Direktor (samo čitanje)</option></select>'+
         '<button class="btn primary block" type="submit">Kreiraj korisnika</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveKorisnik: async function(e){
@@ -4295,11 +4303,11 @@ var app = {
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal()"><div class="modal">'+
       '<div class="modal-head"><h3>'+esc(k.ime)+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<div class="row-sub" style="margin-bottom:12px">'+esc(k.role)+' &middot; '+esc(k.email)+
+      '<div class="row-sub" style="margin-bottom:var(--r3)">'+esc(k.role)+' &middot; '+esc(k.email)+
         (k.aktivan ? '' : ' &middot; <b style="color:var(--red)">neaktivan</b>')+'</div>'+
       '<button class="btn sec block" onclick="app.korisnikUloga(\''+k.id+'\')">Promijeni ulogu</button>'+
-      '<button class="btn sec block" style="margin-top:8px" onclick="app.korisnikPin(\''+k.id+'\')">Novi PIN</button>'+
-      '<button class="btn sec block" style="margin-top:8px" onclick="app.closeModal();app.korisnikAktivan(\''+k.id+'\','+(!k.aktivan)+')">'+
+      '<button class="btn sec block" style="margin-top:var(--r2)" onclick="app.korisnikPin(\''+k.id+'\')">Novi PIN</button>'+
+      '<button class="btn sec block" style="margin-top:var(--r2)" onclick="app.closeModal();app.korisnikAktivan(\''+k.id+'\','+(!k.aktivan)+')">'+
         (k.aktivan?'Deaktiviraj':'Aktiviraj')+'</button>'+
       '</div></div>';
   },
@@ -4317,7 +4325,7 @@ var app = {
           '<option value="readonly"'+(k&&k.role==='readonly'?' selected':'')+'>Direktor (samo čitanje)</option>'+
         '</select>'+
         '<button class="btn primary block" type="submit">Spremi</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveKorisnikUloga: async function(e, id){
@@ -4335,10 +4343,10 @@ var app = {
       '<form onsubmit="app.saveKorisnikPin(event,\''+id+'\')">'+
         '<label>PIN (najmanje 8 znamenki)</label>'+
         '<div class="pin-wrap">'+
-        '<input name="pin" type="password" required inputmode="numeric" minlength="8" id="np-pin" style="text-align:left;font-size:16px;letter-spacing:normal;font-weight:400;padding:12px">'+
+        '<input name="pin" type="password" required inputmode="numeric" minlength="8" id="np-pin" style="text-align:left;font-size:var(--t-body);letter-spacing:normal;font-weight:400;padding:var(--r3)">'+
         '<button type="button" class="pin-oko" onclick="app.pinOko(\'np-pin\',this)" aria-label="Prikaži PIN">'+ikonaOko(false)+'</button></div>'+
         '<button class="btn primary block" type="submit" style="margin-top:14px">Spremi</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveKorisnikPin: async function(e, id){
@@ -4365,8 +4373,8 @@ var app = {
         '<label for="logo-input" class="btn sec block file-label" id="logo-label">Odaberi logo</label>'+
         '<img id="logo-prev" class="foto-prev" alt="pregled loga"'+
           (t.logo ? ' src="'+esc(t.logo)+'" style="display:block;max-height:70px"' : '')+'>'+
-        '<label>Osnovna boja</label><input type="color" name="boja" value="'+esc(t.boja)+'" style="height:48px;padding:4px">'+
-        '<label>Boja isticanja</label><input type="color" name="boja_akcent" value="'+esc(t.boja_akcent)+'" style="height:48px;padding:4px">'+
+        '<label>Osnovna boja</label><input type="color" name="boja" value="'+esc(t.boja)+'" style="height:48px;padding:var(--r1)">'+
+        '<label>Boja isticanja</label><input type="color" name="boja_akcent" value="'+esc(t.boja_akcent)+'" style="height:48px;padding:var(--r1)">'+
         '<label>Sektori (jedan po retku — npr. Energetika, Pakiranje)</label>'+
         '<textarea name="programi" rows="3">'+esc((t.programi||[]).join('\n'))+'</textarea>'+
         '<label>Smjene (jedna po retku)</label>'+
@@ -4385,7 +4393,7 @@ var app = {
         '<textarea name="mjerna_oprema" rows="4" placeholder="npr. Sonda temperature S1 | umjeravanje svakih 180 dana">'+
           esc((t.mjerna_oprema||MJERNA_ZADANO).map(function(z){ return z.naziv+' | '+z.rezim; }).join('\n'))+'</textarea>'+
         '<button class="btn primary block" type="submit">Spremi postavke</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   logoOdabran: function(e){
@@ -4472,7 +4480,7 @@ var app = {
       '<form onsubmit="app.potvrdiObrisiDemo(event,'+(!!sve)+')">'+
         '<label>Za potvrdu upiši OBRISI</label><input name="potvrda" required autocomplete="off">'+
         '<button class="btn opasno block" type="submit">Obriši</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   potvrdiObrisiDemo: async function(e, sve){
@@ -4498,7 +4506,7 @@ var app = {
         '<label>Zalijepi podatke (jedan redak = jedna stavka, odvojeno s ; ili tab)</label>'+
         '<textarea name="csv" rows="8" required placeholder="e3;Ekstruder E3;Energetika;350"></textarea>'+
         '<button class="btn primary block" type="submit">Uvezi</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveUvoz: async function(e){
@@ -4589,7 +4597,7 @@ var app = {
     var zadaciUzKvar = zadatak ? [] : DATA.kvarovi.filter(function(x){ return x.tip==='zadatak' && x.izvor_kvar===kId; });
     /* K-3: narudžba koja zna za ovaj kvar — prikaži kao obvezu koja stiže, ne samo "čeka dio" */
     var narudzbaZaKvar = zadatak ? null : (DATA.nabava||[]).filter(function(x){ return x.kvar_id===kId && !x.primljeno; })[0];
-    var red = function(l, v){ return v ? '<div class="row-sub" style="margin-top:4px"><b style="color:var(--text)">'+l+':</b> '+v+'</div>' : ''; };
+    var red = function(l, v){ return v ? '<div class="row-sub" style="margin-top:var(--r1)"><b style="color:var(--text)">'+l+':</b> '+v+'</div>' : ''; };
     var info =
       red('Datum', fmtDate(k.date)) +
       (zadatak
@@ -4606,10 +4614,10 @@ var app = {
       red('Riješio', k.tko ? esc(k.tko) : '') +
       red('Sudjelovali', k.sudjelovali ? esc(k.sudjelovali) : '') +
       red('Zamijenjeno', k.zam ? esc(k.zam) : '') +
-      (izvorK ? '<div class="row-sub" style="margin-top:4px"><b style="color:var(--text)">Iz kvara:</b> '+
+      (izvorK ? '<div class="row-sub" style="margin-top:var(--r1)"><b style="color:var(--text)">Iz kvara:</b> '+
         '<a class="clink" onclick="app.closeModal();app.detaljKvara(\''+izvorK.id+'\')">'+
         esc((machineById(izvorK.m)||{name:'—'}).name)+' — '+esc(izvorK.opis)+'</a></div>' : '') +
-      (kontaktZ ? '<div class="row-sub" style="margin-top:4px"><b style="color:var(--text)">Kontakt:</b> '+esc(kontaktZ.naziv)+
+      (kontaktZ ? '<div class="row-sub" style="margin-top:var(--r1)"><b style="color:var(--text)">Kontakt:</b> '+esc(kontaktZ.naziv)+
         (kontaktZ.tel ? ' &middot; <a class="clink" href="tel:'+esc(String(kontaktZ.tel).replace(/[\s\/]/g,''))+'">'+esc(kontaktZ.tel)+'</a>' : '')+
         '</div>' : '') +
       (narudzbaZaKvar ? red('Narudžba dijela', 'naručeno'+(narudzbaZaKvar.ocekivano ? ', stiže ~'+fmtDate(narudzbaZaKvar.ocekivano) : '')) : '') +
@@ -4633,7 +4641,7 @@ var app = {
     /* §16 P3: čipovi "Gotovo do" — samo dok je kvar u radu i još nema procjene; nestaju sami
        čim je procjena upisana (onda gore već piše "Procijenjeno gotovo") ili kvar zatvoren. */
     if(!zadatak && k.status==='u_radu' && !k.procjena_gotovo)
-      info += '<div class="role-write" style="margin-top:8px">'+
+      info += '<div class="role-write" style="margin-top:var(--r2)">'+
         '<div class="rasp-sheet-lbl">Gotovo do?</div><div class="rasp-cipovi">'+
         '<button class="rasp-cip" onclick="app.postaviGotovoDo(\''+kId+'\',1)">+1 h</button>'+
         '<button class="rasp-cip" onclick="app.postaviGotovoDo(\''+kId+'\',2)">+2 h</button>'+
@@ -4643,8 +4651,8 @@ var app = {
     var komHtml = kom.length ? kom.map(function(c){
       return '<div class="kvar-item"><div class="kvar-top"><span><b style="color:var(--text)">'+esc(c.tko)+'</b></span>'+
         '<span>'+fmtDateTime(c.created_at)+'</span></div>'+
-        '<div style="font-size:13.5px;margin-top:3px">'+esc(c.tekst)+'</div></div>';
-    }).join('') : '<div class="empty" style="padding:12px">Još nema komentara.</div>';
+        '<div style="font-size:var(--t-meta);margin-top:3px">'+esc(c.tekst)+'</div></div>';
+    }).join('') : '<div class="empty" style="padding:var(--r3)">Još nema komentara.</div>';
     var akcije = '';
     /* Radni tok je preuzmi → radi → riješi (PLAN-KAIZEN S3): na otvorenom kvaru je
        "Preuzimam" glavni gumb. "Riješi" ostaje kao brzi put — majstor koji je već
@@ -4656,10 +4664,10 @@ var app = {
     /* E: dosad je iz "Riješen" jedini izlaz bio Storniraj — a to briše zapis iz analitike/
        MTTR-a/CSV-a/IFS-a, iako se rad stvarno dogodio. Ovo vraća u tijek bez brisanja traga. */
     if(k.status==='rijesen')
-      akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.vratiURad(\''+kId+'\')">Nije riješeno — vrati u rad</button>';
+      akcije += '<button class="btn sec block role-write" style="margin-top:var(--r2)" onclick="app.vratiURad(\''+kId+'\')">Nije riješeno — vrati u rad</button>';
     if(jeOtvoren(k) && !zadatak)
       /* premješteno s kartice: prekidač koji ne mora stajati na svakoj kartici u popisu */
-      akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.cekaDioIzDetalja(\''+kId+'\')">'+
+      akcije += '<button class="btn sec block role-write" style="margin-top:var(--r2)" onclick="app.cekaDioIzDetalja(\''+kId+'\')">'+
         /* §16 P3: "Treba dio" je tehničarova strana ("ne mogu dalje bez ovoga") — nabava je
            voditeljev posao (§2), pa tekst i sam kaže kome se to javlja, ne pretpostavlja da je
            TEHNIČAR taj koji naručuje (brzoCekaDio šalje sysPoruku + obavijest voditelju). */
@@ -4670,48 +4678,48 @@ var app = {
          javio "treba dio" (gore), ne mora i sam naručivati.
          SIM-FIX C3: prije se gumb skrivao dok voditelj ne postavi ceka_dio — a voditelj
          često unaprijed zna da treba naručiti dio, prije nego tehničar javi. */
-      akcije += '<button class="btn sec block role-voditelj" style="margin-top:8px" onclick="app.naruciZaKvar(\''+kId+'\')">Naruči dio za ovaj kvar</button>';
+      akcije += '<button class="btn sec block role-voditelj" style="margin-top:var(--r2)" onclick="app.naruciZaKvar(\''+kId+'\')">Naruči dio za ovaj kvar</button>';
     /* §16 P3 (rupa #5 "dio ugrađen usred kvara"): dosad se moglo razdužiti tek pri zatvaranju
        (Riješi kvar) ili na Skladištu "−" (gubi vezu s kvarom) — sad i dok je kvar još otvoren,
        s istim filtrom dijelova kao "Naruči dio za ovaj kvar". */
     if(jeOtvoren(k) && !zadatak)
-      akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.ugradiDioZaKvar(\''+kId+'\')">+ Ugrađen dio</button>';
+      akcije += '<button class="btn sec block role-write" style="margin-top:var(--r2)" onclick="app.ugradiDioZaKvar(\''+kId+'\')">+ Ugrađen dio</button>';
     /* §15 #5: vanjski izvođač — kad tehničar/voditelj ne može sam (rashlada, elektro, garancija).
        Zove se s kvara: kontakt vrste Servis → tel: + zabilježi → zadatak s vezom + "Čeka servis". */
     if(jeOtvoren(k) && !zadatak)
-      akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="'+
+      akcije += '<button class="btn sec block role-write" style="margin-top:var(--r2)" onclick="'+
         (k.ceka_servis ? 'app.cekaServisToggle(\''+kId+'\')' : 'app.zoviServis(\''+kId+'\')')+'">'+
         (k.ceka_servis ? '✓ Čeka servis — makni oznaku' : 'Zovi servis (vanjski izvođač)')+'</button>';
     if(k.status!=='otkazan')
-      akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.urediKvar(\''+kId+'\')">Uredi</button>';
+      akcije += '<button class="btn sec block role-write" style="margin-top:var(--r2)" onclick="app.urediKvar(\''+kId+'\')">Uredi</button>';
     if(!zadatak && k.status!=='otkazan')
       /* najčešći zadatak iz kvara je narudžba dijela ("naruči ležaj za P2") — veza se upiše sama, ne bira se */
-      akcije += '<button class="btn sec block role-write" style="margin-top:8px" onclick="app.noviZadatak(null,\''+kId+'\')">+ Zadatak iz ovog kvara</button>';
+      akcije += '<button class="btn sec block role-write" style="margin-top:var(--r2)" onclick="app.noviZadatak(null,\''+kId+'\')">+ Zadatak iz ovog kvara</button>';
     var zadaciUzKvarHtml = zadaciUzKvar.length
-      ? '<h2 style="margin-top:16px">Zadaci uz ovaj kvar ('+zadaciUzKvar.length+')</h2><div class="card">'+
+      ? '<h2 style="margin-top:var(--r4)">Zadaci uz ovaj kvar ('+zadaciUzKvar.length+')</h2><div class="card">'+
         zadaciUzKvar.map(zadatakRedak).join('')+'</div>'
       : '';
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>'+esc(m.name)+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<div style="margin-bottom:8px">'+chips+'</div>'+
-      '<div style="font-size:15.5px;font-weight:600;line-height:1.4">'+esc(k.opis)+'</div>'+
+      '<div style="margin-bottom:var(--r2)">'+chips+'</div>'+
+      '<div style="font-size:var(--t-body);font-weight:600;line-height:1.4">'+esc(k.opis)+'</div>'+
       info+
       (k.foto ? '<img src="'+esc(k.foto)+'" alt="fotografija kvara" onclick="app.viewFoto(\''+kId+'\')" '+
         'style="margin-top:10px;max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--border);cursor:pointer;display:block">' : '')+
-      (k.foto_rijeseno ? '<div class="row-sub" style="margin-top:8px">Fotografija popravka:</div>'+
+      (k.foto_rijeseno ? '<div class="row-sub" style="margin-top:var(--r2)">Fotografija popravka:</div>'+
         '<img src="'+esc(k.foto_rijeseno)+'" alt="fotografija popravka" onclick="app.viewFotoRijeseno(\''+kId+'\')" '+
-        'style="margin-top:4px;max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--border);cursor:pointer;display:block">' : '')+
+        'style="margin-top:var(--r1);max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--border);cursor:pointer;display:block">' : '')+
       /* radnje odmah ispod podataka — majstor ne smije morati proskrolati komentare
          da dođe do "Preuzimam" / "Riješi kvar" */
       akcije+
       zadaciUzKvarHtml+
-      '<h2 style="margin-top:16px">Komentari ('+kom.length+')</h2>'+
+      '<h2 style="margin-top:var(--r4)">Komentari ('+kom.length+')</h2>'+
       '<div class="card">'+komHtml+'</div>'+
       '<form class="role-write" onsubmit="app.dodajKomentar(event,\''+kId+'\',\'detalj\')">'+
         '<label>Novi komentar</label>'+
         '<textarea name="tekst" rows="2" required placeholder="što je napravljeno, što čeka, kome je predano…"></textarea>'+
-        '<button class="btn sec block" type="submit" style="margin-top:8px">Dodaj komentar</button>'+
+        '<button class="btn sec block" type="submit" style="margin-top:var(--r2)">Dodaj komentar</button>'+
       '</form>'+
       '</div></div>';
   },
@@ -4725,12 +4733,12 @@ var app = {
       return '<div class="kvar-item">'+
         '<div class="kvar-top"><span><b style="color:var(--text)">'+esc(c.tko)+'</b></span>'+
         '<span>'+fmtDate(localDT(c.created_at).d)+'</span></div>'+
-        '<div style="font-size:13.5px;margin-top:3px">'+esc(c.tekst)+'</div></div>';
+        '<div style="font-size:var(--t-meta);margin-top:3px">'+esc(c.tekst)+'</div></div>';
     }).join('') : '<div class="empty">Još nema komentara.</div>';
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Komentari — '+esc(m.name)+'</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<div class="row-sub" style="margin-bottom:8px">'+esc(k.opis)+'</div>'+
+      '<div class="row-sub" style="margin-bottom:var(--r2)">'+esc(k.opis)+'</div>'+
       '<div class="card">'+listaHtml+'</div>'+
       '<form class="role-write" onsubmit="app.dodajKomentar(event,\''+kId+'\')">'+
         '<label>Novi komentar</label>'+
@@ -4899,7 +4907,7 @@ var app = {
         '</select>'+
         '<input type="number" id="pon-n" name="ponavljanje_n" min="1" step="1" placeholder="broj dana" style="display:none">'+
         '<button class="btn primary block" type="submit">Spremi zadatak</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveZadatak: async function(e){
@@ -5057,7 +5065,7 @@ var app = {
       (stroj ? '<div class="row-sub" style="margin-bottom:2px">'+esc(stroj)+'</div>' : '')+
       (cip ? '<div class="rasp-sheet-lbl">Tko radi?</div><div class="rasp-cipovi">'+cip+'</div>' : '')+
       satiRed+
-      (opts.plan ? '<button class="btn sec block" style="margin-top:12px" onclick="app.planDalje()">Preskoči ›</button>' : '')+
+      (opts.plan ? '<button class="btn sec block" style="margin-top:var(--r3)" onclick="app.planDalje()">Preskoči ›</button>' : '')+
       '</div></div>';
   },
   dodijeliIzSheeta: async function(tip, id, ime){
@@ -5185,9 +5193,9 @@ var app = {
           '<div class="rasp-sheet-lbl">Trajanje</div><div class="rasp-cipovi sati">'+cipoviSati(id, p.trajanje_h)+'</div>'+
         '</div>'+
         brziPremjestaj('preventiva', id)+
-        '<button class="btn sec block role-voditelj" style="margin-top:8px" onclick="app.pokreniPremjestanje(\'preventiva\',\''+id+'\')">Premjesti na drugi dan</button>'+
-        '<button class="btn sec block role-voditelj" style="margin-top:8px" onclick="app.urediPreventivu(\''+id+'\')">Uredi</button>'+
-        '<button class="btn sec block" style="margin-top:8px" onclick="app.closeModal();app.openStroj(\''+p.m+'\')">Otvori stroj</button>'+
+        '<button class="btn sec block role-voditelj" style="margin-top:var(--r2)" onclick="app.pokreniPremjestanje(\'preventiva\',\''+id+'\')">Premjesti na drugi dan</button>'+
+        '<button class="btn sec block role-voditelj" style="margin-top:var(--r2)" onclick="app.urediPreventivu(\''+id+'\')">Uredi</button>'+
+        '<button class="btn sec block" style="margin-top:var(--r2)" onclick="app.closeModal();app.openStroj(\''+p.m+'\')">Otvori stroj</button>'+
         '</div></div>';
     } else {
       var z = DATA.kvarovi.filter(function(x){ return x.id===id; })[0];
@@ -5201,8 +5209,8 @@ var app = {
         '<button class="btn primary block role-write" onclick="app.closeModal();app.obaviZadatak(\''+id+'\')">✓ Obavljeno</button>'+
         (cipZ ? '<div class="role-write"><div class="rasp-sheet-lbl">Tko radi</div><div class="rasp-cipovi">'+cipZ+'</div></div>' : '')+
         brziPremjestaj('zadatak', id)+
-        '<button class="btn sec block role-voditelj" style="margin-top:8px" onclick="app.pokreniPremjestanje(\'zadatak\',\''+id+'\')">'+(z.rok?'Premjesti rok':'Stavi na dan…')+'</button>'+
-        '<button class="btn sec block" style="margin-top:8px" onclick="app.closeModal();app.detaljKvara(\''+id+'\')">Detalji</button>'+
+        '<button class="btn sec block role-voditelj" style="margin-top:var(--r2)" onclick="app.pokreniPremjestanje(\'zadatak\',\''+id+'\')">'+(z.rok?'Premjesti rok':'Stavi na dan…')+'</button>'+
+        '<button class="btn sec block" style="margin-top:var(--r2)" onclick="app.closeModal();app.detaljKvara(\''+id+'\')">Detalji</button>'+
         '</div></div>';
     }
   },
@@ -5276,7 +5284,7 @@ var app = {
         var s = d.poKat[kk];
         return '<div class="a-item">'+esc(kk)+' — '+s.n+' kvarova, '+H(s.sati)+', '+EUR(s.cost)+'</div>';
       }).join('')+
-      '<button class="btn primary block" style="margin-top:16px" onclick="app.closeModal()">Zatvori</button>'+
+      '<button class="btn primary block" style="margin-top:var(--r4)" onclick="app.closeModal()">Zatvori</button>'+
       '</div></div>';
   },
   /* Izvoz s Analitike mora poštovati baš ono što je odabrano na ekranu (dana ILI mjesec) —
@@ -5434,7 +5442,7 @@ var app = {
         '<label>Kategorija</label><select name="kat">'+katOpts+'</select>'+
         '<label>Cijena (€)</label><input type="number" name="cijena" min="0" step="0.01" value="'+p.cijena+'">'+
         '<button class="btn primary block" type="submit">Spremi</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveUrediDio: async function(e, id){
@@ -5469,8 +5477,8 @@ var app = {
       '<div class="row-sub" style="margin-bottom:10px">'+esc(p.naziv)+'</div>'+
       '<form onsubmit="app.saveKolicinu(event,\''+id+'\')">'+
         '<label>Novo stanje</label><input type="number" name="stanje" min="0" step="1" value="'+p.stanje+'" required autofocus>'+
-        '<button class="btn primary block" type="submit" style="margin-top:8px">Spremi</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn primary block" type="submit" style="margin-top:var(--r2)">Spremi</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveKolicinu: async function(e, id){
@@ -5498,7 +5506,7 @@ var app = {
         '<label>Sektor</label><select name="program">'+progOpts+'</select>'+
         '<label>Trošak zastoja (€/h)</label><input type="number" name="rate" step="10" min="0" value="'+m.rate+'" required>'+
         '<button class="btn primary block" type="submit">Spremi</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveUrediStroj: async function(e, mId){
@@ -5531,7 +5539,7 @@ var app = {
         '<label>Procjena trajanja (h, izborno)</label><input type="number" name="trajanje_h" min="0" step="0.5" value="'+(p.trajanje_h||'')+'">'+
         '<label class="prekidac"><input type="checkbox" name="zaustavlja_liniju"'+(p.zaustavlja_liniju?' checked':'')+'><span>Zaustavlja liniju dok traje</span></label>'+
         '<button class="btn primary block" type="submit" style="margin-top:14px">Spremi</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveUrediPreventivu: async function(e, pId){
@@ -5574,7 +5582,7 @@ var app = {
         '<label>E-mail</label><input name="email" type="email" value="'+esc(pt.email)+'">'+
         '<label>Napomena</label><input name="nap" value="'+esc(pt.nap)+'">'+
         '<button class="btn primary block" type="submit">Spremi</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveUrediPartnera: async function(e, id){
@@ -5599,10 +5607,10 @@ var app = {
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Naruči dio</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<div style="font-size:15.5px;font-weight:650">'+esc(p.naziv)+'</div>'+
-      '<div class="row-sub" style="margin-bottom:4px">stanje '+p.stanje+' / minimum '+p.min+
+      '<div style="font-size:var(--t-body);font-weight:650">'+esc(p.naziv)+'</div>'+
+      '<div class="row-sub" style="margin-bottom:var(--r1)">stanje '+p.stanje+' / minimum '+p.min+
         (p.sku ? ' &middot; šifra '+esc(p.sku) : '')+'</div>'+
-      (kv ? '<div class="row-sub" style="margin-bottom:4px">Vezano uz kvar: '+esc(kv.opis)+'</div>' : '')+
+      (kv ? '<div class="row-sub" style="margin-bottom:var(--r1)">Vezano uz kvar: '+esc(kv.opis)+'</div>' : '')+
       '<form onsubmit="app.saveNarudzbu(event,\''+id+'\')">'+
         (kv ? '<input type="hidden" name="kvar_id" value="'+esc(kv.id)+'">' : '')+
         '<label>Količina</label><input type="number" name="kolicina" min="1" step="1" value="'+predlozena+'" required>'+
@@ -5611,7 +5619,7 @@ var app = {
         '<label>Cijena po komadu (€)</label><input type="number" name="cijena" min="0" step="0.01" value="'+(p.cijena||0)+'">'+
         '<label>Napomena</label><input name="napomena" placeholder="npr. hitno — stroj čeka">'+
         '<button class="btn primary block" type="submit">Zabilježi narudžbu</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   /* K-3: ulaz "naruči dio" IZ kvara koji čeka dio — veza se upiše sama */
@@ -5627,7 +5635,7 @@ var app = {
       '<form onsubmit="event.preventDefault();var d=this.elements.dio.value;app.closeModal();app.naruciDio(d,\''+kId+'\');">'+
         '<label>Dio</label><select name="dio" required>'+dioOpts+'</select>'+
         '<button class="btn primary block" type="submit">Dalje</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   /* §16 P3 (rupa #5): ugradnja dijela DOK je kvar još otvoren — isti filtar dijelova kao
@@ -5645,7 +5653,7 @@ var app = {
         '<label>Dio</label><select name="dio" required>'+dioOpts+'</select>'+
         '<label>Količina</label><input type="number" name="kol" min="1" step="1" value="1">'+
         '<button class="btn primary block" type="submit">Ugrađeno — skini sa skladišta</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveUgradiDio: async function(e, kId){
@@ -5722,7 +5730,7 @@ var app = {
         '<label>Koliko je komada stiglo (preostalo ×'+preostalo+')?</label>'+
         '<input type="number" name="kol" min="1" max="'+preostalo+'" step="1" value="'+preostalo+'" required>'+
         '<button class="btn primary block" type="submit">Zaprimi</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   savePrimitak: async function(e, id){
@@ -5931,7 +5939,7 @@ var app = {
         '</div>'+
         '</div>'+
         '<button class="btn primary block" type="submit">Spremi kvar</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
     PENDING_FOTO = '';
   },
@@ -6136,7 +6144,7 @@ var app = {
         '<label>Razlog (ostaje u evidenciji)</label>'+
         '<textarea name="razlog" rows="2" required placeholder="npr. popravak nije držao, kvar se ponovio…"></textarea>'+
         '<button class="btn primary block" type="submit">Vrati u rad</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveVratiURad: async function(e, kId){
@@ -6197,9 +6205,9 @@ var app = {
         '<label>Što je napravljeno / zamijenjeno</label><input name="zam" value="'+esc(k.zam||'')+'" placeholder="npr. remen, brtva… (prazno ako ništa)">'+
         /* SIM-FIX C1: privremeni popravak/rok sanacije dosad je bio dostupan samo u "Uredi kvar" —
            majstor koji zatvara kvar na licu mjesta ionako zna je li popravak privremen. */
-        '<label class="prekidac" style="margin-top:8px"><input type="checkbox" name="privremeni"'+(k.privremeni?' checked':'')+
+        '<label class="prekidac" style="margin-top:var(--r2)"><input type="checkbox" name="privremeni"'+(k.privremeni?' checked':'')+
           ' onchange="app.prekidacSanacije(this.checked)"><span>Privremeni popravak (traži trajnu sanaciju)</span></label>'+
-        '<div id="polje-sanacije" style="margin-top:8px'+(k.privremeni?'':';display:none')+'">'+
+        '<div id="polje-sanacije" style="margin-top:var(--r2)'+(k.privremeni?'':';display:none')+'">'+
           '<label>Rok trajne sanacije</label>'+
           '<input type="date" name="rok_sanacije" value="'+esc(k.rok_sanacije||'')+'">'+
         '</div>';
@@ -6224,13 +6232,13 @@ var app = {
         '<div style="display:none">'+
           '<label>Sudjelovali (ako je radilo više ljudi)</label>'+sudjelovaliCheckbox('')+
           dodatno+
-          '<label style="margin-top:12px">Fotografija popravka (izborno)</label>'+
+          '<label style="margin-top:var(--r3)">Fotografija popravka (izborno)</label>'+
           '<input type="file" id="foto-input" class="file-input" accept="image/*" capture="environment" onchange="app.fotoOdabrana(event)">'+
           '<label for="foto-input" class="btn sec block file-label" id="foto-label">📷 Slikaj gotov popravak</label>'+
           '<img id="foto-prev" class="foto-prev" alt="pregled fotografije">'+
         '</div>'+
-        '<button class="btn primary block" type="submit" style="margin-top:8px">'+(zadatak?'Obavljeno':'Zatvori kvar')+'</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn primary block" type="submit" style="margin-top:var(--r2)">'+(zadatak?'Obavljeno':'Zatvori kvar')+'</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveRijesen: async function(e, kId){
@@ -6351,9 +6359,9 @@ var app = {
             '<span>Čeka dio (naručeno, popravak stoji)</span></label>'
           : '')+
         /* privremeni popravak ide u IFS odjeljak 3. — vrijedi i dok kvar traje i nakon zatvaranja */
-        '<label class="prekidac" style="margin-top:8px"><input type="checkbox" name="privremeni"'+(k.privremeni?' checked':'')+
+        '<label class="prekidac" style="margin-top:var(--r2)"><input type="checkbox" name="privremeni"'+(k.privremeni?' checked':'')+
           ' onchange="app.prekidacSanacije(this.checked)"><span>Privremeni popravak (traži trajnu sanaciju)</span></label>'+
-        '<div id="polje-sanacije" style="margin-top:8px'+(k.privremeni?'':';display:none')+'">'+
+        '<div id="polje-sanacije" style="margin-top:var(--r2)'+(k.privremeni?'':';display:none')+'">'+
           '<label>Rok trajne sanacije</label>'+
           '<input type="date" name="rok_sanacije" value="'+esc(k.rok_sanacije||'')+'">'+
         '</div>';
@@ -6374,8 +6382,8 @@ var app = {
           '+ Dodatno (stroj, dodjela, trajanje…)</button>'+
         '<div style="display:none">'+dodatno+'</div>'+
         '<button class="btn primary block" type="submit">Spremi izmjene</button>'+
-        '<button class="btn sec block role-voditelj" type="button" style="margin-top:8px" onclick="app.stornirajKvar(\''+kId+'\')">Storniraj (pogrešan unos)</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block role-voditelj" type="button" style="margin-top:var(--r2)" onclick="app.stornirajKvar(\''+kId+'\')">Storniraj (pogrešan unos)</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveUredi: async function(e, kId){
@@ -6528,17 +6536,17 @@ var app = {
       return '<div class="row" style="align-items:center">'+
         '<div class="grow"><div class="row-title">'+esc(p.naziv)+'</div>'+
           '<div class="row-sub">'+esc(p.usluga||'')+(p.mjesto ? ' · '+esc(p.mjesto) : '')+'</div>'+
-          (tel ? '<a class="clink" href="tel:'+esc(tel)+'" style="font-size:14px;font-weight:700">📞 '+esc(p.tel)+'</a>' : '')+'</div>'+
+          (tel ? '<a class="clink" href="tel:'+esc(tel)+'" style="font-size:var(--t-meta);font-weight:700">📞 '+esc(p.tel)+'</a>' : '')+'</div>'+
         '<button class="btn primary sm" style="flex-shrink:0" onclick="app.zabiljeziServis(\''+kId+'\',\''+p.id+'\')">Zabilježi poziv</button>'+
       '</div>';
-    }).join('') : '<div class="empty" style="padding:12px">Nema kontakata vrste Servis. Dodaj ga u Poruke → Kontakti.</div>';
+    }).join('') : '<div class="empty" style="padding:var(--r3)">Nema kontakata vrste Servis. Dodaj ga u Poruke → Kontakti.</div>';
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Zovi servis</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<div class="row-sub" style="margin-bottom:8px">'+esc(m.name)+' &middot; '+esc(k.opis)+'</div>'+
+      '<div class="row-sub" style="margin-bottom:var(--r2)">'+esc(m.name)+' &middot; '+esc(k.opis)+'</div>'+
       '<div class="row-sub" style="margin-bottom:10px">Nazovi, pa "Zabilježi poziv" — kvar dobiva oznaku <b>Čeka servis</b>, a na Rasporedu nastaje zadatak s kontaktom (tko dolazi, kad).</div>'+
       '<div class="card" style="padding:4px 0">'+redovi+'</div>'+
-      '<button class="btn sec block" style="margin-top:12px" onclick="app.closeModal();app.detaljKvara(\''+kId+'\')">Natrag</button>'+
+      '<button class="btn sec block" style="margin-top:var(--r3)" onclick="app.closeModal();app.detaljKvara(\''+kId+'\')">Natrag</button>'+
       '</div></div>';
   },
   zabiljeziServis: async function(kId, partnerId){
@@ -6580,7 +6588,7 @@ var app = {
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
       '<div class="modal-head"><h3>Kad dolazi?</h3><button class="x" onclick="app.closeModal();app.detaljKvara(\''+kId+'\')">✕</button></div>'+
       '<div class="row-sub" style="margin-bottom:10px">'+esc(z.opis)+'</div>'+
-      '<div style="display:flex;gap:8px">'+
+      '<div style="display:flex;gap:var(--r2)">'+
         '<button class="btn sec" style="flex:1" onclick="app.premjestiNa(\'zadatak\',\''+zId+'\',\''+todayISO()+'\').then(function(){app.detaljKvara(\''+kId+'\');})">Danas</button>'+
         '<button class="btn sec" style="flex:1" onclick="app.premjestiNa(\'zadatak\',\''+zId+'\',\''+isoShift(1)+'\').then(function(){app.detaljKvara(\''+kId+'\');})">Sutra</button>'+
         '<button class="btn sec" style="flex:1" onclick="app.premjestiNa(\'zadatak\',\''+zId+'\',\''+isoShift(7)+'\').then(function(){app.detaljKvara(\''+kId+'\');})">+7 dana</button>'+
@@ -6615,7 +6623,7 @@ var app = {
         '<label>Razlog storniranja (ostaje u evidenciji)</label>'+
         '<textarea name="razlog" rows="2" required placeholder="npr. duplo prijavljen, kriva prijava…"></textarea>'+
         '<button class="btn primary block" type="submit">Storniraj</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</form></div></div>';
   },
   saveStorno: async function(e, kId){
@@ -6717,9 +6725,9 @@ var app = {
         '<input type="file" id="dok-input-foto" class="file-input" accept="image/*" capture="environment" onchange="app.dokumentOdabran(event)">'+
         '<label for="dok-input-foto" class="btn sec block file-label">📷 Slikaj papir</label>'+
         '<input type="file" id="dok-input-datoteka" class="file-input" accept="application/pdf,image/*" onchange="app.dokumentOdabran(event)">'+
-        '<label for="dok-input-datoteka" class="btn sec block file-label" style="margin-top:8px">📄 Odaberi datoteku</label>'+
+        '<label for="dok-input-datoteka" class="btn sec block file-label" style="margin-top:var(--r2)">📄 Odaberi datoteku</label>'+
         '<div id="dok-ime" class="row-sub" style="margin-top:6px"></div>'+
-        '<button class="btn primary block" type="submit" style="margin-top:8px">Spremi dokument</button>'+
+        '<button class="btn primary block" type="submit" style="margin-top:var(--r2)">Spremi dokument</button>'+
       '</form></div></div>';
   },
   saveDokument: async function(e, mId){
@@ -6770,7 +6778,7 @@ var app = {
       '<div class="modal-head"><h3>Obriši dokument?</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
       '<div class="row-sub" style="margin-bottom:10px">'+esc(d.naziv)+'</div>'+
       '<button class="btn opasno block" onclick="app.potvrdiBrisanjeDokumenta(\''+id+'\')">Obriši</button>'+
-      '<button class="btn sec block" style="margin-top:8px" onclick="app.closeModal()">Odustani</button>'+
+      '<button class="btn sec block" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
       '</div></div>';
   },
   potvrdiBrisanjeDokumenta: async function(id){
@@ -6945,7 +6953,7 @@ var app = {
     $('#modal-root').innerHTML =
       '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal audit">'+
       '<div class="modal-head"><h3>Izvještaj za audit (IFS)</h3>'+
-        '<span style="display:flex;gap:8px;align-items:center">'+
+        '<span style="display:flex;gap:var(--r2);align-items:center">'+
         '<button class="btn sec sm" onclick="window.print()">Ispis / PDF</button>'+
         '<button class="x" onclick="app.closeModal()">✕</button></span></div>'+
       '<div class="print-head"><img src="'+document.querySelector('.hdr-logo').src+'" alt="Clarum">'+
@@ -6953,7 +6961,7 @@ var app = {
         '<div class="ph-sub">'+esc(TVRTKA.puni_naziv||TVRTKA.naziv)+' &middot; Sektor održavanja &middot; '+fmtDate(todayISO())+
         ' &middot; ref. '+esc(TVRTKA.audit_norma)+'</div></div></div>'+
       '<div class="a-meta">Generirano: '+fmtDate(todayISO())+' &middot; '+esc(TVRTKA.puni_naziv||TVRTKA.naziv)+' &middot; Sektor održavanja &middot; ref. '+esc(TVRTKA.audit_norma)+'</div>'+
-      '<label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Razdoblje zahvata</label>'+
+      '<label style="font-size:var(--t-label);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Razdoblje zahvata</label>'+
       '<select onchange="app.audit(this.value)" style="margin:4px 0 6px">'+
         '<option value="30"'+(dani===30?' selected':'')+'>Zadnjih 30 dana</option>'+
         '<option value="90"'+(dani===90?' selected':'')+'>Zadnjih 90 dana</option>'+
@@ -6969,7 +6977,7 @@ var app = {
       '<div class="a-sub">Kontrola propuštanja i godišnji servis — MB Frigo (ugovor); punjenja rashladne tvari evidentiraju se po datumu, količini i razlogu.</div>'+
       otvHtml+
       '<button class="btn sec block" style="margin-top:18px" onclick="window.print()">Ispis / PDF</button>'+
-      '<button class="btn primary block" style="margin-top:8px" onclick="app.closeModal()">Zatvori</button>'+
+      '<button class="btn primary block" style="margin-top:var(--r2)" onclick="app.closeModal()">Zatvori</button>'+
       '</div></div>';
   }
 };
@@ -7076,10 +7084,10 @@ function neMozePlanirati(){ return SESSION.role==='readonly' || SESSION.role==='
    Ne pamti se više trajanje po osobi (rijetko stvarno korišteno), samo tko je pomogao. */
 function sudjelovaliCheckbox(trenutno){
   trenutno = trenutno || '';
-  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px">'+
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--r1);margin-top:var(--r1)">'+
     MAJSTORI.map(function(ime){
       return '<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;'+
-        'font-size:13px;font-weight:500;color:var(--text);margin:0">'+
+        'font-size:var(--t-meta);font-weight:500;color:var(--text);margin:0">'+
         '<input type="checkbox" name="sudjelovali_ime" value="'+esc(ime)+'" style="width:auto"'+
         (trenutno.indexOf(ime)>-1?' checked':'')+'> '+esc(ime)+'</label>';
     }).join('')+'</div>';
@@ -7096,10 +7104,10 @@ function dijeloviDatalist(polje, id){
 }
 function strojeviCheckbox(odabrani){
   odabrani = odabrani || [];
-  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px">'+
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--r1);margin-top:var(--r1)">'+
     DATA.machines.map(function(m){
       return '<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;'+
-        'font-size:13px;font-weight:500;color:var(--text);margin:0">'+
+        'font-size:var(--t-meta);font-weight:500;color:var(--text);margin:0">'+
         '<input type="checkbox" name="stroj_id" value="'+m.id+'" style="width:auto"'+
         (odabrani.indexOf(m.id)>-1?' checked':'')+'> '+esc(m.name)+'</label>';
     }).join('')+'</div>';

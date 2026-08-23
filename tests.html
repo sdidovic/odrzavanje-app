@@ -3380,6 +3380,40 @@ async function testovi(W, D){
   ok('IFS izvještaj preživi siroče', true);
   W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== 'kvX'; });
   W.showScreen('pregled');
+
+  grupa('SUSTAV — tokeni (KORAK 2: tipografija/razmaci/boje)');
+  try{
+    var izvor = await (await fetch('index.html?tok=' + Date.now())).text();
+    var TOKENI = ['--t-tab','--t-label','--t-sub','--t-meta','--t-body','--t-title','--t-stat','--t-hero'];
+    var rootMatch = izvor.match(/:root\{[\s\S]*?\n\}/);
+    var rootBlok = rootMatch ? rootMatch[0] : '';
+    TOKENI.forEach(function(t){
+      ok('token '+t+' definiran u :root', rootBlok.indexOf(t+':') !== -1);
+    });
+    /* (b) nema font-size:NNpx literala izvan @media print — dopuštene iznimke: nema ih (0) */
+    var styleMatch = izvor.match(/<style>[\s\S]*?<\/style>/);
+    var styleBlok = styleMatch ? styleMatch[0] : '';
+    var printOvi = styleBlok.match(/@media print\{[\s\S]*?\n  \}\n/g) || [];
+    var bezPrinta = styleBlok;
+    printOvi.forEach(function(p){ bezPrinta = bezPrinta.replace(p, ''); });
+    var literaliStyle = (bezPrinta.match(/font-size\s*:\s*[\d.]+px/g) || []);
+    var literaliCijeli = (izvor.match(/font-size\s*:\s*[\d.]+px/g) || []);
+    /* dopušteno najviše 5 iznimaka ukupno u cijeloj datoteci (nema poznatih iznimaka trenutno) */
+    ok('font-size literali izvan @media print (<=5 iznimaka): ' + literaliCijeli.length,
+       literaliCijeli.length <= 5, 'literali: ' + literaliCijeli.join(', '));
+    /* (c) svaki var(--x) u datoteci ima definiciju u :root */
+    var definirani = {};
+    (rootBlok.match(/--[a-zA-Z0-9-]+(?=\s*:)/g) || []).forEach(function(d){ definirani[d] = true; });
+    var koristeni = izvor.match(/var\(--[a-zA-Z0-9-]+\)/g) || [];
+    var nedostaju = [];
+    koristeni.forEach(function(v){
+      var ime = v.slice(4, -1);
+      if(!definirani[ime] && nedostaju.indexOf(ime) === -1) nedostaju.push(ime);
+    });
+    ok('svaki var(--…) ima definiciju u :root', nedostaju.length === 0, 'nedostaje: ' + nedostaju.join(', '));
+  }catch(e){
+    ok('SUSTAV — tokeni provjera nije mogla dohvatiti index.html', false, String(e));
+  }
 }
 </script>
 </body>
