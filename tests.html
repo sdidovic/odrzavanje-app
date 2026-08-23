@@ -1106,9 +1106,11 @@ async function testovi(W, D){
   var brNarudzbi = W.DATA.nabava.length;
   var kritican = W.DATA.dijelovi.filter(function(p){ return p.stanje < p.min; })[0];
   app.naruciDio(kritican.id); await cekaj(150);
-  var nf = D.querySelector('#modal-root form');
-  ok('narudžba predlaže količinu do dvostrukog minimuma',
-     parseInt(nf.elements.kolicina.value,10) >= kritican.min);
+  /* VLASNIK-3B: sheet narudžbe je sad u #sheet-root (donji list), ne #modal-root;
+     zadana količina je max(1, min-stanje), ne "do dvostrukog minimuma" */
+  var nf = D.querySelector('#sheet-root form');
+  ok('narudžba predlaže zadano max(1, min-stanje)',
+     parseInt(nf.elements.kolicina.value,10) === Math.max(1, kritican.min - kritican.stanje));
   nf.elements.kolicina.value = '3';
   posalji(nf); await cekaj(250);
   jednako('narudžba je zabilježena', W.DATA.nabava.length, brNarudzbi + 1);
@@ -1119,10 +1121,10 @@ async function testovi(W, D){
   ok('zapis o narudžbi je u kanalu',
      W.DATA.poruke.some(function(p){ return p.tko==='Sustav' && p.tekst.indexOf('Naručeno') > -1; }));
   var stanjePrijePrimitka = W.dioPoId(kritican.id).stanje;
-  /* primitak je modal (PLAN-KAIZEN K-1), ne prompt() */
+  /* primitak je sheet (donji list), ne prompt() */
   app.primiNabavu(nova.id); await cekaj(120);
-  f = D.querySelector('#modal-root form');
-  ok('primitak je uredan modal, ne prompt()', !!f && !!f.elements.kol);
+  f = D.querySelector('#sheet-root form');
+  ok('primitak je uredan sheet, ne prompt()', !!f && !!f.elements.kol);
   f.elements.kol.value = '3';
   posalji(f); await cekaj(250);
   jednako('primitak povećava stanje', W.dioPoId(kritican.id).stanje, stanjePrijePrimitka + 3);
@@ -1140,7 +1142,7 @@ async function testovi(W, D){
      D.querySelector('#parts-list').innerHTML.indexOf('toggleNaruceno') === -1);
   var brPrijeD = W.DATA.nabava.length;
   app.naruciDio(kritican2.id); await cekaj(150);
-  var nf2 = D.querySelector('#modal-root form');
+  var nf2 = D.querySelector('#sheet-root form');
   nf2.elements.kolicina.value = '2';
   posalji(nf2); await cekaj(250);
   jednako('narudžba s Dijelova je zabilježena u Nabavi', W.DATA.nabava.length, brPrijeD + 1);
@@ -1148,17 +1150,67 @@ async function testovi(W, D){
   ok('dio više nije na popisu "Za naručiti"',
      D.querySelector('#screen-nabava').innerHTML.indexOf('app.naruciDio(\''+kritican2.id+'\')') === -1);
 
+  grupa('VLASNIK-3B narudžba i primitak — sheet u tri/dva dodira');
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  var dio3B = { id:'d3Btest', naziv:'TEST3B dio', stroj:'V1', lokacija:'A1',
+    stanje:2, min:6, dob:'Tokić', cijena:5, kategorija:'Ostalo', strojevi:[] };
+  W.DATA.dijelovi.push(dio3B);
+  app.naruciDio(dio3B.id); await cekaj(100);
+  var f3B = D.querySelector('#sheet-root form');
+  jednako('sheet narudžbe zadano predlaže max(1, min-stanje)', f3B.elements.kolicina.value, '4');
+  app.narudzbaKolSet(5); await cekaj(30);
+  jednako('čip "5" postavlja količinu na 5', D.getElementById('narudzba-kol').value, '5');
+  ok('gumb primarne radnje kaže "Naruči 5 kom"',
+     D.getElementById('narudzba-submit-btn').textContent.indexOf('Naruči 5 kom') > -1);
+  var brNar3B = W.DATA.nabava.length, brPor3B = W.DATA.poruke.length;
+  posalji(D.querySelector('#sheet-root form')); await cekaj(150);
+  jednako('spremanje stvara narudžbu', W.DATA.nabava.length, brNar3B + 1);
+  var nar3B = W.DATA.nabava[W.DATA.nabava.length-1];
+  jednako('narudžba nosi predloženu količinu i zadanog dobavljača', nar3B.kolicina+'|'+nar3B.dobavljac, '5|Tokić');
+  ok('sysPoruka "Naručeno" je zabilježena',
+     W.DATA.poruke.length > brPor3B &&
+     W.DATA.poruke[W.DATA.poruke.length-1].tekst.indexOf('Naručeno') > -1);
+
+  app.primiNabavu(nar3B.id); await cekaj(100);
+  var fp3B = D.querySelector('#sheet-root form');
+  jednako('sheet primitka zadano predlaže naručenu (preostalu) količinu', fp3B.elements.kol.value, '5');
+  var stanje3BPrije = dio3B.stanje;
+  posalji(fp3B); await cekaj(200);
+  jednako('"Zaprimi" diže stanje za primljenu količinu', dio3B.stanje, stanje3BPrije + 5);
+  ok('"Zaprimi" zatvara narudžbu', !!nar3B.primljeno);
+
+  /* majstor smije zaprimiti (role-write), ne smije naručiti (role-voditelj) — nigdje u putu
+     narudžbe/primitka ne smije ostati role-voditelj blokada na primitku */
+  var dio3Bb = { id:'d3Bbtest', naziv:'TEST3B dio B', stroj:'V1', lokacija:'A1',
+    stanje:1, min:5, dob:'Tokić', cijena:1, kategorija:'Ostalo', strojevi:[] };
+  W.DATA.dijelovi.push(dio3Bb);
+  W.SESSION = { ime:'Tehničar', role:'majstor' }; D.body.dataset.role = 'majstor';
+  app.naruciDio(dio3Bb.id); await cekaj(100);
+  ok('sheet narudžbe se otvara i pod ulogom majstor, ali primarni gumb je role-voditelj (skriven)',
+     W.getComputedStyle(D.getElementById('narudzba-submit-btn')).display === 'none');
+  app.narudzbaZatvori();
+  var narZaMajstora = { id:'nb3Btest', dio_id:dio3Bb.id, kolicina:2, dobavljac:'Tokić',
+    narucen:W.todayISO(), ocekivano:null, primljeno:null, primljena_kolicina:null, cijena:1, tko:'Voditelj' };
+  W.DATA.nabava.push(narZaMajstora);
+  app.primiNabavu(narZaMajstora.id); await cekaj(100);
+  ok('majstor vidi primarni gumb primitka (role-write, nije role-voditelj)',
+     W.getComputedStyle(D.getElementById('primitak-submit-btn')).display !== 'none');
+  app.primitakZatvori();
+  W.DATA.nabava = W.DATA.nabava.filter(function(n){ return n.id!=='nb3Btest'; });
+  W.DATA.dijelovi = W.DATA.dijelovi.filter(function(p){ return p.id!=='d3Btest' && p.id!=='d3Bbtest'; });
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+
   grupa('Skladište jače — G5 (djelomični primitak, povijest, K-2/K-3)');
   /* S8.1: djelomični primitak — narudžba ostaje otvorena dok kumulativno ne stigne sve */
   var dioZaDjel = W.DATA.dijelovi[0];
   var stanjeZaDjel = dioZaDjel.stanje;
   app.naruciDio(dioZaDjel.id); await cekaj(120);
-  var fD = D.querySelector('#modal-root form');
+  var fD = D.querySelector('#sheet-root form');
   fD.elements.kolicina.value = '5';
   posalji(fD); await cekaj(200);
   var narDjel = W.DATA.nabava[W.DATA.nabava.length-1];
   app.primiNabavu(narDjel.id); await cekaj(120);
-  var fp1 = D.querySelector('#modal-root form');
+  var fp1 = D.querySelector('#sheet-root form');
   jednako('primitak predlaže punu preostalu količinu (prvi put = sve)', fp1.elements.kol.value, '5');
   fp1.elements.kol.value = '2';
   posalji(fp1); await cekaj(200);
@@ -1167,7 +1219,7 @@ async function testovi(W, D){
   jednako('stanje dijela raste za primljeno', dioZaDjel.stanje, stanjeZaDjel + 2);
   ok('narudžba i dalje u dolasku (djelomično)', !!W.narudzbaZaDio(dioZaDjel.id));
   app.primiNabavu(narDjel.id); await cekaj(120);
-  var fp2 = D.querySelector('#modal-root form');
+  var fp2 = D.querySelector('#sheet-root form');
   jednako('drugi primitak predlaže samo preostalo (3, ne ukupnih 5)', fp2.elements.kol.value, '3');
   posalji(fp2); await cekaj(200);
   ok('narudžba se zatvara kad kumulativno dosegne naručeno', !!narDjel.primljeno);
@@ -1194,8 +1246,12 @@ async function testovi(W, D){
   app.naruciZaKvar(kvarCekaDio.id); await cekaj(120);
   var fk3 = D.querySelector('#modal-root form');
   posalji(fk3); await cekaj(150);
-  var fk3b = D.querySelector('#modal-root form');
+  /* VLASNIK-3B: naruciDio (iz naruciZaKvar) sad otvara sheet u #sheet-root, s vidljivim čipom
+     "za kvar: <stroj>" i skrivenim kvar_id */
+  var fk3b = D.querySelector('#sheet-root form');
   ok('obrazac narudžbe iz kvara nosi skrivenu vezu na kvar', fk3b.elements.kvar_id.value === kvarCekaDio.id);
+  ok('sheet narudžbe iz kvara prikazuje čip "za kvar"',
+     D.querySelector('#sheet-root').textContent.indexOf('za kvar:') > -1);
   posalji(fk3b); await cekaj(200);
   var narK3 = W.DATA.nabava[W.DATA.nabava.length-1];
   jednako('narudžba iz kvara nosi kvar_id', narK3.kvar_id, kvarCekaDio.id);
@@ -1211,7 +1267,7 @@ async function testovi(W, D){
   var origObavijest = W.posaljiObavijest;
   W.posaljiObavijest = function(naslov, tekst, ruta, samoZa){ obavijesti.push({naslov:naslov, samoZa:samoZa}); };
   app.primiNabavu(narK3.id); await cekaj(120);
-  var fk3c = D.querySelector('#modal-root form');
+  var fk3c = D.querySelector('#sheet-root form');
   fk3c.elements.kol.value = String(narK3.kolicina);
   posalji(fk3c); await cekaj(200);
   W.posaljiObavijest = origObavijest;
@@ -1242,7 +1298,7 @@ async function testovi(W, D){
   /* mock nema .from — da bi nenamjeran poziv apiUpdate glasno pukao umjesto tihog upisa */
   W.sb = { rpc: function(){ return Promise.resolve({data:null, error:null}); } };
   app.primiNabavu(narM1.id); await cekaj(80);
-  var fM1 = D.querySelector('#modal-root form');
+  var fM1 = D.querySelector('#sheet-root form');
   fM1.elements.kol.value = '2';
   posalji(fM1); await cekaj(200);
   ok('RPC koji vrati null (već zaprimljeno) javlja toast "već zaprimljena"',
@@ -1278,7 +1334,7 @@ async function testovi(W, D){
      !!btnNaruciM && W.getComputedStyle(btnNaruciM).display === 'none');
   /* nakon zaprimanja majstor se vraća na ekran s kojeg je došao (Nabava mu nije u traci) */
   app.primiNabavu(narM2.id); await cekaj(100);
-  var fM2 = D.querySelector('#modal-root form');
+  var fM2 = D.querySelector('#sheet-root form');
   fM2.elements.kol.value = '1';
   posalji(fM2); await cekaj(200);
   jednako('nakon zaprimanja majstor se vraća na ekran s kojeg je došao (Skladište)', W.CURRENT_SCREEN, 'dijelovi');
@@ -2582,9 +2638,11 @@ async function testovi(W, D){
   fSku.elements.sku.value = 'TEST-SKU-042';
   posalji(fSku); await cekaj(120);
   jednako('šifra dijela je spremljena', dioZaSku.sku, 'TEST-SKU-042');
+  /* VLASNIK-3B: novi sheet narudžbe je smanjen na stanje/min/dobavljač (bez šifre u zaglavlju) —
+     šifra i dalje postoji na dijelu (gore provjereno), samo se više ne ponavlja u sheetu narudžbe */
   app.naruciDio(dioZaSku.id); await cekaj(100);
-  ok('šifra se vidi u obrascu narudžbe', D.querySelector('#modal-root').textContent.indexOf('TEST-SKU-042') > -1);
-  app.closeModal();
+  ok('sheet narudžbe se otvara i za dio sa šifrom', D.querySelector('#sheet-root form') !== null);
+  app.narudzbaZatvori();
   dioZaSku.sku = null;
 
   /* Sustav → Korisnici: redak je za čitanje (miran ekran), tri radnje idu u detalj na dodir */

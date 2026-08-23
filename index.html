@@ -1497,6 +1497,9 @@ function odabirPolje(cfg){
     '</button>';
 }
 var ODABIR_CFG = null;
+/* VLASNIK-3B: stanje stepera količine u sheetu narudžbe/primitka (jedan po vremenu, sheet je modalan) */
+var NARUDZBA_KOL = 1;
+var PRIMITAK_KOL = 1;
 function renderOdabirSheet(){
   var cfg = ODABIR_CFG;
   if(!cfg){ $('#sheet-root').innerHTML=''; return; }
@@ -3190,8 +3193,8 @@ function dioKarticaHtml(p){
   if(p.lokacija) meta.push(esc(p.lokacija));
   if(vidiFinancije()) meta.push(EUR(p.cijena));
   var primarni = nar
-    ? '<button class="btn primary block role-write" style="min-height:52px" onclick="app.closeModal();app.primiNabavu(\''+nar.id+'\')">Stiglo</button>'
-    : '<button class="btn primary block role-voditelj" style="min-height:52px" onclick="app.closeModal();app.naruciDio(\''+p.id+'\')">Naruči</button>';
+    ? '<button class="btn primary block role-write" style="min-height:52px" onclick="app.primiNabavu(\''+nar.id+'\',true)">Stiglo</button>'
+    : '<button class="btn primary block role-voditelj" style="min-height:52px" onclick="app.naruciDio(\''+p.id+'\',null,true)">Naruči</button>';
   var yellowHtml = '';
   if(nar){
     var preostalo = nar.kolicina - (nar.primljena_kolicina||0);
@@ -6435,30 +6438,65 @@ var app = {
     await apiUpdate('partneri', id, { naziv:pt.naziv, usluga:pt.usluga, mjesto:pt.mjesto,
       tel:pt.tel, email:pt.email, nap:pt.nap, tip:pt.tip });
   },
-  naruciDio: function(id, kvarId){
+  /* VLASNIK-3B: "Naruči" u tri dodira — donji list (sheet-root), veliki stepper količine +
+     brzi čipovi, dobavljač kroz app.odabir, sklopljeni detalji ("+ Više"). Spremanje
+     (saveNarudzbu) je netaknuto — samo markup obrasca je nov. izKartice=true kad je pozvano
+     iz kartice dijela: zatvori karticu prvo (jednostavnije od slaganja listova), ponovno je
+     otvori nakon spremanja (VLASNIK-3B t.6). */
+  naruciDio: function(id, kvarId, izKartice){
     var p = dioPoId(id);
     if(!p) return;
-    var dobOpcije = DATA.partneri.map(function(x){ return { v:x.naziv, t:x.naziv }; });
-    var predlozena = Math.max(1, (p.min * 2) - p.stanje);
+    if(izKartice) app.closeModal();
     var kv = kvarId ? DATA.kvarovi.filter(function(x){ return x.id===kvarId; })[0] : null;
-    $('#modal-root').innerHTML =
-      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
-      '<div class="modal-head"><h3>Naruči dio</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<div style="font-size:var(--t-body);font-weight:650">'+esc(p.naziv)+'</div>'+
-      '<div class="row-sub" style="margin-bottom:var(--r1)">stanje '+p.stanje+' / minimum '+p.min+
-        (p.sku ? ' &middot; šifra '+esc(p.sku) : '')+'</div>'+
-      (kv ? '<div class="row-sub" style="margin-bottom:var(--r1)">Vezano uz kvar: '+esc(kv.opis)+'</div>' : '')+
-      '<form onsubmit="app.saveNarudzbu(event,\''+id+'\')">'+
+    var zadnja = (DATA.nabava||[]).filter(function(n){ return n.dio_id===id; })
+      .sort(function(a,b){ return String(b.narucen||'').localeCompare(String(a.narucen||'')); })[0];
+    var predlozena = zadnja ? Math.max(1, zadnja.kolicina) : Math.max(1, p.min - p.stanje);
+    var dobZadano = (zadnja && zadnja.dobavljac) || p.dob || '';
+    var dobOpcije = DATA.partneri.filter(function(x){ return (x.tip||'Dobavljač')==='Dobavljač'; })
+      .map(function(x){ return { v:x.naziv, t:x.naziv }; });
+    NARUDZBA_KOL = predlozena;
+    $('#sheet-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.narudzbaZatvori()"><div class="modal sheet">'+
+      '<div class="modal-head sheet-glava"><h3 style="font-size:var(--t-title);font-weight:700">Naruči: '+esc(p.naziv)+'</h3>'+
+        '<button class="x" type="button" onclick="app.narudzbaZatvori()" aria-label="Zatvori" style="width:44px;height:44px">'+
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>'+
+        '</button></div>'+
+      '<div class="s" style="margin:-2px 0 var(--r3)">stanje '+p.stanje+' &middot; min '+p.min+' &middot; '+esc(dobZadano||'bez dobavljača')+'</div>'+
+      (kv ? '<span class="chip rad" style="margin-bottom:var(--r2);display:inline-block">za kvar: '+esc((machineById(kv.m)||{}).name||kv.opis)+'</span>' : '')+
+      '<form onsubmit="app.saveNarudzbu(event,\''+id+'\','+(izKartice?'true':'false')+')">'+
         (kv ? '<input type="hidden" name="kvar_id" value="'+esc(kv.id)+'">' : '')+
-        '<label>Količina</label><input type="number" name="kolicina" min="1" step="1" value="'+predlozena+'" required>'+
-        '<label>Dobavljač</label>'+odabirPolje({name:'dobavljac', opcije:dobOpcije, odabrano:p.dob||'', naslov:'Dobavljač'})+
-        '<label>Očekivana isporuka</label><input type="date" name="ocekivano" min="'+todayISO()+'">'+
-        '<label>Cijena po komadu (€)</label><input type="number" name="cijena" min="0" step="0.01" value="'+(p.cijena||0)+'">'+
-        '<label>Napomena</label><input name="napomena" placeholder="npr. hitno — stroj čeka">'+
-        '<button class="btn primary block" type="submit">Zabilježi narudžbu</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
+        '<input type="hidden" name="kolicina" id="narudzba-kol" value="'+predlozena+'">'+
+        '<div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:6px 0 12px">'+
+          '<button type="button" class="qbtn" style="width:44px;height:44px" onclick="app.narudzbaQty(-1)" aria-label="Manje">&minus;</button>'+
+          '<span id="narudzba-kol-prikaz" style="font-size:var(--t-hero);font-weight:800;min-width:56px;text-align:center">'+predlozena+'</span>'+
+          '<button type="button" class="qbtn" style="width:44px;height:44px" onclick="app.narudzbaQty(1)" aria-label="Više">+</button>'+
+        '</div>'+
+        '<div class="f-trak" style="justify-content:center;gap:8px;margin-bottom:var(--r3)">'+
+          [1,2,5,10].map(function(n){ return '<span class="f" onclick="app.narudzbaKolSet('+n+')">'+n+'</span>'; }).join('')+
+        '</div>'+
+        '<label>Dobavljač</label>'+odabirPolje({name:'dobavljac', opcije:dobOpcije, odabrano:dobZadano, naslov:'Dobavljač'})+
+        '<details style="margin-top:var(--r2)"><summary style="min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600;color:var(--accent)">+ Više</summary>'+
+          '<div class="role-fin"><label>Cijena po komadu (€)</label><input type="number" name="cijena" min="0" step="0.01" value="'+(p.cijena||0)+'"></div>'+
+          '<label>Očekivana isporuka</label><input type="date" name="ocekivano" min="'+todayISO()+'">'+
+          '<label>Napomena</label><input name="napomena" placeholder="npr. hitno — stroj čeka">'+
+        '</details>'+
+        '<button class="btn primary block role-voditelj" type="submit" id="narudzba-submit-btn" style="min-height:52px;margin-top:var(--r3)">Naruči '+predlozena+' kom</button>'+
       '</form></div></div>';
   },
+  narudzbaQty: function(delta){
+    NARUDZBA_KOL = Math.max(1, NARUDZBA_KOL + delta);
+    app.narudzbaOsvjeziKol();
+  },
+  narudzbaKolSet: function(n){
+    NARUDZBA_KOL = n;
+    app.narudzbaOsvjeziKol();
+  },
+  narudzbaOsvjeziKol: function(){
+    var hid = document.getElementById('narudzba-kol'); if(hid) hid.value = NARUDZBA_KOL;
+    var prikaz = document.getElementById('narudzba-kol-prikaz'); if(prikaz) prikaz.textContent = NARUDZBA_KOL;
+    var btn = document.getElementById('narudzba-submit-btn'); if(btn) btn.textContent = 'Naruči '+NARUDZBA_KOL+' kom';
+  },
+  narudzbaZatvori: function(){ $('#sheet-root').innerHTML=''; },
   /* K-3: ulaz "naruči dio" IZ kvara koji čeka dio — veza se upiše sama */
   naruciZaKvar: function(kId){
     if(jeTempId(kId)){ alert('Zapis se upravo sprema u bazu — pokušaj za par sekundi.'); return; }
@@ -6523,7 +6561,7 @@ var app = {
     }
     await apiUpdate('kvarovi', kId, { zam:k.zam });
   },
-  saveNarudzbu: async function(e, dioId){
+  saveNarudzbu: async function(e, dioId, izKartice){
     e.preventDefault();
     var f = new FormData(e.target);
     var p = dioPoId(dioId);
@@ -6541,7 +6579,11 @@ var app = {
     };
     if(!DATA.nabava) DATA.nabava = [];
     DATA.nabava.push(n);
-    app.closeModal(); showScreen('nabava');
+    /* VLASNIK-3B: sheet je u #sheet-root, ne #modal-root — zatvori sheet i, ako je narudžba
+       pokrenuta iz kartice dijela, vrati korisnika na karticu (t.6) umjesto na Nabavu. */
+    $('#sheet-root').innerHTML = '';
+    if(izKartice) app.otvoriDio(dioId); else showScreen('nabava');
+    toast('Naručeno ✓');
     var spremljeno = await apiInsert('nabava', { dio_id:n.dio_id, kolicina:n.kolicina, dobavljac:n.dobavljac,
       narucen:n.narucen, ocekivano:n.ocekivano, cijena:n.cijena, napomena:n.napomena, tko:n.tko,
       kvar_id:n.kvar_id }, n);
@@ -6549,46 +6591,75 @@ var app = {
       sysPoruka('🧾 Naručeno: '+(p?p.naziv:'dio')+' ×'+n.kolicina+' kod '+(n.dobavljac||'—')+
         (n.ocekivano ? ', očekivano '+fmtDate(n.ocekivano) : '')+' ('+(SESSION.ime||'')+')');
   },
-  primiNabavu: function(id){
+  /* VLASNIK-3B: "Stiglo" u dva dodira — donji list, veliki stepper (zadano = cijeli preostatak,
+     jer to je najčešći slučaj), čip "Sve (N)". izKartice: isti obrazac kao naruciDio t.6. */
+  primiNabavu: function(id, izKartice){
     var n = (DATA.nabava||[]).filter(function(x){ return x.id===id; })[0];
     if(!n) return;
     if(jeTempId(id)){ alert('Narudžba se upravo sprema — pokušaj za par sekundi.'); return; }
+    if(izKartice) app.closeModal();
     var p = dioPoId(n.dio_id);
+    /* S8.1: djelomični primitak — stigne li manje od preostalog, narudžba ostaje
+       otvorena s ostatkom umjesto da nestane kao da je sve stiglo */
     var preostalo = n.kolicina - (n.primljena_kolicina||0);
-    $('#modal-root').innerHTML =
-      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
-      '<div class="modal-head"><h3>Primitak narudžbe</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
-      '<div class="row-sub" style="margin-bottom:2px">'+esc(p?p.naziv:'dio')+' &middot; naručeno ×'+n.kolicina+
-        (n.primljena_kolicina ? ' &middot; dosad stiglo ×'+n.primljena_kolicina : '')+
-        (n.dobavljac?' kod '+esc(n.dobavljac):'')+'</div>'+
-      '<form onsubmit="app.savePrimitak(event,\''+id+'\')">'+
-        /* S8.1: djelomični primitak — stigne li manje od preostalog, narudžba ostaje
-           otvorena s ostatkom umjesto da nestane kao da je sve stiglo */
-        '<label>Koliko je komada stiglo (preostalo ×'+preostalo+')?</label>'+
-        '<input type="number" name="kol" min="1" max="'+preostalo+'" step="1" value="'+preostalo+'" required>'+
-        '<button class="btn primary block" type="submit">Zaprimi</button>'+
-        '<button class="btn sec block" type="button" style="margin-top:var(--r2)" onclick="app.closeModal()">Odustani</button>'+
+    PRIMITAK_KOL = preostalo;
+    $('#sheet-root').innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)app.primitakZatvori()"><div class="modal sheet">'+
+      '<div class="modal-head sheet-glava"><h3 style="font-size:var(--t-title);font-weight:700">Stiglo: '+esc(p?p.naziv:'dio')+'</h3>'+
+        '<button class="x" type="button" onclick="app.primitakZatvori()" aria-label="Zatvori" style="width:44px;height:44px">'+
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>'+
+        '</button></div>'+
+      '<div class="s" style="margin:-2px 0 var(--r3)">naručeno '+n.kolicina+' &middot; '+esc(n.dobavljac||'—')+' &middot; naručeno '+fmtDate(n.narucen)+'</div>'+
+      (n.primljena_kolicina ? '<div class="s" style="margin:-2px 0 var(--r3)">dosad stiglo &times;'+n.primljena_kolicina+' &middot; preostalo &times;'+preostalo+'</div>' : '')+
+      '<form onsubmit="app.savePrimitak(event,\''+id+'\','+(izKartice?'true':'false')+')">'+
+        '<input type="hidden" name="kol" id="primitak-kol" value="'+preostalo+'">'+
+        '<div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:6px 0 12px">'+
+          '<button type="button" class="qbtn" style="width:44px;height:44px" onclick="app.primitakQty(-1,'+preostalo+')" aria-label="Manje">&minus;</button>'+
+          '<span id="primitak-kol-prikaz" style="font-size:var(--t-hero);font-weight:800;min-width:56px;text-align:center">'+preostalo+'</span>'+
+          '<button type="button" class="qbtn" style="width:44px;height:44px" onclick="app.primitakQty(1,'+preostalo+')" aria-label="Više">+</button>'+
+        '</div>'+
+        '<div class="f-trak" style="justify-content:center;margin-bottom:var(--r3)">'+
+          '<span class="f" onclick="app.primitakKolSet('+preostalo+')">Sve ('+preostalo+')</span>'+
+        '</div>'+
+        '<button class="btn primary block role-write" type="submit" id="primitak-submit-btn" style="min-height:52px">Zaprimi '+preostalo+' kom</button>'+
       '</form></div></div>';
   },
-  savePrimitak: async function(e, id){
+  primitakQty: function(delta, max){
+    PRIMITAK_KOL = Math.max(1, Math.min(max, PRIMITAK_KOL + delta));
+    app.primitakOsvjezi();
+  },
+  primitakKolSet: function(n){
+    PRIMITAK_KOL = n;
+    app.primitakOsvjezi();
+  },
+  primitakOsvjezi: function(){
+    var hid = document.getElementById('primitak-kol'); if(hid) hid.value = PRIMITAK_KOL;
+    var prikaz = document.getElementById('primitak-kol-prikaz'); if(prikaz) prikaz.textContent = PRIMITAK_KOL;
+    var btn = document.getElementById('primitak-submit-btn'); if(btn) btn.textContent = 'Zaprimi '+PRIMITAK_KOL+' kom';
+  },
+  primitakZatvori: function(){ $('#sheet-root').innerHTML=''; },
+  savePrimitak: async function(e, id, izKartice){
     e.preventDefault();
     var n = (DATA.nabava||[]).filter(function(x){ return x.id===id; })[0];
     if(!n || n.primljeno) return;
     var preostalo = n.kolicina - (n.primljena_kolicina||0);
     var kol = Math.max(0, Math.min(preostalo, parseInt(new FormData(e.target).get('kol'),10) || 0));
     if(!kol) return;
-    app.closeModal();
+    /* VLASNIK-3B: sheet je u #sheet-root, ne #modal-root */
+    $('#sheet-root').innerHTML = '';
     var p = dioPoId(n.dio_id);
     var novaPrimljena = (n.primljena_kolicina||0) + kol;
     var zavrseno = novaPrimljena >= n.kolicina;
     n.primljena_kolicina = novaPrimljena;
     n.primljeno = zavrseno ? todayISO() : null;
     if(p) p.stanje = p.stanje + kol;
-    /* SIM-FIX M4: majstor stiže u Nabavu preko "Nabava"/"Otvori u Nabavi" na Skladištu — Nabava
+    /* VLASNIK-3B t.6: iz kartice dijela → natrag na karticu (ne na Nabavu/Skladište).
+       SIM-FIX M4: majstor stiže u Nabavu preko "Nabava"/"Otvori u Nabavi" na Skladištu — Nabava
        mu nije u donjoj traci, pa bi nakon zaprimanja ostao na ekranu bez povratka. Vrati ga na
        ekran s kojeg je stvarno došao (isti PRIJASNJI_EKRAN obrazac kao drugdje u appu); voditelj
        ostaje na Nabavi jer tipično zaprima više stavki zaredom. */
-    showScreen(SESSION.role==='majstor' ? (PRIJASNJI_EKRAN || 'dijelovi') : 'nabava');
+    if(izKartice) app.otvoriDio(n.dio_id);
+    else showScreen(SESSION.role==='majstor' ? (PRIJASNJI_EKRAN || 'dijelovi') : 'nabava');
     if(REMOTE && naMrezi()){
       /* SIM-FIX M1: dosad je SVAKI neuspjeh RPC-a (i "prava" mrežna greška i čisto "netko je
          narudžbu već zaprimio") padao u isti catch koji upisuje lokalno optimistički izračunato
@@ -6617,6 +6688,7 @@ var app = {
       await apiUpdate('nabava', id, { primljeno:n.primljeno, primljena_kolicina:n.primljena_kolicina });
       if(p) await apiUpdate('dijelovi', p.id, { stanje:p.stanje });
     }
+    toast('Zaprimljeno ✓ · na skladištu '+(p?p.stanje:'?'));
     sysPoruka('📦 Primljeno: '+(p?p.naziv:'dio')+' ×'+kol+
       (zavrseno ? ' — narudžba zatvorena' : ' (preostalo ×'+(n.kolicina-novaPrimljena)+', narudžba ostaje otvorena)')+
       ' — na skladištu '+(p?p.stanje:'?')+' ('+(SESSION.ime||'')+')');
