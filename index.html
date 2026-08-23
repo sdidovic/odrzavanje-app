@@ -93,6 +93,7 @@ h1{font-size:var(--t-body);font-weight:700;letter-spacing:-.2px;line-height:1.15
 .hdr-badge{font-size:var(--t-label);font-weight:700;padding:4px 8px;border-radius:6px;white-space:nowrap;
   background:var(--btn-audit-bg);border:1px solid var(--btn-audit-rub);color:var(--card)}
 .hdr-badge.crveno{background:var(--red);border-color:var(--red)}
+.hdr-badge.plavo{background:var(--plava-tekst);border-color:var(--plava-tekst)}
 .btn-audit{background:var(--btn-audit-bg);border:1px solid var(--btn-audit-rub);color:var(--card);
   font-size:var(--t-label);font-weight:700;line-height:1.25;padding:4px 8px;border-radius:6px;
   text-align:center;cursor:pointer;flex-shrink:0;white-space:nowrap;backdrop-filter:blur(2px);
@@ -3320,7 +3321,13 @@ function partsListHtml(){
             '<div class="card" style="border-color:var(--red-border)">'+krit.map(dioIspodMinRow).join('')+'</div>';
   }
   if(otv.length){
-    html += '<div class="sec" style="color:var(--yellow)"><span>U dolasku</span><span>'+otv.length+'</span></div>'+
+    /* SMJER-D: gumb "Nabava (N)" je maknut s vrha Skladišta — put do povijesti narudžbi je
+       sad ovaj link, samo za voditelja (majstor nema razloga listati sve narudžbe, samo
+       zaprima ono što stoji u ovoj sekciji). */
+    html += '<div class="sec" style="color:var(--yellow)"><span>U dolasku &middot; '+otv.length+'</span>'+
+            '<a href="javascript:void(0)" class="role-voditelj" style="min-height:44px;min-width:44px;'+
+              'display:inline-flex;align-items:center;justify-content:flex-end;color:var(--yellow);'+
+              'font-weight:700;text-transform:none;letter-spacing:0" onclick="app.go(\'nabava\')">sve narudžbe &rsaquo;</a></div>'+
             '<div class="card" style="border-color:var(--yellow-border)">'+otv.map(dioUDolaskuRow).join('')+'</div>';
   }
   var kats = {};
@@ -3384,8 +3391,10 @@ function renderNabava(){
   $('#screen-nabava').innerHTML =
     '<button class="back" onclick="app.go(\'dijelovi\')">‹ Skladište</button>'+
     /* AUDIT-FIX (UX): korisnik koji stigne preko brojke "Za naručiti" s Pregleda nije
-       nigdje vidio ime ekrana na kojem se nalazi — jedini orijentir bio je gumb "natrag". */
-    '<div style="font-size:var(--t-title);font-weight:700;margin:4px 0 10px">Nabava</div>'+
+       nigdje vidio ime ekrana na kojem se nalazi — jedini orijentir bio je gumb "natrag".
+       SMJER-D (t.5): ekran je sad povijest narudžbi dostupna preko "sve narudžbe ›" na
+       Skladištu — naslov "Narudžbe" bolje opisuje sadržaj nego generično "Nabava". */
+    '<div style="font-size:var(--t-title);font-weight:700;margin:4px 0 10px">Narudžbe</div>'+
     '<h2>Za naručiti ('+zaNar.length+')</h2>'+
     '<div class="card">'+ (zaNar.length ? zaNar.map(function(p){
       return '<div class="row"><div class="grow">'+
@@ -3418,20 +3427,13 @@ function renderNabava(){
 function renderDijelovi(){
   var vrijednost = 0;
   DATA.dijelovi.forEach(function(p){ vrijednost += p.stanje * p.cijena; });
-  /* SMJER-B: "+ Novi dio" seli u #fab (varijanta na ovom ekranu, role-voditelj) —
-     zadržan je samo ulaz u Nabavu (role-write, zaprimanje RLS već dopušta tehničaru). */
+  /* SMJER-B: "+ Novi dio" seli u #fab (varijanta na ovom ekranu, role-voditelj).
+     SMJER-D: gumb "Nabava (N)" je maknut s vrha — put do povijesti narudžbi je sad link
+     "sve narudžbe ›" u naslovu sekcije "U dolasku" (partsListHtml), samo za voditelja. */
   $('#screen-dijelovi').innerHTML =
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:var(--r2)">'+
       '<input type="search" placeholder="Naziv, stroj, dobavljač…" value="'+esc(PART_Q)+'"'+
         ' oninput="app.traziDio(this.value)" style="flex:1;margin-bottom:0">'+
-      '<button class="btn-mini role-write" style="position:relative" onclick="app.go(\'nabava\')">Nabava'+
-        (function(){
-          var otv = otvoreneNarudzbe();
-          if(!otv.length) return '';
-          var kasni = otv.filter(function(n){ return n.ocekivano && n.ocekivano < todayISO(); }).length;
-          /* značka kašnjenja — isti obrazac kao badge na karticama u dnu, ali za "nešto kasni" */
-          return ' ('+otv.length+')'+(kasni ? '<span class="badge" style="top:-7px;right:-7px">'+kasni+'</span>' : '');
-        })()+'</button>'+
     '</div>'+
     '<div id="parts-list">'+partsListHtml()+'</div>'+
     (vidiFinancije() ? '<div class="row-sub" style="text-align:center;margin-top:var(--r3)">Vrijednost skladišta: <b style="color:var(--text)">'+EUR(vrijednost)+'</b></div>' : '');
@@ -4063,7 +4065,10 @@ function planRedak(x, opts){
     onclick = x.tip==='prev' ? "app.akcijeStavke('preventiva','"+it.id+"')" : "app.detaljKvara('"+it.id+"')";
   } else if(x.tip==='prev'){
     onclick = "app.akcijeStavke('preventiva','"+it.id+"')";
-    naslov = esc(it.opis);
+    /* SMJER-E (t.2): "Pregled" ispred opisa u Danas/Kasni/Sljedećih 7 dana — Kasnije/Bez roka
+       (opts.tiho) su namjerno tiši prikaz i tu oznaku ne dobivaju. Kvar već ima svoj crveni
+       status čip (kChip niže), ovo ga ne dira. */
+    naslov = (!opts.tiho ? '<span class="k acc" style="margin-right:6px;vertical-align:middle">Pregled</span>' : '')+esc(it.opis);
     var vanjski = it.izv && it.izv!=='interno';
     tekst.push('Redovni pregled'+(vanjski ? ' · <b>'+esc(it.izv)+'</b>' : ''));
     if(m) tekst.push(esc(m.name));
@@ -4187,6 +4192,49 @@ function renderStoji(sz){
   var stoje = sz.sada.filter(function(k){ return zaustavljaLiniju(k); });
   if(!stoje.length) return '';
   return renderSec('Stoji', null, {crv:true})+stoje.map(stojiRedak).join('');
+}
+
+/* ---------- SMJER-E: "Servis dolazi" — auto-zadaci iz "Zovi servis" (opis počinje "Servis ")
+   ili zadaci s kontaktom tipa Servis, otvoreni i s rokom unutar 7 dana (ili bez roka).
+   Prikazuje se na SAM VRH tehničarova rasporeda, iznad "Stoji" — prazna sekcija se ne renderira. */
+function servisDolaziStavke(){
+  var granica = isoShift(7);
+  var servisIds = {};
+  (DATA.partneri||[]).forEach(function(p){ if(p.tip==='Servis') servisIds[p.id] = true; });
+  return DATA.kvarovi.filter(function(k){
+    if((k.tip||'kvar')!=='zadatak' || !jeOtvoren(k)) return false;
+    var jeServis = String(k.opis||'').indexOf('Servis ')===0 || (k.kontakt_id && servisIds[k.kontakt_id]);
+    if(!jeServis) return false;
+    return !k.rok || k.rok <= granica;
+  }).sort(function(a,b){ return String(a.rok||'9999').localeCompare(String(b.rok||'9999')); });
+}
+function servisRokChipTxt(rok){
+  if(!rok) return 'bez roka';
+  var danas = todayISO();
+  if(rok < danas) return 'kasni';
+  if(rok === danas) return 'danas';
+  if(rok === isoShift(1)) return 'sutra';
+  return DANI_KR[new Date(rok+'T00:00:00').getDay()]+'.';
+}
+function servisRedak(k){
+  var kont = k.kontakt_id ? (DATA.partneri||[]).filter(function(p){ return p.id===k.kontakt_id; })[0] : null;
+  var izvorK = k.izvor_kvar ? DATA.kvarovi.filter(function(x){ return x.id===k.izvor_kvar; })[0] : null;
+  var m = izvorK && izvorK.m ? machineById(izvorK.m) : null;
+  var naslov = (kont ? esc(kont.naziv) : 'Servis')+(m ? ' &middot; '+esc(m.name) : '');
+  var opisKvara = izvorK ? izvorK.opis : k.opis;
+  var opisSkr = opisKvara ? (String(opisKvara).length>50 ? esc(String(opisKvara).slice(0,50))+'…' : esc(opisKvara)) : '';
+  var rokTxt = k.rok ? fmtDate(k.rok) : 'bez roka';
+  return '<div class="li click" data-id="'+k.id+'" style="border-left-color:var(--plava-rub)" onclick="app.detaljKvara(\''+k.id+'\')">'+
+    '<div class="grow"><div class="t">'+naslov+'</div>'+
+    '<div class="s">'+esc(rokTxt)+(opisSkr ? ' &middot; '+opisSkr : '')+'</div></div>'+
+    '<span class="k" style="background:var(--plava-bg);color:var(--plava-tekst)">'+esc(servisRokChipTxt(k.rok))+'</span>'+
+  '</div>';
+}
+function renderServisDolazi(){
+  var stavke = servisDolaziStavke();
+  if(!stavke.length) return '';
+  return renderSec('Servis dolazi &middot; '+stavke.length, null)+
+    '<div class="card" style="border-color:var(--plava-rub)">'+stavke.map(servisRedak).join('')+'</div>';
 }
 
 /* ---------- ZONA 3: Sada u pogonu (kvarovi = stvarnost dana) ---------- */
@@ -4380,6 +4428,7 @@ function renderRaspored(){
     renderTjedniTrak(sz)+
     premjestiHtml+
     (vidiTim ? renderTim(sz) : '')+
+    renderServisDolazi()+
     renderStoji(sz)+
     renderPlan(sz)+
     renderSadaUPogonu(sz);
@@ -4790,10 +4839,11 @@ function oblikOtvoren(n){
 function postaviBadgeveEkrana(name){
   if(name==='raspored'){
     var sz = danSazetak(todayISO());
+    var nServis = servisDolaziStavke().length;
     postaviBadgeve([
       { tekst: sz.n+' danas' },
       { tekst: sz.kasni+' kasne', crveno: sz.kasni>0 }
-    ]);
+    ].concat(nServis>0 ? [{ tekst: nServis+' servis', plavo:true }] : []));
   } else if(name==='kvarovi'){
     var nOtv = DATA.kvarovi.filter(function(k){ return jeOtvoren(k) && (k.tip||'kvar')==='kvar'; }).length;
     postaviBadgeve([{ tekst: nOtv+' '+oblikOtvoren(nOtv), crveno: nOtv>0 }]);
@@ -4847,7 +4897,7 @@ function postaviBadgeve(stavke){
   var el = document.getElementById('hdr-badges');
   if(!el) return;
   el.innerHTML = (stavke||[]).map(function(s){
-    return '<span class="hdr-badge'+(s.crveno?' crveno':'')+'">'+esc(s.tekst)+'</span>';
+    return '<span class="hdr-badge'+(s.crveno?' crveno':'')+(s.plavo?' plavo':'')+'">'+esc(s.tekst)+'</span>';
   }).join('');
 }
 /* SMJER-B: FAB (⚡ brza prijava) je vidljiv na pregled/kvarovi/raspored, i skriven dok
@@ -6750,11 +6800,18 @@ var app = {
       '<div class="li click" onclick="app.viseZatvori();app.closeModal();showScreen(\'nabava\')"><div class="t">Narudžbe (povijest)</div></div>'+
       '</div></div></div>';
   },
+  /* SMJER-D (t.4): "+ Novi dio" je sad .sheet (isti obrazac kao ostali donji listovi), a
+     Kategorija/Dobavljač idu kroz app.odabir (odabirPolje) — skriveni <select>/name su isti
+     kao prije, saveDio čita FormData po istom name pa je spremanje netaknuto. */
   noviDio: function(){
-    var dobOpts = DATA.partneri.map(function(p){ return '<option>'+esc(p.naziv)+'</option>'; }).join('');
+    var dobOpcije = DATA.partneri.map(function(p){ return { v:p.naziv, t:p.naziv }; });
+    var katOpcije = KAT_DIJELOVA.map(function(k){ return { v:k, t:k }; });
     $('#modal-root').innerHTML =
-      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal">'+
-      '<div class="modal-head"><h3>Novi dio</h3><button class="x" onclick="app.closeModal()">✕</button></div>'+
+      '<div class="overlay" onclick="if(event.target===this)app.closeModal(\'izvan\')"><div class="modal sheet">'+
+      '<div class="modal-head sheet-glava"><h3 style="font-size:var(--t-title);font-weight:700">Novi dio</h3>'+
+        '<button class="x" type="button" onclick="app.closeModal()" aria-label="Zatvori" style="width:44px;height:44px">'+
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>'+
+        '</button></div>'+
       '<form onsubmit="app.saveDio(event)">'+
         '<label>Naziv dijela</label><input name="naziv" required placeholder="npr. Remen, ležaj, brtva…">'+
         '<label>Za koje strojeve</label>'+strojeviCheckbox([])+
@@ -6767,11 +6824,10 @@ var app = {
           dijeloviDatalist('sku','dio-sku-dl')+
         '<label>Stanje na skladištu</label><input type="number" name="stanje" min="0" step="1" value="1" required>'+
         '<label>Minimum</label><input type="number" name="min" min="0" step="1" value="1" required>'+
-        '<label>Dobavljač</label><select name="dob">'+dobOpts+'</select>'+
-        '<label>Kategorija</label><select name="kat">'+
-          KAT_DIJELOVA.map(function(k){ return '<option>'+esc(k)+'</option>'; }).join('')+'</select>'+
+        '<label>Dobavljač</label>'+odabirPolje({name:'dob', opcije:dobOpcije, odabrano:'', naslov:'Dobavljač', placeholder:'— odaberi —'})+
+        '<label>Kategorija</label>'+odabirPolje({name:'kat', opcije:katOpcije, odabrano:KAT_DIJELOVA[0], naslov:'Kategorija', placeholder:'— odaberi —'})+
         '<label>Cijena (€)</label><input type="number" name="cijena" min="0" step="1" value="0" required>'+
-        '<button class="btn primary block" type="submit">Spremi dio</button>'+
+        '<button class="btn primary block" type="submit" style="min-height:52px">Spremi dio</button>'+
       '</form></div></div>';
   },
   saveDio: async function(e){
@@ -8127,7 +8183,7 @@ function sudjelovaliCheckbox(trenutno){
   return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--r1);margin-top:var(--r1)">'+
     MAJSTORI.map(function(ime){
       return '<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;'+
-        'font-size:var(--t-meta);font-weight:500;color:var(--text);margin:0">'+
+        'font-size:var(--t-meta);font-weight:500;color:var(--text);margin:0;min-height:44px">'+
         '<input type="checkbox" name="sudjelovali_ime" value="'+esc(ime)+'" style="width:auto"'+
         (trenutno.indexOf(ime)>-1?' checked':'')+'> '+esc(ime)+'</label>';
     }).join('')+'</div>';
@@ -8147,7 +8203,7 @@ function strojeviCheckbox(odabrani){
   return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--r1);margin-top:var(--r1)">'+
     DATA.machines.map(function(m){
       return '<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;'+
-        'font-size:var(--t-meta);font-weight:500;color:var(--text);margin:0">'+
+        'font-size:var(--t-meta);font-weight:500;color:var(--text);margin:0;min-height:44px">'+
         '<input type="checkbox" name="stroj_id" value="'+m.id+'" style="width:auto"'+
         (odabrani.indexOf(m.id)>-1?' checked':'')+'> '+esc(m.name)+'</label>';
     }).join('')+'</div>';

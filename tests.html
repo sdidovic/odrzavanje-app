@@ -1099,7 +1099,10 @@ async function testovi(W, D){
 
   grupa('Nabava');
   app.go('dijelovi'); await cekaj(150);
-  ok('Dijelovi imaju ulaz u nabavu', D.querySelector('#screen-dijelovi').innerHTML.indexOf('Nabava') > -1);
+  /* SMJER-D: gumb "Nabava (N)" je maknut s vrha Skladišta — vrh nosi samo pretragu,
+     put do povijesti narudžbi je link "sve narudžbe ›" u naslovu sekcije "U dolasku". */
+  ok('vrh Skladišta više nema gumb "Nabava"',
+     D.querySelector('#screen-dijelovi > div:first-child').innerHTML.indexOf('nabava') === -1);
   app.go('nabava'); await cekaj(200);
   ok('nabava prikazuje što treba naručiti',
      D.querySelector('#screen-nabava').textContent.indexOf('Za naručiti') > -1);
@@ -1321,10 +1324,12 @@ async function testovi(W, D){
   W.DATA.nabava.push(narM2);
   W.SESSION = { ime:'Tehničar', role:'majstor' }; D.body.dataset.role = 'majstor';
   app.go('dijelovi'); await cekaj(150);
-  var btnNabavaTabM = Array.prototype.filter.call(D.querySelectorAll('#screen-dijelovi button'),
-    function(b){ return b.textContent.indexOf('Nabava') === 0; })[0];
-  ok('tehničar vidi gumb "Nabava" na Skladištu (RLS mu zaprimanje već dopušta)',
-     !!btnNabavaTabM && W.getComputedStyle(btnNabavaTabM).display !== 'none');
+  /* SMJER-D: "sve narudžbe ›" na vrhu sekcije "U dolasku" je role-voditelj — tehničar
+     do Nabave/povijesti narudžbi ne dolazi s vrha Skladišta, samo zaprima kroz redak
+     "U dolasku" (RLS mu zaprimanje već dopušta, testirano niže preko primiNabavu). */
+  var linkNabavaTabM = D.querySelector('#screen-dijelovi a[onclick*="app.go(\'nabava\')"]');
+  ok('tehničar (majstor) NEMA link "sve narudžbe" na Skladištu (samo voditelj)',
+     !linkNabavaTabM || W.getComputedStyle(linkNabavaTabM).display === 'none');
   app.go('nabava'); await cekaj(200);
   var btnStigloM = D.querySelector('#screen-nabava button[onclick="app.primiNabavu(\'narM2test\')"]');
   var btnNaruciM = D.querySelector('#screen-nabava button[onclick="app.naruciDio(\'dioM2\')"]');
@@ -2402,8 +2407,10 @@ async function testovi(W, D){
     ocekivano:W.isoShift(-3), primljeno:null, primljena_kolicina:null, cijena:5, tko:'Voditelj' };
   W.DATA.nabava.push(nKasni);
   app.go('dijelovi'); await cekaj(100);
-  ok('gumb Nabava nosi crvenu značku kad nešto kasni',
-     D.querySelector('#screen-dijelovi .badge') !== null);
+  /* VLASNIK-3D: gumb „Nabava" više ne postoji na Skladištu — kašnjenje se vidi u retku
+     „U dolasku" kao „Kasni isporuka" (i u header badge-u preko postaviBadgeveEkrana). */
+  ok('kasna isporuka je označena na Skladištu (redak „U dolasku")',
+     D.querySelector('#screen-dijelovi').textContent.indexOf('Kasni isporuka') > -1);
   W.DATA.nabava = W.DATA.nabava.filter(function(n){ return n.id !== 'nbKASNI1'; });
 
   /* Analitika: redak Ukupno + odabir točnog mjeseca */
@@ -4020,6 +4027,111 @@ async function testovi(W, D){
   ok('povijest u kartici sadrži poruku "Primljeno" za dio',
      D.querySelector('#modal-root').innerHTML.indexOf('Primljeno') > -1);
   app.closeModal();
+
+  grupa('VLASNIK-3D navigacija (Skladište bez gumba "Nabava", novi dio je sheet)');
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
+  var dio3D = { id:'d3Dtest', naziv:'TEST 3D ispod minimuma', stroj:'V1', lokacija:'A1',
+    stanje:0, min:5, dob:'Tokić', cijena:1, kategorija:'Ostalo', strojevi:[] };
+  var narudzba3D = { id:'nb3Dtest', dio_id:'d3Dtest2', kolicina:2, primljena_kolicina:0,
+    primljeno:null, kvar_id:null, narucen:W.todayISO(), ocekivano:W.isoShift(2), dobavljac:'Tokić' };
+  var dio3D2 = { id:'d3Dtest2', naziv:'TEST 3D u dolasku', stroj:'V1', lokacija:'A1',
+    stanje:1, min:2, dob:'Tokić', cijena:1, kategorija:'Ostalo', strojevi:[] };
+  W.DATA.dijelovi.push(dio3D, dio3D2);
+  W.DATA.nabava.push(narudzba3D);
+  app.go('dijelovi'); await cekaj(150);
+  ok('vrh Skladišta nema gumb "Nabava (N)"',
+     D.querySelector('#screen-dijelovi > div:first-child').innerHTML.indexOf('nabava') === -1);
+  var linkSveNarudzbeV = D.querySelector('#parts-list a[onclick*="app.go(\'nabava\')"]');
+  ok('naslov "U dolasku" ima link "sve narudžbe ›" za voditelja',
+     !!linkSveNarudzbeV && W.getComputedStyle(linkSveNarudzbeV).display !== 'none' &&
+     linkSveNarudzbeV.textContent.indexOf('sve narudžbe') > -1);
+  D.body.dataset.role = 'majstor';
+  ok('isti link je sakriven za majstora (role-voditelj)',
+     W.getComputedStyle(linkSveNarudzbeV).display === 'none');
+  D.body.dataset.role = 'voditelj';
+  var redakIspodMin3D = D.querySelector('#parts-list [onclick*="app.otvoriDio(\'d3Dtest\')"]');
+  ok('"Naruči" u retku ispod minimuma otvara sheet narudžbe (app.naruciDio bez izKartice)',
+     !!redakIspodMin3D && redakIspodMin3D.innerHTML.indexOf("app.naruciDio('d3Dtest')") > -1 &&
+     redakIspodMin3D.innerHTML.indexOf("app.naruciDio('d3Dtest',") === -1);
+  app.naruciDio('d3Dtest'); await cekaj(100);
+  ok('klik "Naruči" doista otvara sheet narudžbe u #sheet-root', !!D.querySelector('#sheet-root form'));
+  app.narudzbaZatvori();
+  var redakUDolasku3D = D.querySelector('#parts-list [onclick*="app.otvoriDio(\'d3Dtest2\')"]');
+  ok('"Stiglo" u retku "U dolasku" zove app.primiNabavu(narudzba.id)',
+     !!redakUDolasku3D && redakUDolasku3D.innerHTML.indexOf("app.primiNabavu('nb3Dtest')") > -1);
+  app.primiNabavu('nb3Dtest'); await cekaj(100);
+  ok('klik "Stiglo" doista otvara sheet primitka u #sheet-root', !!D.querySelector('#sheet-root form'));
+  app.primitakZatvori();
+  app.noviDio(); await cekaj(100);
+  ok('"+ Novi dio" je sad .sheet (ne stari .modal bez sheet klase)',
+     !!D.querySelector('#modal-root .modal.sheet'));
+  var brDijelovaPrije3D = W.DATA.dijelovi.length;
+  var f3D = D.querySelector('#modal-root form');
+  f3D.elements.naziv.value = 'TEST 3D novi dio';
+  f3D.elements.stanje.value = '3';
+  f3D.elements.min.value = '1';
+  f3D.elements.cijena.value = '2';
+  posalji(f3D); await cekaj(150);
+  jednako('spremanje novog dijela (saveDio) i dalje radi kroz .sheet obrazac',
+     W.DATA.dijelovi.length, brDijelovaPrije3D + 1);
+  ok('novi dio je zabilježen s ispravnim nazivom',
+     W.DATA.dijelovi[W.DATA.dijelovi.length-1].naziv === 'TEST 3D novi dio');
+  W.DATA.dijelovi = W.DATA.dijelovi.filter(function(p){
+    return p.id!=='d3Dtest' && p.id!=='d3Dtest2' && p.naziv!=='TEST 3D novi dio'; });
+  W.DATA.nabava = W.DATA.nabava.filter(function(n){ return n.id!=='nb3Dtest'; });
+
+  grupa('VLASNIK-8 servis dolazi (Raspored — tehničarov dan)');
+  var strojServis8 = W.DATA.machines[0];
+  var partnerServis8 = { id:'ptServis8', naziv:'MB Frigo', usluga:'servis rashladne tehnike',
+    mjesto:'', nap:'', tel:'', email:'', tip:'Servis' };
+  W.DATA.partneri.push(partnerServis8);
+  var izvorKvar8 = { id:'kvServis8'+Date.now(), m:strojServis8.id, date:W.todayISO(),
+    opis:'TEST kvar za servis', sati:0, status:'otvoren', upoz:false, tip:'kvar',
+    kategorija:'Ostalo', dodijeljen:'Tehničar', ceka_dio:false, ceka_servis:true,
+    prioritet:'normalno', otpusteno:false, privremeni:false, rok_sanacije:null };
+  var zadatakServis8 = { id:'zadServis8'+Date.now(), m:strojServis8.id, date:W.todayISO(),
+    opis:'Servis MB Frigo — TEST kvar za servis', sati:0, status:'otvoren', upoz:false, tko:null,
+    zam:null, foto:null, dodijeljen:'Tehničar', prioritet:'normalno', smjena:null,
+    ceka_dio:false, ceka_servis:false, sudjelovali:null, tip:'zadatak', rok:W.isoShift(1),
+    kategorija:'Ostalo', otpusteno:false, privremeni:false, rok_sanacije:null,
+    izvor_kvar:izvorKvar8.id, kontakt_id:partnerServis8.id, ponavljanje:null,
+    created_at:new Date().toISOString() };
+  W.DATA.kvarovi.push(izvorKvar8, zadatakServis8);
+  W.SESSION = { ime:'Tehničar', role:'majstor' }; D.body.dataset.role = 'majstor';
+  app.go('raspored'); await cekaj(150);
+  var sviSecoviServis8 = D.querySelectorAll('#screen-raspored .sec');
+  var secoviServis8 = Array.prototype.filter.call(sviSecoviServis8,
+    function(s){ return s.textContent.indexOf('Servis dolazi') > -1; });
+  ok('sekcija "Servis dolazi" postoji i prikazana je PRVA (iznad "Stoji"/plana)',
+     secoviServis8.length === 1 && sviSecoviServis8[0] === secoviServis8[0]);
+  var kartica8 = secoviServis8[0].nextElementSibling;
+  ok('redak "Servis dolazi" prikazuje kontakt i stroj u naslovu',
+     !!kartica8 && kartica8.textContent.indexOf('MB Frigo') > -1 &&
+     kartica8.textContent.indexOf(strojServis8.name) > -1);
+  ok('redak nosi čip roka "sutra"', !!kartica8 && kartica8.textContent.indexOf('sutra') > -1);
+  ok('#hdr-badges dobiva plavi badge "servis" kad sekcija ima stavke',
+     D.getElementById('hdr-badges').innerHTML.indexOf('servis') > -1 &&
+     D.getElementById('hdr-badges').innerHTML.indexOf('plavo') > -1);
+
+  var prevServis8 = { id:'prServis8'+Date.now(), m:strojServis8.id, opis:'TEST redovni pregled servis8',
+    interval:30, next:W.todayISO(), izv:'interno', dodijeljen:'Tehničar', trajanje_h:1,
+    zaustavlja_liniju:false };
+  W.DATA.preventiva.push(prevServis8);
+  app.go('raspored'); await cekaj(150);
+  ok('preventiva u sekciji "Danas" nosi oznaku "Pregled" ispred opisa',
+     D.querySelector('#screen-raspored').innerHTML.indexOf('class="k acc"') > -1 &&
+     D.querySelector('#screen-raspored').innerHTML.indexOf('>Pregled<') > -1);
+
+  W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){
+    return k.id!==izvorKvar8.id && k.id!==zadatakServis8.id; });
+  W.DATA.preventiva = W.DATA.preventiva.filter(function(p){ return p.id!==prevServis8.id; });
+  W.DATA.partneri = W.DATA.partneri.filter(function(p){ return p.id!==partnerServis8.id; });
+  app.go('raspored'); await cekaj(150);
+  ok('bez otvorenih "Servis" zadataka sekcija "Servis dolazi" se uopće ne renderira',
+     D.querySelector('#screen-raspored').innerHTML.indexOf('Servis dolazi') === -1);
+  ok('bez stavki badge "servis" nestaje iz headera',
+     D.getElementById('hdr-badges').innerHTML.indexOf('servis') === -1);
+  W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
 
   grupa('SUSTAV — tokeni (KORAK 2: tipografija/razmaci/boje)');
   try{
