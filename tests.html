@@ -404,20 +404,32 @@ async function testovi(W, D){
   ok('direktor ne vidi gumbe za pisanje', !pisi || W.getComputedStyle(pisi).display === 'none');
   W.showScreen('dijelovi');
   ok('direktor vidi vrijednost skladišta', D.querySelector('#screen-dijelovi').innerHTML.indexOf('Vrijednost skladišta') > -1);
-  /* §15 #4 — direktorov hero na Pregledu */
+  /* §15 #4 → SMJER-B (DirektorB): hero + "Sada stoji"/"Najveći zastoj"/"Najskuplji strojevi"/
+     "Po mjesecima" kao samostalne .li/.bar-row sekcije umjesto .rasp-hero-grid/.dir-stoji.
+     Stara .dir-hero/.rasp-stat/.rasp-hero-grid oznaka je ukinuta u novom obliku. */
   W.showScreen('pregled');
-  var dirHero = D.querySelector('#screen-pregled .dir-hero');
-  ok('direktor ima hero blok na vrhu Pregleda (§15 #4)', !!dirHero && D.querySelector('#screen-pregled').firstElementChild === dirHero);
-  ok('hero nosi € ovaj mjesec kao glavnu brojku', !!dirHero && /€/.test(dirHero.querySelector('.rasp-dan-h1').textContent));
-  ok('hero ima 3 statistike (otvoreno / zastoja / kasni servis)', !!dirHero && dirHero.querySelectorAll('.rasp-stat').length === 3);
-  ok('hero ima redak "Stoji:" ili "Sve linije rade"', !!dirHero && !!dirHero.querySelector('.dir-stoji'));
+  var dirEkran = D.querySelector('#screen-pregled');
+  ok('direktor ima trošak zastoja kao brojku na vrhu Pregleda (SMJER-B)',
+    /€/.test(dirEkran.firstElementChild.textContent));
+  ok('direktor ima gumb "Analitika ›" koji vodi na analitiku (≥44px)', (function(){
+    var btn = [...dirEkran.querySelectorAll('button')].find(function(b){ return /Analitika/.test(b.textContent); });
+    return !!btn && btn.getAttribute('onclick').indexOf("app.go('analitika')") > -1 &&
+      btn.getBoundingClientRect().height >= 44;
+  })());
+  ok('direktor ima sekciju "Sada stoji"', dirEkran.textContent.indexOf('Sada stoji') > -1);
+  ok('direktorov hero ima čip trenda pored brojke troška (kad postoji prošli mjesec za usporedbu)', (function(){
+    var chip = dirEkran.firstElementChild.querySelector('.k.red, .k.grn');
+    return !chip || /vs\./.test(chip.textContent);   /* nema prošlog mjeseca za usporedbu → nema čipa, i to je ispravno */
+  })());
   ok('direktor NEMA sklopljenu traku financija (hero ju je zamijenio)', !D.querySelector('#screen-pregled .rasp-kal-traka'));
   ok('direktor NEMA "Moji zadaci" (nema što raditi)', D.querySelector('#screen-pregled').textContent.indexOf('Moji zadaci') === -1);
-  ok('direktor NEMA 3 stat kartice (hero ih je zamijenio)', !D.querySelector('#screen-pregled .stat-grid'));
+  ok('direktor NEMA .st traku (nije njegov posao)', !D.querySelector('#screen-pregled .st'));
   W.SESSION = { ime:'Voditelj', role:'voditelj' };
   D.body.dataset.role = 'voditelj';
   W.showScreen('pregled');
-  ok('voditelj i dalje ima klasični Pregled (stat kartice, ne hero)', !!D.querySelector('#screen-pregled .stat-grid') && !D.querySelector('#screen-pregled .dir-hero'));
+  ok('voditelj ima traku .st sa 4 ćelije, ne dir-hero (SMJER-B)',
+    !!D.querySelector('#screen-pregled .st') && !D.querySelector('#screen-pregled .dir-hero') &&
+    D.querySelector('#screen-pregled .st').children.length === 4);
 
   grupa('Analitika');
   W.ANA_DANA = 365;
@@ -785,9 +797,11 @@ async function testovi(W, D){
   /* redak "Raspored i zadaci" je izbačen (PLAN-KAIZEN S1) — dupli put do iste kartice */
   ok('Pregled nema redak "Raspored i zadaci"',
      D.querySelector('#screen-pregled').textContent.indexOf('Raspored i zadaci') === -1);
-  ok('kartica "Zaostali servisi" vodi na Raspored', (function(){
-     var s = Array.prototype.filter.call(D.querySelectorAll('#screen-pregled .stat'),
-       function(e){ return e.textContent.indexOf('Zaostali servisi') > -1; })[0];
+  /* SMJER-B: stara "Zaostali servisi" stat kartica je zamijenjena ćelijom "pregleda kasne"
+     u .st traci (VoditeljB) — ista brojka (late.length), isti klik (Raspored). */
+  ok('ćelija "pregleda kasne" u .st traci vodi na Raspored', (function(){
+     var s = Array.prototype.filter.call(D.querySelectorAll('#screen-pregled .st button'),
+       function(e){ return e.textContent.indexOf('pregleda kasne') > -1; })[0];
      return !!s && String(s.getAttribute('onclick')||'').indexOf("go('raspored')") > -1;
   })());
   app.go('raspored'); await cekaj(120);
@@ -798,12 +812,12 @@ async function testovi(W, D){
   ok('kritični dijelovi su na vrhu', D.querySelector('#parts-list .sec').textContent.indexOf('minimuma') > -1);
   ok('pretraga skladišta ima novi placeholder (SMJER-B maketa SkladisteB)',
      D.querySelector('#screen-dijelovi input[type="search"]').placeholder.indexOf('dobavljač') > -1);
-  ok('kartica na Pregledu kaže "Za naručiti", ne "Dijelovi za naručiti"', (function(){
+  ok('ćelija na Pregledu kaže "naručiti", ne "Dijelovi za naručiti"', (function(){
      W.SESSION = { ime:'Voditelj', role:'voditelj' }; D.body.dataset.role = 'voditelj';
      app.go('pregled');
-     var labele = Array.prototype.map.call(D.querySelectorAll('#screen-pregled .stat-label'), function(e){ return e.textContent; });
+     var labele = Array.prototype.map.call(D.querySelectorAll('#screen-pregled .st span'), function(e){ return e.textContent; });
      app.go('dijelovi');
-     return labele.indexOf('Za naručiti') > -1 && labele.indexOf('Dijelovi za naručiti') === -1;
+     return labele.indexOf('naručiti') > -1 && labele.indexOf('Dijelovi za naručiti') === -1;
   })());
   /* F4 §2b: lokacija na skladištu (dijelovi.lokacija je postojao u bazi, nikad u UI) */
   var dioZaLok = W.DATA.dijelovi[0];
@@ -1570,20 +1584,22 @@ async function testovi(W, D){
   app.pregledFinToggle(); await cekaj(80);   /* zatvori za sljedeće testove */
   W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id!=='kvPM1' && k.id!=='kvPM2'; });
 
-  grupa('Trenutno stoji');
+  grupa('Stoji (SMJER-B: VoditeljB — .li-stoji, ne "Trenutno stoji")');
   W.showScreen('pregled'); await cekaj(120);
-  var stojiIma = D.querySelector('#screen-pregled').textContent.indexOf('Trenutno stoji') > -1;
+  var stojiEls = D.querySelectorAll('#screen-pregled .li-stoji');
+  var stojiIma = stojiEls.length > 0;
   /* SIM-FIX: "stoji" više nije "otvoren i nije upoz" nego zaustavljaLiniju (hitno/čeka dio,
-     i dalje bez upoz) — isto pravilo kao filtar "Trenutno stoji" na Pregledu. */
-  var imaPravihKvarova = W.DATA.kvarovi.some(function(k){ return W.zaustavljaLiniju(k) && k.m; });
-  jednako('sekcija se prikazuje točno kad nešto stoji', stojiIma, imaPravihKvarova);
+     i dalje bez upoz) — isto pravilo kao filtar "Stoji" na Pregledu. */
+  var kvaroviNaLiniji = W.DATA.kvarovi.filter(function(k){ return W.zaustavljaLiniju(k) && k.m; });
+  jednako('broj .li-stoji redaka = broj kvarova koji zaustavljaju liniju', stojiEls.length, kvaroviNaLiniji.length);
+  ok('sekcija "Stoji" nestaje kad ništa ne stoji', stojiIma === (kvaroviNaLiniji.length > 0));
   ok('upozorenja se ne broje kao zastoj', (function(){
     var upoz = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && k.upoz; })[0];
     if(!upoz) return true;
-    var html = D.querySelector('#screen-pregled').innerHTML;
-    var od = html.indexOf('Trenutno stoji');
-    if(od === -1) return true;
-    return html.slice(od, html.indexOf('<h2', od+5)).indexOf(upoz.opis) === -1;
+    var upozStroj = (W.machineById(upoz.m)||{}).name;
+    return Array.prototype.every.call(stojiEls, function(el){
+      return el.getAttribute('onclick').indexOf(upoz.id) === -1;
+    });
   })());
 
   grupa('SIM-FIX — zaustavljaLiniju(): "stoji li linija" iz stvarnih unosa, ne iz mrtvog polja upoz');
@@ -1608,11 +1624,12 @@ async function testovi(W, D){
     poceo_at:new Date(Date.now()-3600000).toISOString(), procjena_gotovo: W.todayISO()+'T23:59' };
   W.DATA.kvarovi.push(kvarKgotov);
   W.showScreen('pregled'); await cekaj(120);
-  var htmlK = D.querySelector('#screen-pregled').innerHTML;
-  var iK = htmlK.indexOf('TEST K procjena gotovo');
-  ok('kvar s procjena_gotovo prikazuje "→" u sekciji Trenutno stoji',
-     iK > -1 && htmlK.slice(iK, iK+400).indexOf('→ '+W.fmtSat(new Date(kvarKgotov.procjena_gotovo))) > -1,
-     'isječak: '+htmlK.slice(iK, iK+400));
+  /* SMJER-B: redak više ne nosi opis (samo stroj/trajanje/tko) — nalazimo ga preko
+     onclick="app.detaljKvara('kvK1')", ne preko teksta opisa. */
+  var rowK1 = D.querySelector('#screen-pregled .li-stoji[onclick*="kvK1"]');
+  ok('kvar s procjena_gotovo prikazuje "→" u retku "Stoji"',
+     !!rowK1 && rowK1.textContent.indexOf('→ '+W.fmtSat(new Date(kvarKgotov.procjena_gotovo))) > -1,
+     'redak: '+(rowK1 ? rowK1.textContent : '(redak nije nađen)'));
   W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== 'kvK1'; });
 
   var kvarKnarudzba = { id:'kvK2', m:'e2', date:W.todayISO(), opis:'TEST K dio stiže', sati:0,
@@ -1623,40 +1640,41 @@ async function testovi(W, D){
   W.DATA.kvarovi.push(kvarKnarudzba);
   W.DATA.nabava.push(narK);
   W.showScreen('pregled'); await cekaj(120);
-  var htmlK2 = D.querySelector('#screen-pregled').innerHTML;
-  var iK2 = htmlK2.indexOf('TEST K dio stiže');
-  ok('kvar bez procjene, ali s otvorenom narudžbom, prikazuje "dio stiže ~"',
-     iK2 > -1 && htmlK2.slice(iK2, iK2+400).indexOf('dio stiže ~'+W.fmtDate(narK.ocekivano)) > -1,
-     'isječak: '+htmlK2.slice(iK2, iK2+400));
+  var rowK2 = D.querySelector('#screen-pregled .li-stoji[onclick*="kvK2"]');
+  ok('kvar bez procjene, ali s otvorenom narudžbom, prikazuje "dio stiže"',
+     !!rowK2 && rowK2.textContent.indexOf('dio stiže '+W.fmtDate(narK.ocekivano)) > -1,
+     'redak: '+(rowK2 ? rowK2.textContent : '(redak nije nađen)'));
   W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== 'kvK2'; });
   W.DATA.nabava = W.DATA.nabava.filter(function(n){ return n.id !== 'narK1'; });
   W.showScreen('pregled'); await cekaj(100);
 
-  grupa('Pregled presložen — S2 (prvo što gori, pa brojke, pa povijest)');
+  grupa('Pregled presložen — SMJER-B (traka .st, pa Stoji, pa Tim/Odluka/Moji zadaci, pa Zadnje)');
   var html2 = D.querySelector('#screen-pregled').innerHTML;
-  var iStat = html2.indexOf('stat-grid');
+  var iSt = html2.indexOf('class="st"');
   /* AUDIT-FIX (UX, veća stavka): financijski blok (velika kartica + oba bar-grafa) je
      sad sklopiv i ZATVOREN po defaultu — najgušći dio najgušćeg (i demo) ekrana više
-     nije nametnut; prvi pogled ostaje "Trenutno stoji" + 3 stat kartice + Moji zadaci. */
+     nije nametnut; prvi pogled ostaje traka .st + Stoji + Moji zadaci. */
   ok('financijski blok je zatvoren po defaultu (big-card nije u DOM-u dok se ne otvori)',
      !W.PREGLED_FIN_OTVOREN && D.querySelector('#screen-pregled .big-card') === null);
-  ok('traka za otvaranje financija postoji i javlja trošak ovog mjeseca',
-     html2.indexOf('Trošak zastoja ovaj mjesec') > -1);
+  ok('link "Financije" za otvaranje financijskog bloka postoji u naslovu "Zadnje"',
+     html2.indexOf('Financije') > -1);
   if(stojiIma){
-    var iStoji2 = html2.indexOf('Trenutno stoji');
-    ok('"Trenutno stoji" dolazi prije stat kartica (najvažnije na vrhu)', iStoji2 > -1 && iStoji2 < iStat);
+    var iStoji2 = html2.indexOf('li-stoji');
+    ok('traka .st dolazi prije sekcije "Stoji" (najvažnija brojka na vrhu)', iSt > -1 && iSt < iStoji2);
   }
   app.pregledFinToggle(); await cekaj(100);
   var html2b = D.querySelector('#screen-pregled').innerHTML;
-  var iStat2 = html2b.indexOf('stat-grid');
-  var iFinTraka = html2b.indexOf('Trošak zastoja ovaj mjesec');
+  var iSt2 = html2b.indexOf('class="st"');
+  var iFinLink = html2b.indexOf('Financije');
   var iBig = html2b.indexOf('big-card');
   var iNajskuplji = html2b.indexOf('Najskuplji strojevi');
-  var iZadnji2 = html2b.indexOf('Zadnji događaji');
-  ok('stat kartice dolaze prije trake financija, traka prije razvijene kartice troška',
-     iStat2 > -1 && iFinTraka > iStat2 && iBig > iFinTraka);
+  var iZadnje2 = html2b.indexOf('>Zadnje<');
+  /* SMJER-B: "Zadnje" je uvijek vidljiva sekcija; financijski detalji (uklj. najskuplje
+     strojeve) su sad IZA nje, sklopivi — obrnut redoslijed od stare verzije. */
+  ok('traka .st dolazi prije linka Financije, link prije razvijene kartice troška',
+     iSt2 > -1 && iFinLink > iSt2 && iBig > iFinLink);
   ok('velika kartica troška dolazi prije najskupljih strojeva', iBig < iNajskuplji);
-  ok('najskuplji strojevi dolaze prije zadnjih događaja', iNajskuplji < iZadnji2);
+  ok('"Zadnje" dolazi prije najskupljih strojeva (uvijek vidljivo prije sklopivih financija)', iZadnje2 > -1 && iZadnje2 < iNajskuplji);
   app.pregledFinToggle(); await cekaj(80);   /* zatvori za sljedeće testove */
   W.SESSION = { ime:'Tehničar', role:'majstor' }; D.body.dataset.role = 'majstor';
   W.showScreen('pregled'); await cekaj(120);
@@ -1870,7 +1888,8 @@ async function testovi(W, D){
 
   /* jedna definicija "za naručiti" na sva tri mjesta */
   W.showScreen('pregled'); await cekaj(150);
-  var naKartici = parseInt(D.querySelectorAll('#screen-pregled .stat-num')[1].textContent, 10);
+  var celijaNaruciti = [...D.querySelectorAll('#screen-pregled .st button')].find(function(b){ return /naručiti/.test(b.textContent); });
+  var naKartici = parseInt(celijaNaruciti.querySelector('b').textContent, 10);
   W.showScreen('nabava'); await cekaj(150);
   var naNabavi = W.zaNaruciti().length;
   W.showScreen('dijelovi'); await cekaj(150);
@@ -3099,22 +3118,17 @@ async function testovi(W, D){
   while(W.RASP_PLAN && brojKoraka < 20){ app.planDalje(); await cekaj(60); brojKoraka++; }
   ok('sekvenca završava (RASP_PLAN null) bez modala', W.RASP_PLAN === null && !D.querySelector('#modal-root .modal'));
 
-  grupa('§16 P1/P2 — kraći putovi i pločice po ulozi');
+  grupa('§16 P1/P2 → SMJER-B — traka .st je sad ista za majstora/proizvodnju/voditelja (role-fin skriva samo €)');
   W.SESSION = { ime:'Tehničar', role:'majstor' }; D.body.dataset.role = 'majstor';
   app.go('pregled'); await cekaj(100);
-  ok('tehničar vidi "Danas na Rasporedu" umjesto "Za naručiti"', (function(){
-     var labele = Array.prototype.map.call(D.querySelectorAll('#screen-pregled .stat-label'), function(e){ return e.textContent; });
-     return labele.indexOf('Danas na Rasporedu') > -1 && labele.indexOf('Za naručiti') === -1;
-  })());
+  ok('tehničar (bez financija) vidi traku .st s 3 ćelije (stoji/naručiti/pregleda kasne)',
+     D.querySelector('#screen-pregled .st') && D.querySelector('#screen-pregled .st').children.length === 3);
 
   W.SESSION = { ime:'Voditelj proizvodnje', role:'proizvodnja' }; D.body.dataset.role = 'proizvodnja';
   app.go('pregled'); await cekaj(100);
-  ok('proizvodnja ne vidi "Za naručiti" na Pregledu',
-     D.querySelector('#screen-pregled').textContent.indexOf('Za naručiti') === -1);
-  ok('proizvodnja vidi status planiranog zastoja linije', (function(){
-     var t = D.querySelector('#screen-pregled').textContent;
-     return t.indexOf('dana do zastoja linije') > -1 || t.indexOf('Nema planiranih zastoja') > -1;
-  })());
+  ok('proizvodnja (bez financija) vidi traku .st s 3 ćelije, bez € ćelije',
+     D.querySelector('#screen-pregled .st') && D.querySelector('#screen-pregled .st').children.length === 3 &&
+     D.querySelector('#screen-pregled').textContent.indexOf('€') === -1);
   var stojeTest = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && !k.upoz && k.m; });
   var staroStanje = stojeTest.map(function(k){ return k.status; });
   stojeTest.forEach(function(k){ k.status = 'rijesen'; });
@@ -3138,17 +3152,24 @@ async function testovi(W, D){
     sati:0, status:'otvoren', upoz:true, tip:'kvar', kategorija:'Ostalo',
     created_at:new Date(Date.now()-1000*3600000).toISOString()});
   app.go('pregled'); await cekaj(100);
-  var dirHeroTest = D.querySelector('#screen-pregled .dir-hero');
+  /* SMJER-B: "top5" (do 5 najskupljih strojeva) sad legitimno može uključivati isti stroj
+     kao dodano upozorenje — provjera mora gledati SAMO redak "Najveći zastoj", ne cijeli
+     ekran (koji odsad uvijek prikazuje i do 5 najskupljih strojeva). */
+  var najveciEl = [...D.querySelectorAll('#screen-pregled .li')].find(function(el){
+    return el.textContent.indexOf('Najveći zastoj:') > -1;
+  });
   ok('upozorenje ne postaje "najveći zastoj" iako mu je hipotetski trošak veći od cijelog mjeseca',
-     !!dirHeroTest && dirHeroTest.textContent.indexOf('Tunel za zamrzavanje') === -1);
+     !najveciEl || najveciEl.textContent.indexOf('Tunel za zamrzavanje') === -1);
   W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id!=='kvUPOZ-test'; });
   app.go('pregled'); await cekaj(100);
-  /* SIM-FIX: tri slabe mete do Analitike (iznos bez oznake, sivi 12,5px tekst, skriveni gumb)
-     svedene na jednu pravu pilulu; iznos u eurima više nije zaseban dodir. */
-  ok('direktorov pregled ima pravu metu "Analitika i izvoz" (SIM-FIX: tri mete → jedna)',
-     D.querySelector('#screen-pregled').textContent.indexOf('Analitika i izvoz') > -1);
-  ok('iznos u eurima na direktorovu hero-u više nije zaseban dodir',
-     !D.querySelector('#screen-pregled .dir-hero .rasp-dan-h1').hasAttribute('onclick'));
+  /* SIM-FIX → SMJER-B (DirektorB): tri slabe mete do Analitike svedene na jednu pravu
+     pilulu ("Analitika ›", ≥44px) umjesto stare "Analitika i izvoz" pilule na hero-u. */
+  ok('direktorov pregled ima pravu metu "Analitika ›" (SIM-FIX: tri mete → jedna)', (function(){
+     var btn = [...D.querySelectorAll('#screen-pregled button')].find(function(b){ return /Analitika/.test(b.textContent); });
+     return !!btn && btn.getAttribute('onclick').indexOf("go('analitika')") > -1;
+  })());
+  ok('iznos u eurima na direktorovu vrhu nije zaseban dodir (nema onclick na brojci)',
+     !D.querySelector('#screen-pregled').firstElementChild.querySelector('span[style*="font-size:var(--t-hero)"]').hasAttribute('onclick'));
   ok('NAZIV_ULOGE ima čitljive nazive za sve uloge (session-row)',
      W.NAZIV_ULOGE.majstor==='Tehničar održavanja' && W.NAZIV_ULOGE.readonly.indexOf('Direktor')>-1 &&
      W.NAZIV_ULOGE.proizvodnja==='Voditelj proizvodnje' && W.NAZIV_ULOGE.voditelj==='Voditelj održavanja');

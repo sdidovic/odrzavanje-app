@@ -147,6 +147,21 @@ h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* ord
 .li.li-sanacija{border-left:3px dashed var(--yellow-border)}
 .li.li-gotov{opacity:.55}
 .li.li-gotov .t{text-decoration:line-through}
+/* SMJER-B: traka s četiri (ili tri, role-fin) brojke na vrhu Pregleda — zamjena za staru
+   .stat-grid od tri kartice + poseban red za trošak mjeseca (VoditeljB.dc.html). */
+.st{display:grid;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-s);
+  overflow:hidden;margin-bottom:var(--r3)}
+.st>button{all:unset;box-sizing:border-box;display:block;min-height:48px;padding:9px 4px;
+  text-align:center;border-right:1px solid var(--border);cursor:pointer}
+.st>button:last-child{border-right:none}
+.st>button:active{background:var(--hover-bg)}
+.st b{display:block;font-size:var(--t-stat);font-weight:800;letter-spacing:-.4px;line-height:1.1;color:var(--text)}
+.st span{display:block;font-size:var(--t-label);font-weight:600;color:var(--text-2);margin-top:3px;
+  text-transform:none;letter-spacing:0}
+.st b.crv{color:var(--red)}
+.st b.zut{color:var(--yellow)}
+.st span.crv{color:var(--red)}
+.st span.zel{color:var(--green)}
 .k{display:inline-block;font-size:var(--t-label);font-weight:700;letter-spacing:.5px;
   text-transform:uppercase;padding:3px 7px;border-radius:5px;white-space:nowrap;flex:none}
 .k.red{background:var(--red-bg);color:var(--red)}
@@ -2147,14 +2162,25 @@ function renderPregled(){
   /* najskuplji strojevi u zadnja 3 mjeseca */
   var t90 = isoShift(-92), costBy = {};
   KV.forEach(function(k){ if(k.date >= t90 && k.m) costBy[k.m] = (costBy[k.m]||0) + kvarCost(k); });
-  var top = Object.keys(costBy).map(function(id){ return {id:id, c:costBy[id]}; })
-    .sort(function(a,b){ return b.c - a.c; }).slice(0,3);
+  var topSvi = Object.keys(costBy).map(function(id){ return {id:id, c:costBy[id]}; })
+    .sort(function(a,b){ return b.c - a.c; });
+  var top = topSvi.slice(0,3);
   var maxC = top.length ? top[0].c : 1;
   var topHtml = top.map(function(t){
     var tm = machineById(t.id) || {name:'—'};
     return '<div class="bar-row" onclick="app.openStroj(\''+t.id+'\')">'+
       '<div class="bar-name">'+esc(tm.name)+'</div>'+
       '<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(t.c/maxC*100)+'%"></div></div>'+
+      '<div class="bar-val">'+EUR(t.c)+'</div></div>';
+  }).join('');
+  /* SMJER-B (DirektorB): direktoru do 5 strojeva umjesto 3 — isti izvor (topSvi), samo dulji rez */
+  var top5 = topSvi.slice(0,5);
+  var maxC5 = top5.length ? top5[0].c : 1;
+  var topHtml5 = top5.map(function(t){
+    var tm = machineById(t.id) || {name:'—'};
+    return '<div class="bar-row" onclick="app.openStroj(\''+t.id+'\')">'+
+      '<div class="bar-name">'+esc(tm.name)+'</div>'+
+      '<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(t.c/maxC5*100)+'%"></div></div>'+
       '<div class="bar-val">'+EUR(t.c)+'</div></div>';
   }).join('');
 
@@ -2174,7 +2200,7 @@ function renderPregled(){
     return '<div class="bar-row" style="cursor:default">'+
       '<div class="bar-name">'+esc(x.label)+(x.uTijeku ? ' <span class="nepotpun">u tijeku</span>' : '')+'</div>'+
       '<div class="bar-track"><div class="bar-fill'+(x.uTijeku?' u-tijeku':'')+
-        '" style="width:'+Math.round(x.c/maxM*100)+'%"></div></div>'+
+        '" style="width:'+Math.round(x.c/maxM*100)+'%'+(x.uTijeku?'':';background:var(--accent-rub)')+'"></div></div>'+
       '<div class="bar-val">'+EUR(x.c)+'</div></div>';
   }).join('');
 
@@ -2190,37 +2216,38 @@ function renderPregled(){
       var tb = pb ? pb.getTime() : new Date(b.date+'T00:00:00').getTime();
       return ta - tb;
     });
+  /* SMJER-B (VoditeljB): "Stoji" u .li obliku s crvenom trakom (postojeći .li-stoji) —
+     ista logika/podaci kao stara stojiHtml, samo oblik retka je promijenjen. */
+  function stojiGotovoTxt(k){
+    if(k.procjena_gotovo){
+      var pg = new Date(k.procjena_gotovo);
+      if(!isNaN(pg.getTime())) return ' &middot; → '+fmtSat(pg)+(pg.getTime() < Date.now() ? ' (kasni)' : '');
+    } else {
+      var narudzba = (DATA.nabava||[]).filter(function(x){ return x.kvar_id===k.id && !x.primljeno; })[0];
+      if(narudzba && narudzba.ocekivano) return ' &middot; dio stiže '+fmtDate(narudzba.ocekivano);
+    }
+    return '';
+  }
   var stojiHtml = stoje.length
-    ? '<h2>Trenutno stoji ('+stoje.length+')</h2><div class="card">'+stoje.map(function(k){
+    ? '<div class="sec crv"><span>Stoji</span><span>'+stoje.length+'</span></div>'+stoje.map(function(k){
         var sm = machineById(k.m) || {name:'—', rate:350};
         var p = pocetakKvara(k);
         /* bez poznatog početka ne postoji trošak "do sada" — prazno je poštenije od nule */
         var sati = p ? Math.max(0, (Date.now() - p.getTime())/3600000) : null;
-        /* SIM-FIX K: voditelj proizvodnje otvara app upravo zbog "kad će raditi" — dosad je ovaj
-           redak pokazivao samo koliko stroj već stoji, ne i procjenu gotovosti. Isti redoslijed
-           prioriteta kao Raspored (sadaRedak, ~3524): procjena_gotovo → otvorena narudžba dijela. */
-        var gotovo = '';
-        if(k.procjena_gotovo){
-          var pg = new Date(k.procjena_gotovo);
-          if(!isNaN(pg.getTime())) gotovo = ' &middot; <span class="rasp-do'+(pg.getTime() < Date.now() ? ' kasni' : '')+'">→ '+fmtSat(pg)+'</span>';
-        } else {
-          var narudzba = (DATA.nabava||[]).filter(function(x){ return x.kvar_id===k.id && !x.primljeno; })[0];
-          if(narudzba && narudzba.ocekivano) gotovo = ' &middot; dio stiže ~'+fmtDate(narudzba.ocekivano);
-        }
-        return '<div class="row click" onclick="app.detaljKvara(\''+k.id+'\')">'+
-          '<div class="grow"><div class="row-title" style="font-size:var(--t-meta)">'+esc(sm.name)+
-            (k.prioritet==='hitno' ? ' <span class="chip kvar">HITNO</span>' : '')+
-            (k.ceka_dio ? ' <span class="chip upoz">Čeka dio · stoji</span>' : '')+
-            (k.ceka_servis ? ' <span class="chip servis">Čeka servis</span>' : '')+'</div>'+
-          '<div class="row-sub">'+esc(k.opis)+'</div>'+
-          '<div class="row-sub">'+(trajanjeKvara(k) || 'u tijeku')+
-            (k.dodijeljen ? ' &middot; <b>'+esc(k.dodijeljen)+'</b>' : ' &middot; nedodijeljen')+gotovo+'</div></div>'+
+        return '<div class="li li-stoji click" onclick="app.detaljKvara(\''+k.id+'\')">'+
+          '<div style="flex:1;min-width:0">'+
+            '<div class="t">'+esc(sm.name)+
+              (k.prioritet==='hitno' ? ' <span class="k red">Hitno</span>' : '')+
+              (k.ceka_dio ? ' <span class="k yel">Čeka dio</span>' : '')+'</div>'+
+            '<div class="s">'+(trajanjeKvara(k) || 'u tijeku')+
+              (k.dodijeljen ? ' &middot; '+esc(k.dodijeljen) : ' &middot; nedodijeljen')+stojiGotovoTxt(k)+'</div>'+
+          '</div>'+
           (vidiFinancije() && sati !== null
-            ? '<div class="row-right"><div class="stoji-cijena">'+EUR(sati * (sm.rate||350))+
-              '<span>do sada</span></div></div>'
+            ? '<div style="text-align:right"><div class="eur" style="color:var(--red)">'+EUR(sati * (sm.rate||350))+
+              '</div><div class="s" style="margin-top:0">do sada</div></div>'
             : '')+
         '</div>';
-      }).join('')+'</div>'
+      }).join('')
     : '';
 
   /* S2 (PLAN-KAIZEN): majstor ne vidi financije — njegov pregled počinje zadacima,
@@ -2237,10 +2264,85 @@ function renderPregled(){
      prva stvar koju voditelj traži ujutro, a majstora uopće ne zanimaju. */
   var mojiZadaciHtml = (function(){
     var moji = aktivni().filter(function(k){ return jeOtvoren(k) && k.dodijeljen===SESSION.ime; });
-    return moji.length
-      ? '<h2>Moji zadaci ('+moji.length+')</h2><div class="card">'+moji.map(function(k){ return kvarItem(k,true); }).join('')+'</div>'
-      : '';
+    if(!moji.length) return '';
+    /* SMJER-B: isti .li/.ring uzorak kao Raspored (planRedak) — prsten je pravi toggle
+       samo za zadatke (rasporedObaviZadatak), za obične kvarove nema jednostavnog "gotovo"
+       (traži sate/detalj), pa je ondje prsten tiho dekorativan. */
+    return '<div class="sec"><span>Moji zadaci</span><span>'+moji.length+'</span></div>'+
+      moji.map(function(k){
+        var mZ = machineById(k.m) || {name: (k.tip==='zadatak' ? 'Opći zadatak' : 'Nepoznat stroj')};
+        var ring = (k.tip==='zadatak')
+          ? '<span class="ring role-write" onclick="event.stopPropagation();app.rasporedObaviZadatak(\''+k.id+'\')" aria-label="Obavljeno"></span>'
+          : '<span class="ring" aria-hidden="true" style="opacity:.35"></span>';
+        var sub = (k.tip==='zadatak')
+          ? (k.rok ? 'Rok: '+fmtDate(k.rok) : 'Bez roka')
+          : (trajanjeKvara(k) || 'u tijeku');
+        return '<div class="li click" onclick="app.detaljKvara(\''+k.id+'\')">'+ring+
+          '<div style="flex:1;min-width:0"><div class="t">'+esc(mZ.name)+'</div>'+
+          '<div class="s">'+sub+'</div></div>'+
+          (k.prioritet==='hitno' ? '<span class="k red">Hitno</span>' : '')+
+        '</div>';
+      }).join('');
   })();
+  /* SMJER-B (VoditeljB): "Treba tvoju odluku" — spojeni popis triju izvora koji svi traže
+     jednu istu radnju od voditelja: naruči, dodijeli. Nedodijeljeno se ne gubi u Kvarovima. */
+  var lateNedod = DATA.preventiva.filter(function(p){ return p.next < todayISO() && !p.dodijeljen; });
+  /* upozorenje (upoz:true) namjerno ne ulazi u "Treba tvoju odluku" — isto pravilo kao
+     posvuda drugdje na Pregledu: upoz je izričito "ne traži hitnu pažnju". */
+  var kvarNedod = open.filter(function(k){ return !k.dodijeljen && !k.upoz; });
+  var odlukaN = low.length + lateNedod.length + kvarNedod.length;
+  var odlukaHtml = odlukaN
+    ? '<div class="sec crv"><span>Treba tvoju odluku</span><span>'+odlukaN+'</span></div>'+
+      low.map(function(d){
+        return '<div class="li click" onclick="app.go(\'nabava\')">'+
+          '<div style="flex:1;min-width:0"><div class="t">Naručiti: '+esc(d.naziv)+'</div>'+
+          '<div class="s">stanje '+d.stanje+' &middot; min '+d.min+' &middot; '+esc(d.dob||'—')+'</div></div>'+
+          '<span class="k red">'+d.stanje+'/'+d.min+'</span></div>';
+      }).join('')+
+      lateNedod.map(function(p){
+        var dana = danaOd(p.next);
+        return '<div class="li click" onclick="app.akcijeStavke(\'preventiva\',\''+p.id+'\')">'+
+          '<div style="flex:1;min-width:0"><div class="t">Dodijeliti: '+esc(p.opis)+'</div>'+
+          '<div class="s">redovni pregled &middot; kasni '+danaTekst(dana)+'</div></div>'+
+          '<span class="k red">'+danaTekst(dana)+'</span></div>';
+      }).join('')+
+      kvarNedod.map(function(k){
+        var mO = machineById(k.m) || {name:'—'};
+        return '<div class="li click" onclick="app.detaljKvara(\''+k.id+'\')">'+
+          '<div style="flex:1;min-width:0"><div class="t">Dodijeliti: '+esc(mO.name)+' — '+esc(k.opis)+'</div>'+
+          '<div class="s">'+(trajanjeKvara(k) || 'u tijeku')+'</div></div>'+
+          (k.prioritet==='hitno' ? '<span class="k red">Hitno</span>' : '')+'</div>';
+      }).join('')
+    : '';
+  /* SMJER-B: "Tim danas" — jedan .li po tehničaru (MAJSTORI), tko je gdje i što je sljedeće. */
+  var dSum = danSazetak(todayISO());
+  var timAktivnih = 0;
+  var timHtml = MAJSTORI.map(function(ime){
+    var akt = dSum.sada.filter(function(k){ return k.dodijeljen===ime && k.status==='u_radu'; })[0];
+    var statusTxt;
+    if(akt){
+      timAktivnih++;
+      var mmA = machineById(akt.m), pA = pocetakKvara(akt);
+      statusTxt = 'na '+(mmA?mmA.name:'—')+(pA ? ' od '+fmtSat(pA) : '');
+    } else statusTxt = 'slobodan';
+    var mine = dSum.stavke.filter(function(x){ return x.osoba===ime; });
+    var buduce = mine.filter(function(x){ return x.datum >= todayISO(); });
+    var kasneMine = mine.filter(function(x){ return x.datum < todayISO(); });
+    var subDijelovi = [];
+    /* pouzdan izvor je samo item.opis stavke iz Rasporeda — ako ga nema, ne izmišljamo */
+    if(buduce.length && buduce[0].item && buduce[0].item.opis) subDijelovi.push('sljedeće: '+esc(buduce[0].item.opis));
+    if(kasneMine.length) subDijelovi.push('kasni: '+kasneMine.map(function(x){ return esc(x.item && x.item.opis || ''); }).filter(Boolean).join(', '));
+    var planH = (dSum.poOsobi[ime]||{}).h || 0;
+    return '<div class="li">'+
+      '<span class="av velik '+avatarBoja(ime)+'">'+esc(inicijali(ime))+'</span>'+
+      '<div style="flex:1;min-width:0"><div class="t">'+esc(ime)+' &middot; '+statusTxt+'</div>'+
+      '<div class="s">'+(subDijelovi.join(' &middot; ') || '—')+'</div></div>'+
+      (planH > 0 ? '<span class="k acc">'+H(planH)+'</span>' : '')+
+    '</div>';
+  }).join('');
+  var timSekcija = MAJSTORI.length
+    ? '<div class="sec"><span>Tim danas</span><span>'+timAktivnih+' od '+MAJSTORI.length+'</span></div>'+timHtml
+    : '';
   /* AUDIT-FIX (UX): bigCard + oba bar-grafa su nekad uvijek stajala razvijena — najgušći
      dio najgušćeg (i demo) ekrana, a bar-grafovi dupliraju ono što Analitika već pokazuje.
      Sad su iza jednog sklopivog retka: prvi pogled ostaje "što gori" (Trenutno stoji, 3
@@ -2278,46 +2380,54 @@ function renderPregled(){
         : kvarCost(k);
       if(c > najveciTrosak){ najveciTrosak = c; najveciK = k; }
     });
+    /* SMJER-B (DirektorB): "Najveći zastoj" ostaje — tekst MORA sadržavati "Najveći zastoj"
+       (testovi ga traže) — sad kao samostalna sekcija ispod "Sada stoji", ne unutar hero bloka. */
     var najveciRedak = najveciK && najveciTrosak > 0
-      ? '<div class="row click" onclick="app.detaljKvara(\''+najveciK.id+'\')" style="margin-top:var(--r2)">'+
-          '<div class="grow"><div class="row-title" style="font-size:var(--t-meta)">Najveći zastoj: '+
+      ? '<div class="li click" onclick="app.detaljKvara(\''+najveciK.id+'\')">'+
+          '<div style="flex:1;min-width:0"><div class="t">Najveći zastoj: '+
             esc((machineById(najveciK.m)||{name:'—'}).name)+'</div>'+
-          '<div class="row-sub">'+(trajanjeKvara(najveciK)||H(najveciK.sati))+' &middot; '+EUR(najveciTrosak)+
+          '<div class="s">'+(trajanjeKvara(najveciK)||H(najveciK.sati))+
             (jeOtvoren(najveciK) ? ' &middot; u tijeku' : '')+'</div></div>'+
-          '<span class="chev">›</span></div>'
+          '<div class="eur">'+EUR(najveciTrosak)+'</div></div>'
       : '';
     var sveRadi = stoje.length === 0;
-    var stojiRedak;
+    var dirStojiHtml;
     if(sveRadi){
-      stojiRedak = '<div class="dir-stoji" onclick="app.go(\'kvarovi\')"><span class="tocka"></span>'+
-        '<span>Sve linije rade</span><span class="chev">›</span></div>';
+      dirStojiHtml = '<div class="sec crv"><span>Sada stoji</span><span>0</span></div>'+
+        '<div class="li click" onclick="app.go(\'kvarovi\')"><span class="sdot ok"></span>'+
+        '<div style="flex:1;min-width:0"><div class="t">Sve radi</div></div></div>';
     } else {
-      var k0 = stoje[0], sm0 = machineById(k0.m) || {name:'—', rate:350};
-      var p0 = pocetakKvara(k0);
-      var s0 = p0 ? Math.max(0, (Date.now()-p0.getTime())/3600000) : null;
-      stojiRedak = '<div class="dir-stoji stoji" onclick="app.detaljKvara(\''+k0.id+'\')"><span class="tocka"></span>'+
-        '<span>Stoji: <b>'+esc(sm0.name)+'</b>'+(stoje.length>1 ? ' <span class="row-sub">+ još '+(stoje.length-1)+'</span>' : '')+
-          '<span class="row-sub"> · '+(trajanjeKvara(k0)||'u tijeku')+(s0!==null ? ' · '+EUR(s0*(sm0.rate||350))+' do sada' : '')+'</span></span>'+
-        '<span class="chev">›</span></div>';
+      dirStojiHtml = '<div class="sec crv"><span>Sada stoji</span><span>'+stoje.length+'</span></div>'+
+        stoje.map(function(k){
+          var smD = machineById(k.m) || {name:'—', rate:350};
+          var pD = pocetakKvara(k);
+          var satiD = pD ? Math.max(0, (Date.now()-pD.getTime())/3600000) : null;
+          return '<div class="li li-stoji click" onclick="app.detaljKvara(\''+k.id+'\')">'+
+            '<div style="flex:1;min-width:0"><div class="t">'+esc(smD.name)+'</div>'+
+            '<div class="s">'+(pD ? 'od '+fmtSat(pD)+' &middot; ' : '')+
+              (k.ceka_dio ? 'čeka dio' : (k.ceka_servis ? 'čeka servis' : 'u tijeku'))+stojiGotovoTxt(k)+'</div></div>'+
+            (satiD !== null ? '<div class="eur" style="color:var(--red)">'+EUR(satiD*(smD.rate||350))+'</div>' : '')+
+          '</div>';
+        }).join('');
     }
-    dirHero = '<div class="card rasp-hero dir-hero'+(sveRadi && !open.length ? ' gotovo' : '')+'">'+
-      '<div class="rasp-hero-r1"><div>'+
-        '<div class="rasp-dan-h2">Trošak zastoja · '+esc(monthLabel())+'</div>'+
-        '<div class="rasp-dan-h1">'+EUR(cost)+trend+'</div>'+
-        /* SIM-FIX (§16 rupa "Analitika" — tri slabe mete): iznos u eurima više nije dodir
-           (tri mete za istu radnju svode se na jednu), a diskretni sivi tekst postaje prava
-           pilula — isti uzorak (.rasp-skok) kao "Danas ›" na Rasporedu, min. 44px za dodir. */
-        '<button class="rasp-skok" style="margin-top:var(--r2);min-height:44px" onclick="app.go(\'analitika\')">Analitika i izvoz ›</button>'+
-      '</div><div><div class="rasp-smjena">prvih '+danMj+' dana</div>'+
-        (uTijekuCost > 0 ? '<div class="rasp-smjena-jos">+ '+EUR(uTijekuCost)+' još traje</div>' : '')+'</div></div>'+
-      najveciRedak+
-      '<div class="rasp-hero-grid">'+
-        '<div class="rasp-stat" onclick="app.goKvaroviOtvoreni()"><span class="stat-num'+(open.length?' crv':'')+'">'+open.length+'</span><span class="stat-label">otvoreno</span></div>'+
-        '<div class="rasp-stat" onclick="app.go(\'kvarovi\')"><span class="stat-num">'+H(hrs)+'</span><span class="stat-label">zastoja</span></div>'+
-        '<div class="rasp-stat" onclick="app.go(\'raspored\')"><span class="stat-num'+(late.length?' crv':'')+'">'+late.length+'</span><span class="stat-label">kasni servis</span></div>'+
+    /* najsvježiji izvještaj — kratki chip trenda za hero (▲ 23% vs. srpanj), odvojen od
+       duljeg teksta u traci voditelja jer direktor treba "s čim uspoređujem", ne "koliko mjeseca" */
+    var trendChipDir = prevCost > 0
+      ? '<span class="k '+(pct>=0 ? 'red' : (padJeSiguran ? 'grn' : 'red'))+'" style="text-transform:none;letter-spacing:0">'+
+        (pct>=0?'▲ +':'▼ ')+Math.abs(pct)+'% vs. '+esc(MJESECI_G[pm.getMonth()])+'</span>'
+      : '';
+    dirHero = '<div class="card" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:var(--r3)">'+
+      '<div style="min-width:0">'+
+        '<div class="rasp-dan-h2">Trošak zastoja &middot; prvih '+danMj+' dana</div>'+
+        '<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px;flex-wrap:wrap">'+
+          '<span style="font-size:var(--t-hero);font-weight:800;letter-spacing:-.7px;line-height:1.1">'+EUR(cost)+'</span>'+trendChipDir+
+        '</div>'+
+        (uTijekuCost > 0 ? '<div class="s">+ '+EUR(uTijekuCost)+' iz kvara koji još traje</div>' : '')+
       '</div>'+
-      stojiRedak+
-    '</div>';
+      '<button class="rasp-skok" style="min-height:44px;padding:0 14px;flex:none" onclick="app.go(\'analitika\')">Analitika ›</button>'+
+    '</div>'+
+    dirStojiHtml+
+    najveciRedak;
   }
   /* §16 P1: proizvodnja nema dir-hero (ne treba joj €), ali zaslužuje isto "Sve linije rade"
      kad ništa ne stoji — dosad je sekcija naprosto nestala i ekran je počeo brojkama. */
@@ -2325,26 +2435,67 @@ function renderPregled(){
     ? '<div class="dir-stoji" onclick="app.go(\'kvarovi\')"><span class="tocka"></span>'+
       '<span>Sve linije rade</span><span class="chev">›</span></div>'
     : '';
+  /* SMJER-B: "Najskuplji strojevi" i "Po mjesecima" kao samostalne sekcije direktoru
+     (DirektorB) — isti bar-row gradivni elementi kao stari sklopivi financijski blok. */
+  var dirAnalitikaHtml = (SESSION.role==='readonly')
+    ? (top5.length ? '<div class="sec"><span>Najskuplji strojevi &middot; 3 mj.</span></div><div class="card">'+topHtml5+'</div>' : '')+
+      '<div class="sec"><span>Po mjesecima</span></div><div class="card">'+trendHtml+'</div>'
+    : '';
+  /* SMJER-B (DirektorB): zadnji sažetak voditelja — zadnja LJUDSKA poruka od 'Voditelj'
+     (ne Sustav), iz DATA.poruke. Nema poruke → sekcija se ne prikazuje uopće. */
+  var dirPorukaHtml = '';
+  if(SESSION.role==='readonly'){
+    var porukeVod = (DATA.poruke||[]).filter(function(p){ return p.tko==='Voditelj'; })
+      .slice().sort(function(a,b){ return String(b.created_at).localeCompare(String(a.created_at)); });
+    if(porukeVod.length){
+      var zp = porukeVod[0];
+      var danZp = localDT(zp.created_at).d;
+      dirPorukaHtml = '<div class="sec"><span>Zadnji sažetak voditelja</span><span>'+relDatumKratak(danZp)+'</span></div>'+
+        '<div class="li" style="align-items:flex-start;min-height:auto;padding-top:11px;padding-bottom:11px">'+
+        '<div class="s" style="white-space:normal;font-size:var(--t-meta);color:var(--text)">'+esc(zp.tekst)+'</div></div>';
+    }
+  }
+  /* SMJER-B: "Zadnje" u .li obliku — točka boje statusa lijevo, umjesto starog chipa u kartici. */
+  var zadnjeHtml = last3.map(function(k){
+    var mZ2 = machineById(k.m) || {id:'', name:'Nepoznat stroj'};
+    var dotCls = k.status==='rijesen' ? 'ok' : (jeOtvoren(k) ? (k.upoz ? 'upoz' : 'kvar') : 'ok');
+    return '<div class="li click" onclick="app.detaljKvara(\''+k.id+'\')">'+
+      '<span class="sdot '+dotCls+'"></span>'+
+      '<div style="flex:1;min-width:0"><div class="t">'+esc(mZ2.name)+'</div>'+
+      '<div class="s">'+relDatumKratak(k.date)+' &middot; '+esc(k.opis)+' &middot; '+H(k.sati)+'</div></div>'+
+      (vidiFinancije() && !jeOtvoren(k) ? '<div class="eur">'+EUR(kvarCost(k))+'</div>' : '')+
+    '</div>';
+  }).join('');
   $('#screen-pregled').innerHTML =
     (SESSION.role==='readonly'
-      ? dirHero+
-        (top.length ? '<h2>Najskuplji strojevi — zadnja 3 mj.</h2><div class="card">'+topHtml+'</div>' : '')
-      : sveRadiProizvodnja+stojiHtml+
-        '<div class="stat-grid">'+
-          statCard(open.length, 'Otvoreni kvarovi',        open.length ? 'red'    : 'green', "app.goKvaroviOtvoreni()")+
-          drugaStat+
-          /* organizacija se radi na Rasporedu — i brojka vodi onamo. AUDIT-FIX (UX):
-             "Preventive" je žargon bez imenice ("preventivni pregledi") — nekome tko nije
-             iz održavanja djeluje kao nedovršena rečenica. */
-          statCard(late.length, 'Zaostali servisi',        late.length ? 'yellow' : 'green', "app.go('raspored')")+
-        '</div>'+
-        mojiZadaciHtml+
-        (vidiFinancije() ? finTraka+finDetalji : ''))+
-    /* §16 P1: direktoru (2×/tjedno) je "Zadnji događaji" 3 retka bez financija bespredmetno —
-       dir-hero + top-3 stroja mu je dovoljan uvid; ostalima je uvid u "što se upravo dogodilo". */
-    (SESSION.role==='readonly' ? '' :
-      '<h2>Zadnji događaji</h2>'+
-      '<div class="card">'+ last3.map(function(k){ return eventRow(k); }).join('') +'</div>')+
+      ? dirHero+dirAnalitikaHtml+dirPorukaHtml
+      : (function(){
+          /* SMJER-B: traka .st — 4 ćelije (stoji/naručiti/pregleda kasne/€ mjesec), 3 kad
+             role-fin skriva zadnju (proizvodnja). Zamjenjuje staru stat-grid + red troška. */
+          var trendKratko = '', trendCls = '';
+          if(prevCost > 0){
+            trendKratko = (pct>=0?'▲ ':'▼ ')+Math.abs(pct)+'% &middot; mj.';
+            trendCls = pct>=0 ? 'crv' : (padJeSiguran ? 'zel' : 'crv');
+          }
+          var cells =
+            '<button onclick="app.goKvaroviOtvoreni()"><b'+(stoje.length?' class="crv"':'')+'>'+stoje.length+'</b><span>stoji</span></button>'+
+            '<button onclick="app.go(\'nabava\')"><b>'+low.length+'</b><span>naručiti</span></button>'+
+            '<button onclick="app.go(\'raspored\')"><b'+(late.length?' class="zut"':'')+'>'+late.length+'</b><span>pregleda kasne</span></button>'+
+            (vidiFinancije()
+              ? '<button onclick="app.go(\'analitika\')"><b>'+EUR(cost)+'</b><span'+(trendCls?' class="'+trendCls+'"':'')+'>'+(trendKratko||'€ mjesec')+'</span></button>'
+              : '');
+          var nCells = vidiFinancije() ? 4 : 3;
+          return '<div class="st" style="grid-template-columns:repeat('+nCells+',1fr)">'+cells+'</div>'+
+            sveRadiProizvodnja+stojiHtml+
+            timSekcija+
+            odlukaHtml+
+            mojiZadaciHtml+
+            '<div class="sec"><span>Zadnje</span>'+
+              (vidiFinancije() ? '<span class="sec-desno"><a onclick="app.pregledFinToggle()">Financije '+(PREGLED_FIN_OTVOREN?'▾':'›')+'</a></span>' : '')+
+            '</div>'+
+            zadnjeHtml+
+            (vidiFinancije() && PREGLED_FIN_OTVOREN ? finDetalji : '');
+        })())+
     '<div class="session-row">'+
       (REMOTE ? 'Prijavljen: <b>'+esc(SESSION.ime)+'</b> ('+esc(NAZIV_ULOGE[SESSION.role]||SESSION.role)+') &middot; <a onclick="app.odjava()">Odjava</a> &middot; ' : '')+
       /* SIM-FIX: razdjelnik prije "Pomoć" je stajao izvan role-voditelj span-a, pa je
