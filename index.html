@@ -80,21 +80,26 @@ header{position:sticky;top:0;z-index:30;color:var(--card);padding-top:env(safe-a
   background:linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
   box-shadow:0 1px 3px var(--tint-siva-20);border-bottom:2px solid var(--gold)}
 .hdr-inner{max-width:760px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;
-  gap:var(--r3);padding:10px var(--r4)}
+  gap:var(--r3);padding:8px var(--r4)}
 .hdr-brand{display:flex;align-items:center;gap:11px;min-width:0}
-.hdr-logo{height:38px;width:auto;display:block;border-radius:6px;
+.hdr-logo{height:30px;width:auto;display:block;border-radius:6px;
   filter:drop-shadow(0 1px 3px var(--logo-sjena))}
-h1{font-size:var(--t-title);font-weight:700;letter-spacing:-.2px;line-height:1.15}
+h1{font-size:var(--t-body);font-weight:700;letter-spacing:-.2px;line-height:1.15}
 .hdr-sub{font-size:var(--t-label);opacity:.7;margin-top:2px;letter-spacing:.3px;text-transform:uppercase;font-weight:600}
 .hdr-akcije{display:flex;align-items:center;gap:6px;flex-shrink:0}
+#hdr-badges{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.hdr-badge{font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px;white-space:nowrap;
+  background:var(--btn-audit-bg);border:1px solid var(--btn-audit-rub);color:var(--card)}
+.hdr-badge.crveno{background:var(--red);border-color:var(--red)}
 .btn-audit{background:var(--btn-audit-bg);border:1px solid var(--btn-audit-rub);color:var(--card);
-  font-size:var(--t-sub);font-weight:600;line-height:1.25;padding:var(--r3);border-radius:var(--radius-xs);
+  font-size:11px;font-weight:700;line-height:1.25;padding:4px 8px;border-radius:6px;
   text-align:center;cursor:pointer;flex-shrink:0;white-space:nowrap;backdrop-filter:blur(2px);
   transition:background .14s ease}   /* dodirna meta ≥44px — hala, rukavice */
 .btn-audit:active{background:var(--btn-audit-active)}
 
 /* ---------- layout ---------- */
 main{max-width:760px;margin:0 auto;padding:16px 16px calc(86px + env(safe-area-inset-bottom))}
+main.ima-fab{padding-bottom:calc(158px + env(safe-area-inset-bottom))}
 .screen.hidden{display:none}
 /* --text-2, ne --muted: 11.5px se ne broji kao "veliki tekst", a radi se u hali na suncu */
 h2{font-size:var(--t-label);text-transform:uppercase;letter-spacing:.9px;color:var(--text-2);
@@ -581,8 +586,6 @@ body[data-role="proizvodnja"] .role-write:not(.role-prijava){display:none !impor
 body:not([data-role="voditelj"]) .role-voditelj{display:none !important}
 /* financije vidi samo voditelj i direktor (readonly), ne proizvodnja ni tehničar */
 body[data-role="proizvodnja"] .role-fin{display:none !important}
-/* §16 P1: kad "Detaljno" (role-voditelj) nestane, ⚡ Brza prijava ostaje sama — puna širina */
-body:not([data-role="voditelj"]) .kvar-akcije-grid{grid-template-columns:1fr !important}
 /* §16 P1: kad "od N h" (kapacitet, role-voditelj) nestane, ostaju 2 stat kartice.
    SIM-FIX: selektor je bio pisan za Raspored, ali .rasp-hero-grid koristi i direktorov
    dir-hero na Pregledu (koji uvijek ima 3 kartice) — suženo na #screen-raspored. */
@@ -756,14 +759,21 @@ body[data-role="proizvodnja"] #tabbar [data-tab="dijelovi"]{display:none}
 .tab{position:relative;background:none;border:none;padding:9px 1px 10px;display:flex;flex-direction:column;
   align-items:center;gap:3px;font-size:var(--t-tab);font-weight:600;color:var(--muted);cursor:pointer;
   transition:color .14s ease}
-.tab svg{width:21px;height:21px;transition:transform .14s ease}
+.tab svg{width:22px;height:22px;transition:transform .14s ease}
 .tab.active{color:var(--accent)}
 .tab.active svg{transform:translateY(-1px)}
-.tab.active:before{content:'';position:absolute;top:0;left:24%;right:24%;height:2.5px;
+.tab.active:before{content:'';position:absolute;top:0;left:26%;right:26%;height:3px;
   border-radius:0 0 3px 3px;background:var(--accent)}
 .tab .dot{position:relative}
 .badge{position:absolute;top:-5px;right:-10px;background:var(--red);color:var(--card);font-size:var(--t-tab);
   font-weight:700;min-width:17px;height:17px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+/* ---------- FAB: brza prijava (SMJER-B) ---------- */
+#fab{position:fixed;right:16px;bottom:calc(70px + env(safe-area-inset-bottom) + 16px);
+  width:56px;height:56px;border-radius:50%;background:var(--accent);border:none;
+  display:flex;align-items:center;justify-content:center;box-shadow:var(--sjena-3);
+  cursor:pointer;z-index:29;padding:0}
+#fab svg{width:26px;height:26px}
+#fab.sakriven{display:none}
 </style>
 <style id="qr-print-stil"></style><!-- dinamički raspored naljepnica na A4 arku; puni ga renderQR, prazni showScreen -->
 </head>
@@ -779,7 +789,8 @@ body[data-role="proizvodnja"] #tabbar [data-tab="dijelovi"]{display:none}
       </div>
     </div>
     <div class="hdr-akcije">
-      <button class="btn-audit" onclick="app.audit()">IFS izvještaj</button>
+      <div id="hdr-badges"></div>
+      <button class="btn-audit" onclick="app.audit()">IFS</button>
       <button class="btn-audit role-voditelj" onclick="app.otvoriSustav()">Sustav</button>
     </div>
   </div>
@@ -851,6 +862,10 @@ body[data-role="proizvodnja"] #tabbar [data-tab="dijelovi"]{display:none}
     <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="badge" id="badge-poruke" style="display:none"></span></span>
     Poruke</button>
 </div></nav>
+
+<button id="fab" class="role-prijava role-write" aria-label="Brza prijava kvara" onclick="app.brzaPrijava()">
+  <svg viewBox="0 0 24 24" fill="var(--gold)" stroke="none"><path d="M13 2 3 14h7l-1 8 11-13h-7l1-7z"/></svg>
+</button>
 
 <div id="loader"></div>
 <div id="toast"></div>
@@ -952,8 +967,9 @@ function primijeniIdentitet(){
   document.title = TVRTKA.naziv + ' — Održavanje';
   var meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', TVRTKA.boja);
-  var h1 = document.querySelector('.hdr-brand h1');
-  if(h1) h1.textContent = 'Održavanje';
+  /* SMJER-B: naslov više nije fiksno "Održavanje" — prati aktivni ekran (naslovEkrana),
+     showScreen ga postavlja na svaki prijelaz; ovdje ga samo osvježimo za trenutni ekran. */
+  naslovEkrana(CURRENT_SCREEN || 'pregled');
   var pod = document.querySelector('.hdr-sub');
   if(pod) pod.textContent = TVRTKA.naziv;
   if(TVRTKA.logo){
@@ -2499,18 +2515,15 @@ function renderKvarovi(){
        otvara obrazac s ~3x više polja za identičnu svrhu (prijaviti kvar) — slučajan
        dodir u žurbi bacao je korisnika u puno teži put. Brza prijava je sada vidno glavni
        put, Detaljna je manja, sporedna opcija za rijetke slučajeve. */
-    /* §15: proizvodnja smije SAMO brzu prijavu (role-prijava), ne i detaljnu (role-write).
-       §16 P1: "Detaljno" (10 polja: dodjela/prioritet/kategorija/status) je voditeljev alat za
-       povijesni/potpuni unos — tehničaru i proizvodnji ostaje samo ⚡ Brza prijava, puna širina
-       (.kvar-akcije-grid se sažima na 1 stupac kad Detaljno nije vidljivo, vidi CSS). */
-    '<div class="role-write role-prijava kvar-akcije-grid" style="display:grid;grid-template-columns:2fr 1fr;gap:var(--r2);margin-bottom:var(--r3);align-items:stretch">'+
-      '<button class="btn primary role-write role-prijava" onclick="app.brzaPrijava()">⚡ Brza prijava</button>'+
-      '<button class="btn sec sm role-voditelj" onclick="app.noviKvar()">Detaljno</button>'+
-    '</div>'+
-    '<div style="display:flex;gap:var(--r2);margin-bottom:10px">'+
+    /* SMJER-B: ⚡ Brza prijava je preseljena u globalni #fab (jedna radnja, jedno mjesto na
+       svim ekranima gdje ima smisla) — u tijelu Kvarova više nema velikog gumba za nju.
+       "Detaljno" (voditeljev alat za povijesni/potpuni unos) ostaje, ali diskretno, ispod trake
+       s pretragom — nije više ravnopravan par uz brzu prijavu. */
+    '<div style="display:flex;gap:var(--r2);margin-bottom:6px">'+
       '<input type="search" value="'+esc(FILTER.q)+'" placeholder="Pretraži opis…" oninput="app.setFilterTiho(\'q\',this.value)" style="flex:1">'+
       '<button class="btn sec" style="flex-shrink:0" onclick="app.prekidacFiltre()">Filtri'+(nAkt?' ('+nAkt+')':'')+'</button>'+
     '</div>'+
+    '<div style="margin-bottom:var(--r3)"><a class="role-voditelj" href="javascript:void(0)" onclick="app.noviKvar()" style="font-size:13px;color:var(--accent);text-decoration:none">Detaljno</a></div>'+
     (KV_FILTRI_OTVORENI
       ? '<div class="filters">'+
         '<select onchange="app.setFilter(\'stroj\',this.value)">'+strojOpts+'</select>'+
@@ -4112,7 +4125,93 @@ function showScreen(name){
     t.classList.toggle('active', t.getAttribute('data-tab')===tabName);
   });
   updateBadge();
+  naslovEkrana(name);
+  postaviBadgeveEkrana(name);
+  osvjeziFab();
   window.scrollTo(0,0);
+}
+/* hrvatska množina za "N otvoren/otvorena/otvorenih" */
+function oblikOtvoren(n){
+  var j = n % 10, d = n % 100;
+  if(j===1 && d!==11) return 'otvoren';
+  if(j>=2 && j<=4 && (d<12 || d>14)) return 'otvorena';
+  return 'otvorenih';
+}
+function postaviBadgeveEkrana(name){
+  if(name==='raspored'){
+    var sz = danSazetak(todayISO());
+    postaviBadgeve([
+      { tekst: sz.n+' danas' },
+      { tekst: sz.kasni+' kasne', crveno: sz.kasni>0 }
+    ]);
+  } else if(name==='kvarovi'){
+    var nOtv = DATA.kvarovi.filter(function(k){ return jeOtvoren(k) && (k.tip||'kvar')==='kvar'; }).length;
+    postaviBadgeve([{ tekst: nOtv+' '+oblikOtvoren(nOtv), crveno: nOtv>0 }]);
+  } else if(name==='dijelovi'){
+    var nNar = zaNaruciti().length, nDol = otvoreneNarudzbe().length;
+    postaviBadgeve([
+      { tekst: nNar+' naručiti', crveno: nNar>0 },
+      { tekst: nDol+' u dolasku' }
+    ]);
+  } else {
+    postaviBadgeve([]);
+  }
+}
+/* SMJER-B: naslov u headeru prati aktivni ekran umjesto stalnog "Održavanje" —
+   jedno mjesto koje showScreen zove nakon svakog prijelaza. */
+var DANI_KR = ['ned','pon','uto','sri','čet','pet','sub'];
+function kratkiDatumHdr(iso){
+  if(!iso) return '';
+  var d = new Date(iso+'T00:00:00');
+  if(isNaN(d.getTime())) return '';
+  return DANI_KR[d.getDay()]+' '+d.getDate()+'. '+(d.getMonth()+1)+'.';
+}
+function naslovEkrana(name){
+  var h1 = document.querySelector('.hdr-brand h1');
+  if(!h1) return;
+  var naslov;
+  switch(name){
+    case 'pregled': naslov = 'Pregled'; break;
+    case 'kvarovi': naslov = 'Kvarovi'; break;
+    case 'raspored':
+      naslov = (SESSION.role==='majstor')
+        ? SESSION.ime+' · '+kratkiDatumHdr(RASP_ODABRAN || todayISO())
+        : 'Raspored';
+      break;
+    case 'strojevi': naslov = 'Strojevi'; break;
+    case 'dijelovi': naslov = 'Skladište'; break;
+    case 'poruke': case 'kontakti': naslov = 'Poruke'; break;
+    case 'analitika': naslov = 'Analitika'; break;
+    case 'sustav': naslov = 'Sustav'; break;
+    case 'nabava': naslov = 'Nabava'; break;
+    case 'stroj':
+      var m = machineById(CURRENT_M);
+      naslov = m ? m.name : 'Stroj';
+      break;
+    default: naslov = 'Održavanje';
+  }
+  h1.textContent = naslov;
+}
+/* SMJER-B: badge-evi u headeru — svaki ekran koji ih ima ih puni nakon svog rendera. */
+function postaviBadgeve(stavke){
+  var el = document.getElementById('hdr-badges');
+  if(!el) return;
+  el.innerHTML = (stavke||[]).map(function(s){
+    return '<span class="hdr-badge'+(s.crveno?' crveno':'')+'">'+esc(s.tekst)+'</span>';
+  }).join('');
+}
+/* SMJER-B: FAB (⚡ brza prijava) je vidljiv samo na pregled/kvarovi/raspored, i skriven dok
+   je otvoren neki modal (#modal-root nije prazan). */
+function osvjeziFab(){
+  var fab = document.getElementById('fab');
+  if(!fab) return;
+  var mr = document.getElementById('modal-root');
+  var naEkranu = ['pregled','kvarovi','raspored'].indexOf(CURRENT_SCREEN) > -1;
+  var modalOtvoren = mr && mr.firstChild;
+  var vidljiv = naEkranu && !modalOtvoren;
+  fab.classList.toggle('sakriven', !vidljiv);
+  var main = document.querySelector('main');
+  if(main) main.classList.toggle('ima-fab', vidljiv);
 }
 function updateBadge(){
   /* majstoru badge broji NJEGOVE dodijeljene kvarove, voditelju/direktoru sve otvorene.
@@ -7356,6 +7455,12 @@ if('serviceWorker' in navigator && location.protocol.indexOf('http') === 0){
       posaljiPushPretplatu(ev.data.subscription);
     }
   });
+}
+/* SMJER-B: #modal-root se puni innerHTML-om na desetke mjesta u kodu — umjesto da svako
+   od njih zove osvjeziFab(), jedan observer na childList pokriva sva otvaranja/zatvaranja. */
+if(window.MutationObserver){
+  var mrEl = document.getElementById('modal-root');
+  if(mrEl) new MutationObserver(function(){ osvjeziFab(); }).observe(mrEl, {childList:true});
 }
 function prikaziNovuVerziju(){
   var el = document.getElementById('verzija-traka');

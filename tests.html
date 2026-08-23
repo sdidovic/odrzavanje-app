@@ -1613,12 +1613,14 @@ async function testovi(W, D){
     return true;
   })());
   W.showScreen('kvarovi'); await cekaj(60);
-  ok('proizvodnja VIDI "Brza prijava" (jedina write radnja)', (function(){
-    var b = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi .role-prijava'), function(x){ return /Brza prijava/.test(x.textContent); })[0];
+  /* SMJER-B: ⚡ Brza prijava se preselila iz tijela ekrana Kvarovi u globalni #fab —
+     prilagođeno s "gumb u tijelu ekrana" na "#fab je vidljiv i klikabilan (role-prijava)". */
+  ok('proizvodnja VIDI #fab (jedina write radnja, ⚡ brza prijava)', (function(){
+    var b = D.getElementById('fab');
     return !!b && W.getComputedStyle(b).display !== 'none';
   })());
   ok('proizvodnja NE vidi "Detaljno" (samo brza)', (function(){
-    var b = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi button'), function(x){ return x.textContent.trim()==='Detaljno'; })[0];
+    var b = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi a,#screen-kvarovi button'), function(x){ return x.textContent.trim()==='Detaljno'; })[0];
     return !b || W.getComputedStyle(b).display === 'none';
   })());
   W.showScreen('pregled'); await cekaj(60);
@@ -3380,6 +3382,40 @@ async function testovi(W, D){
   ok('IFS izvještaj preživi siroče', true);
   W.DATA.kvarovi = W.DATA.kvarovi.filter(function(k){ return k.id !== 'kvX'; });
   W.showScreen('pregled');
+
+  grupa('SMJER-B ljuska');
+  D.body.dataset.role = 'voditelj'; W.SESSION = { ime:'Voditelj', role:'voditelj' };
+  app.go('kvarovi'); await cekaj(80);
+  ok('naslov headera prati ekran — Kvarovi', D.querySelector('.hdr-brand h1').textContent === 'Kvarovi');
+  ok('badge na Kvarovima sadrži broj otvorenih', (function(){
+    var b = D.getElementById('hdr-badges');
+    if(!b) return false;
+    var n = W.DATA.kvarovi.filter(function(k){ return W.jeOtvoren(k) && (k.tip||'kvar')==='kvar'; }).length;
+    return b.textContent.indexOf(String(n)) > -1;
+  })());
+  ok('na Kvarovima više nema gumba s tekstom "Brza prijava" u tijelu ekrana', (function(){
+    var el = Array.prototype.filter.call(D.querySelectorAll('#screen-kvarovi button, #screen-kvarovi a'),
+      function(x){ return /Brza prijava/.test(x.textContent); })[0];
+    return !el;
+  })());
+  ok('#fab postoji i vidljiv na Kvarovi', (function(){
+    var f = D.getElementById('fab');
+    return !!f && W.getComputedStyle(f).display !== 'none';
+  })());
+  app.go('poruke'); await cekaj(80);
+  ok('#fab skriven na Poruke', W.getComputedStyle(D.getElementById('fab')).display === 'none');
+  app.go('kvarovi'); await cekaj(80);
+  app.noviKvar(); await cekaj(80);
+  ok('#fab skriven dok je modal otvoren', W.getComputedStyle(D.getElementById('fab')).display === 'none');
+  app.closeModal(); await cekaj(80);
+  ok('#fab se vrati kad se modal zatvori', W.getComputedStyle(D.getElementById('fab')).display !== 'none');
+  app.demoUloga('Tehničar'); await cekaj(100);
+  ok('naslov headera na Rasporedu za majstora sadrži njegovo ime', D.querySelector('.hdr-brand h1').textContent.indexOf('Tehničar') > -1);
+  app.demoUloga('Direktor'); await cekaj(100);
+  app.go('kvarovi'); await cekaj(80);
+  ok('za ulogu readonly (Direktor) #fab je skriven', W.getComputedStyle(D.getElementById('fab')).display === 'none');
+  app.demoUloga('Voditelj'); await cekaj(100);
+  D.body.dataset.role = 'voditelj';
 
   grupa('SUSTAV — tokeni (KORAK 2: tipografija/razmaci/boje)');
   try{
