@@ -2,8 +2,13 @@
    Kešira statiku (ljuska aplikacije) da se app otvara brzo i da ikona na
    home screenu radi kao aplikacija. Podaci se NE keširaju — svježina ima
    prednost; bez mreže app jasno javi grešku (papirnati fallback u pogonu). */
-var CACHE = 'odrzavanje-static-v71';
-var STATIKA = ['./index.html', './manifest.json', './vendor/supabase-js.js',
+var CACHE = 'odrzavanje-static-v74';
+/* AUDIT F6: i korijenski URL './' — bez njega se …/ bez mreze ne otvara.
+   Revizija 2.9.: stil, QR knjizica, logo i demo-fotka su izdvojeni iz index.html u zasebne
+   datoteke — SVAKA nova datoteka koju index.html ucitava mora uci ovdje, inace offline ne radi. */
+var STATIKA = ['./', './index.html', './manifest.json', './app.css',
+               './vendor/supabase-js.js', './vendor/qrcode.js',
+               './assets/logo-header.png', './assets/demo-foto.jpg',
                './assets/icon-192.png', './assets/icon-512.png'];
 
 self.addEventListener('install', function(e){
@@ -23,12 +28,14 @@ self.addEventListener('activate', function(e){
 self.addEventListener('push', function(e){
   var p = { naslov:'Održavanje', tekst:'', ruta:'' };
   try{ p = Object.assign(p, e.data ? e.data.json() : {}); }catch(err){ p.tekst = e.data ? e.data.text() : ''; }
+  /* AUDIT-FIX: svi push-evi su dijelili isti tag:'odrzavanje' — svaka nova obavijest je
+     u traci TIHO ZAMIJENILA prethodnu (standardno ponašanje Web Push API-ja za isti tag),
+     pa je hitan kvar mogao nestati prekriven kasnijim rutinskim podsjetnikom prije nego
+     ga itko pročita. Bez zajedničkog tag-a svaka obavijest ostaje svoj zaseban zapis. */
   e.waitUntil(self.registration.showNotification(p.naslov, {
     body: p.tekst,
     icon: './assets/icon-192.png',
     badge: './assets/icon-192.png',
-    tag: 'odrzavanje',
-    renotify: true,
     vibrate: [120, 60, 120],
     data: { ruta: p.ruta || '' }
   }));
@@ -80,8 +87,11 @@ self.addEventListener('fetch', function(e){
   if(e.request.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith(
     fetch(e.request).then(function(res){
-      var kopija = res.clone();
-      caches.open(CACHE).then(function(c){ c.put(e.request, kopija); });
+      /* AUDIT F6: 404/500 se NE kesira — jedan los odgovor je trajno prepisivao dobar kes */
+      if(res && res.ok){
+        var kopija = res.clone();
+        caches.open(CACHE).then(function(c){ c.put(e.request, kopija); });
+      }
       return res;
     }).catch(function(){ return caches.match(e.request); })
   );

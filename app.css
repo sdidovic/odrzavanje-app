@@ -1,0 +1,1016 @@
+/* Clarum Održavanje — sav stil aplikacije. Boje/razmaci/tipografija su CSS varijable u :root
+   (dizajnerski tokeni); tvrtkine boje upisuje primijeniIdentitet() u index.html.
+   Sekcije su označene "---------- naziv ----------" — grep po tome. */
+:root{
+  /* --- boje tvrtke (postavljaju se iz baze) --- */
+  --accent:#3a3285; --accent-dark:#282465; --accent-soft:#edecf7; --accent-rub:#cdc9ec;
+  --gold:#ffd749; --gold-tamni:#8a7427;
+  /* --- podloge i tekst --- */
+  --bg:#f2f4f7; --card:#ffffff; --border:#e4e7ec; --border-jaci:#d3d8e0;
+  --text:#141c2b; --text-2:#3d4657; --muted:#68727f;
+  /* --- statusi --- */
+  --red:#c0181c; --red-bg:#fdeaea; --red-border:#f3cbcb;
+  --yellow:#9a5a06; --yellow-bg:#fdf4e3; --yellow-border:#f0dcb6;
+  --green:#1c6b3a; --green-bg:#e9f4ed; --green-border:#c7e1d1;
+  /* --- razmaci (4px ljestvica) --- */
+  --r1:4px; --r2:8px; --r3:12px; --r4:16px; --r5:24px; --r6:32px;
+  /* SIM-FIX: tipografski tokeni (KORAK 2) */
+  --t-tab:10px;      /* najmanji tekst: tabovi */
+  --t-label:11px;    /* oznake sekcija, cipovi, velika slova */
+  --t-sub:12px;      /* podnaslov retka */
+  --t-meta:13px;     /* meta, brojke u retku */
+  --t-body:15px;     /* tekst, naslov retka, gumb */
+  --t-input:16px;    /* polja za unos — 16px sprječava iOS auto-zoom na fokus */
+  --t-title:17px;    /* naslov ekrana/modala */
+  --t-stat:22px;     /* stat kartice */
+  --t-hero:28px;     /* jedna velika brojka po ekranu */
+  /* --- oblik i dubina --- */
+  --radius:12px; --radius-s:9px; --radius-xs:7px;
+  --sjena-1:0 1px 2px rgba(16,24,40,.05);
+  --sjena-2:0 2px 8px rgba(16,24,40,.07), 0 1px 2px rgba(16,24,40,.04);
+  --sjena-3:0 10px 28px rgba(16,24,40,.14);
+  /* --- ostale boje (dodano refaktorom §16.8 — imenovane po ulozi, ne po tonu) --- */
+  --text-3:#1b2430;
+  --hover-bg:#f6f7f9; --panel-bg:#f8f9fb;
+  --chip-bg:#eef0f3; --chip-tekst-rijesen:#4a545f; --chip-tekst-otkazan:#7c8894;
+  --plava-bg:#e8f0fb; --plava-tekst:#1f4f8f; --plava-rub:#c5d8f2;
+  --chevron:#aab1bd;
+  --trend-gore:#ffb4ad; --trend-dolje:#96e6b0;
+  --av1-bg:#e3eefb;
+  --av2-bg:#e4f3ea;
+  --av3-bg:#fdeee0; --av3-tekst:#9a4d06;
+  --av4-bg:#f3e5f5; --av4-tekst:#6a1b9a;
+  --av5-bg:#e0f2f1; --av5-tekst:#00695c;
+  --msg-bg:#f0f1f5;
+  --okbtn-active:#d6ecdd;
+  --off-traka-bg:#3d4452;
+  --qbtn-rub:#cdd3db;
+  --print-crna:#000; --print-tekst:#333; --print-sub:#444; --print-chip-rub:#666; --print-rub:#ccc;
+  --logo-sjena:rgba(0,0,0,.28);
+  --tint-siva-20:rgba(16,24,40,.2); --tint-siva-10:rgba(16,24,40,.10); --tint-siva-04:rgba(16,24,40,.04);
+  --tint-crna-12:rgba(0,0,0,.12);
+  --btn-audit-bg:rgba(255,255,255,.12); --btn-audit-rub:rgba(255,255,255,.32); --btn-audit-active:rgba(255,255,255,.24);
+  --bijela-tint-05:rgba(255,255,255,.05); --bijela-tint-14:rgba(255,255,255,.14); --bijela-tint-94:rgba(255,255,255,.94);
+  --overlay-tint:rgba(15,23,42,.5);
+}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001ms !important; transition-duration:.001ms !important}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+html,body{touch-action:manipulation}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:var(--bg);color:var(--text);font-size:var(--t-body);line-height:1.5;-webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;font-variant-numeric:tabular-nums}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent}
+::selection{background:var(--accent-soft)}
+
+/* ---------- header ---------- */
+header{position:sticky;top:0;z-index:30;color:var(--card);padding-top:env(safe-area-inset-top);
+  background:linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
+  box-shadow:0 1px 3px var(--tint-siva-20);border-bottom:2px solid var(--gold)}
+.hdr-inner{max-width:760px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;
+  gap:var(--r3);padding:8px var(--r4)}
+.hdr-brand{display:flex;align-items:center;gap:11px;min-width:0;flex:1 1 auto}
+.hdr-logo{height:30px;width:auto;display:block;border-radius:6px;
+  filter:drop-shadow(0 1px 3px var(--logo-sjena))}
+/* E-odmah #1: bez ovoga naslov na uskom zaslonu ne skraćuje se nego se lomi/gura pod
+   susjedne značke — one su flex-shrink:0 pa naslov mora biti taj koji popušta. */
+h1{font-size:var(--t-body);font-weight:700;letter-spacing:-.2px;line-height:1.15;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-sub{font-size:var(--t-label);opacity:.7;margin-top:2px;letter-spacing:.3px;text-transform:uppercase;font-weight:600}
+.hdr-akcije{display:flex;align-items:center;gap:6px;flex-shrink:0}
+#hdr-badges{display:flex;align-items:center;gap:6px;flex:0 0 auto;flex-wrap:nowrap}
+.hdr-badge{font-size:var(--t-label);font-weight:700;padding:4px 8px;border-radius:6px;white-space:nowrap;
+  background:var(--btn-audit-bg);border:1px solid var(--btn-audit-rub);color:var(--card)}
+.hdr-badge.crveno{background:var(--red);border-color:var(--red)}
+.hdr-badge.plavo{background:var(--plava-tekst);border-color:var(--plava-tekst)}
+.btn-audit{background:var(--btn-audit-bg);border:1px solid var(--btn-audit-rub);color:var(--card);
+  font-size:var(--t-label);font-weight:700;line-height:1.25;padding:4px 8px;border-radius:6px;
+  text-align:center;cursor:pointer;flex-shrink:0;white-space:nowrap;backdrop-filter:blur(2px);
+  transition:background .14s ease}   /* dodirna meta ≥44px — hala, rukavice */
+/* ODLUKA 4 (3.9.2026., za pokazati): zvono u zaglavlju otvara Poruke — zamjena za
+   karticu Poruke u donjoj traci (uklonjena za sve uloge, vidi app.css tab bar). */
+.hdr-zvono{position:relative;background:none;border:none;color:var(--card);
+  display:flex;align-items:center;justify-content:center;width:36px;height:36px;
+  border-radius:8px;cursor:pointer;flex-shrink:0;transition:background .14s ease}
+/* PREGLED SERIJE C: ODLUKA 6 (3.9.2026.) je direktoru (readonly) Poruke namjerno maknula
+   iz donje trake ("traže radnju koju readonly svejedno ne može napraviti") — zvono je novi,
+   uvijek prisutan ulaz u isti ekran, pa bi bez ovoga tiho vratilo ono što je odluka maknula
+   (uz crvenu brojku nepročitanih na svakom njegovom ekranu). Jedan redak: ako vlasnik
+   nakon "za pokazati" odluči da direktor ipak čita poruke, briše se ovaj blok. */
+body[data-role="readonly"] .hdr-zvono{display:none !important}
+.hdr-zvono:active{background:var(--btn-audit-active)}
+.btn-audit:active{background:var(--btn-audit-active)}
+
+/* ---------- layout ---------- */
+main{max-width:760px;margin:0 auto;padding:16px 16px calc(86px + env(safe-area-inset-bottom))}
+main.ima-fab{padding-bottom:calc(158px + env(safe-area-inset-bottom))}
+.screen.hidden{display:none}
+/* --text-2, ne --muted: 11.5px se ne broji kao "veliki tekst", a radi se u hali na suncu */
+h2{font-size:var(--t-label);text-transform:uppercase;letter-spacing:.9px;color:var(--text-2);
+  font-weight:700;margin:var(--r5) 0 var(--r2);display:flex;align-items:center;gap:var(--r2)}
+h2:first-child{margin-top:var(--r3)}
+.screen>.card:first-child{margin-top:var(--r3)}   /* zrak ispod zaglavlja i kad ekran ne počinje s h2 (npr. kalendar) */
+h2:after{content:'';flex:1;height:1px;background:var(--border);order:1}   /* order:1 — .h2-desno (order:2) smije stajati desno od crte */
+
+/* ---------- kartice i redovi ---------- */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;box-shadow:var(--sjena-1)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:var(--r3);
+  padding:13px 14px;border-bottom:1px solid var(--border);transition:background .12s ease}
+.row:last-child{border-bottom:none}
+.row.click{cursor:pointer}
+.row.click:active{background:var(--hover-bg)}
+.row-title{font-weight:650;font-size:var(--t-body);letter-spacing:-.1px;color:var(--text)}
+.row-sub{font-size:var(--t-sub);color:var(--muted);margin-top:3px;line-height:1.45}
+.row-right{display:flex;align-items:center;gap:var(--r2);flex-shrink:0}
+.chev{color:var(--chevron);font-size:var(--t-stat);line-height:1}
+.grow{min-width:0;flex:1}
+.empty{padding:26px 16px;text-align:center;color:var(--muted);font-size:var(--t-meta);line-height:1.55}
+/* §15 #2: mirna ikona iznad praznog stanja — "ovdje je prazno" a ne "nešto se pokvarilo";
+   samo na velikim praznim karticama (>= 26px padding), ne u sitnim inline "Nema komentara" */
+.empty:not([style*="padding"])::before{content:'';display:block;width:34px;height:34px;margin:0 auto 10px;
+  border-radius:50%;background:var(--bg) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2368727f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M20 7l-8-4-8 4v10l8 4 8-4z'/><path d='M12 11l8-4M12 11L4 7M12 11v10'/></svg>") center/18px no-repeat;
+  opacity:.75}
+
+/* ---------- SMJER-B: sekcije/retci "moj dan" (Raspored i sljedeći ekrani istog smjera) ----------
+   E-20: klasa "sec" znači dvije stvari — zaglavlje sekcije (<div class="sec">) i sekundarni
+   gumb (<button class="btn sec">). Zaglavlje je nosilo text-transform:uppercase i display:flex,
+   a .btn ta svojstva ne prepisuje, pa su SVI sekundarni gumbi ispadali VELIKIM SLOVIMA dok su
+   primarni ostajali rečeničnim ("IZVOZ CSV" naspram "Ispis PDF-a"). Zaglavlje se sad izuzima
+   od gumba (:not(.btn)) — kolizija nestaje bez diranja stotinjak mjesta u HTML-u. */
+.sec:not(.btn){display:flex;align-items:center;justify-content:space-between;gap:var(--r2);
+  padding:14px 2px 6px;font-size:var(--t-label);font-weight:700;letter-spacing:.9px;
+  text-transform:uppercase;color:var(--text-2)}
+.sec.crv:not(.btn){color:var(--red)}
+.sec-desno{display:flex;align-items:center;gap:var(--r2);text-transform:none;letter-spacing:0;font-weight:600}
+.li{display:flex;align-items:center;gap:10px;padding:10px 12px;min-height:48px;
+  background:var(--card);border-bottom:1px solid var(--border);border-left:3px solid transparent;
+  position:relative}
+.li:last-child{border-bottom:none}
+.li.click{cursor:pointer}
+.li.click:active{background:var(--hover-bg)}
+.li .t{font-size:var(--t-body);font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* E2-10: naslov retka Rasporeda smije prijeći u drugi red umjesto rezanja usred riječi
+   (desni čip "12 D" i podnaslov više ne nose duplu informaciju, pa naslov dobiva prostor) */
+/* PREGLED E2: -webkit-line-clamp reže samo uz overflow:hidden — s "visible" je bio mrtvo
+   slovo, pa bi dovoljno dug naslov rastegnuo redak na tri i više redaka. */
+.li .t.dvored{white-space:normal;overflow:hidden;text-overflow:clip;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.li .s{font-size:var(--t-sub);color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li.li-kasni{border-left-color:var(--red)}
+.li.li-stoji{border-left-color:var(--red);padding-left:9px}
+.li.li-sanacija{border-left:3px dashed var(--yellow-border)}
+.li.li-gotov{opacity:.55}
+.li.li-gotov .t{text-decoration:line-through}
+/* SMJER-B: traka s četiri (ili tri, role-fin) brojke na vrhu Pregleda — zamjena za staru
+   .stat-grid od tri kartice + poseban red za trošak mjeseca (VoditeljB.dc.html). */
+.st{display:grid;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-s);
+  overflow:hidden;margin-bottom:var(--r3)}
+.st>button{all:unset;box-sizing:border-box;display:block;min-height:48px;padding:9px 4px;
+  text-align:center;border-right:1px solid var(--border);cursor:pointer}
+.st>button:last-child{border-right:none}
+.st>button:active{background:var(--hover-bg)}
+.st b{display:block;font-size:var(--t-stat);font-weight:800;letter-spacing:-.4px;line-height:1.1;color:var(--text)}
+.st span{display:block;font-size:var(--t-label);font-weight:600;color:var(--text-2);margin-top:3px;
+  text-transform:none;letter-spacing:0}
+.st b.crv{color:var(--red)}
+.st b.zut{color:var(--yellow)}
+.st span.crv{color:var(--red)}
+.st span.zel{color:var(--green)}
+.k{display:inline-block;font-size:var(--t-label);font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;padding:3px 7px;border-radius:5px;white-space:nowrap;flex:none}
+.k.red{background:var(--red-bg);color:var(--red)}
+.k.yel{background:var(--yellow-bg);color:var(--yellow)}
+.k.acc{background:var(--accent-soft);color:var(--accent)}
+.k.grey{background:var(--bg);color:var(--muted)}
+.k.grn{background:var(--green-bg);color:var(--green)}
+/* SMJER-B Detalj: zaglavlje modala (natrag/naslov/Uredi), meta mreža i redci radnji — zamjena
+   za stari .btn stupac u detaljKvara (ZADATAK 4/5). */
+.det-glava{display:flex;align-items:center;gap:6px;margin:calc(-1*var(--r4)) calc(-1*var(--r4)) var(--r3);
+  padding:8px 12px 8px 8px;background:var(--accent);color:#fff;border-radius:18px 18px 0 0}
+.det-glava .nazad{width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+  flex:none;background:none;border:none;color:#fff;cursor:pointer}
+.det-glava .naslov{flex:1;min-width:0}
+.det-glava .naslov .t{font-size:var(--t-body);font-weight:700;letter-spacing:-.2px;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.det-glava .naslov .s{font-size:var(--t-label);opacity:.8;margin-top:1px;color:#fff}
+.det-glava .uredi{font-size:var(--t-sub);font-weight:600;min-height:44px;display:flex;align-items:center;
+  padding:0 12px;border-radius:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);
+  color:#fff;cursor:pointer;flex:none}
+.det-opis{background:var(--card);margin:0 calc(-1*var(--r4));padding:12px var(--r4);border-bottom:1px solid var(--border)}
+.det-opis.stoji{border-left:3px solid var(--red);padding-left:calc(var(--r4) - 3px)}
+.det-opis .opis-tekst{font-size:var(--t-title);font-weight:700;line-height:1.3;margin-top:8px}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);
+  margin:0 calc(-1*var(--r4));border-bottom:1px solid var(--border)}
+.m{background:var(--card);padding:10px var(--r3)}
+.m b{display:block;font-size:var(--t-label);font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.m span{display:block;font-size:var(--t-body);font-weight:600;margin-top:2px;color:var(--text)}
+.act{display:flex;align-items:center;gap:12px;min-height:52px;padding:0 var(--r4);margin:0 calc(-1*var(--r4));
+  background:var(--card);border:none;border-bottom:1px solid var(--border);font-size:var(--t-body);font-weight:600;
+  color:var(--accent);cursor:pointer;text-align:left;appearance:none;-webkit-appearance:none;
+  width:calc(100% + 2*var(--r4));box-sizing:border-box;font-family:inherit}
+.act:active{background:var(--hover-bg)}
+.act svg{width:22px;height:22px;flex:none}
+.act.prim{background:var(--accent);color:#fff}
+.act.prim svg{stroke:#fff}
+.act.upoz{color:var(--yellow)}
+.act.opasno{color:var(--muted)}
+.act .got-cip{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
+.act .got-cip button{min-height:44px;padding:0 12px;border-radius:18px;border:1.5px solid var(--accent-rub);
+  background:var(--card);color:var(--accent);font-size:var(--t-sub);font-weight:600;cursor:pointer}
+/* VLASNIK-2: kvar/zadatak = radni nalog — traka od 4 (2) koraka umjesto rečenice o statusu */
+.koraci{display:flex;justify-content:space-between;padding:14px var(--r4) 10px;background:var(--card);
+  margin:0 calc(-1*var(--r4));border-bottom:1px solid var(--border)}
+.korak{display:flex;flex-direction:column;align-items:center;flex:1;position:relative;min-width:0}
+.korak:not(:last-child)::after{content:'';position:absolute;top:5px;left:calc(50% + 9px);right:calc(-50% + 9px);
+  height:2px;background:var(--border);z-index:0}
+.korak.proslo:not(:last-child)::after{background:var(--green)}
+.korak-tocka{width:12px;height:12px;border-radius:50%;background:var(--border);z-index:1;flex:none}
+.korak.aktivno .korak-tocka{background:var(--accent)}
+.korak.proslo .korak-tocka{background:var(--green)}
+.korak-txt{margin-top:6px;text-align:center;max-width:100%}
+.korak-n{font-size:var(--t-label);font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.korak.aktivno .korak-n{color:var(--accent)}
+.korak.proslo .korak-n{color:var(--green)}
+.korak-v{font-size:var(--t-label);color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.koraci-off{padding:12px var(--r4);background:var(--card);margin:0 calc(-1*var(--r4));
+  border-bottom:1px solid var(--border);text-align:center}
+.koraci-off span{font-size:var(--t-label);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+/* ODLUKA 3 (3.9.2026.): ista traka koraka nosi i čarobnjak „prvi dan", ali unutar modala —
+   treba joj zrak prema prvom polju obrasca (na nalogu traku slijedi kartica, ovdje label). */
+.modal .koraci{margin-bottom:var(--r3)}
+/* redak stanja: čipovi "čeka dio / čeka servis / gotovo do" — stanje unutar koraka "U radu",
+   ne posebne radnje uz bok */
+.stanje{display:flex;gap:8px;flex-wrap:wrap;padding:10px var(--r4);margin:0 calc(-1*var(--r4));
+  border-bottom:1px solid var(--border);background:var(--card)}
+.stanje .f.zut-akt{background:var(--yellow-bg);color:var(--yellow);border-color:var(--yellow-border)}
+.stanje .f.plava-akt{background:var(--plava-bg);color:var(--plava-tekst);border-color:var(--plava-rub)}
+.stanje .f.acc-akt{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.stanje .f.crv-akt{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
+.nalog-primarni{min-height:52px;font-size:var(--t-body)}
+.nalog-vise{min-height:44px;flex:none;padding:0 16px}
+/* SMJER-B Kvarovi: red filter-čipova iznad popisa — vodoravno skrolabilan, bez vidljive trake */
+.f-trak{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;-ms-overflow-style:none;scrollbar-width:none}
+.f-trak::-webkit-scrollbar{display:none}
+.f{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:18px;
+  font-size:var(--t-sub);font-weight:600;border:1.5px solid var(--accent-rub);background:var(--card);
+  color:var(--accent);white-space:nowrap;flex:none;cursor:pointer}
+.f.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.eur{font-size:var(--t-meta);font-weight:700;color:var(--text);flex:none;text-align:right;min-width:56px}
+/* prsten je vizualno 22px, ali dodirna meta ≥44px kroz pseudo-element (hala, rukavice) */
+.ring{width:22px;height:22px;border-radius:50%;border:2px solid var(--border-jaci);flex:none;
+  position:relative;cursor:pointer}
+.ring::after{content:'';position:absolute;top:-11px;left:-11px;right:-11px;bottom:-11px}
+.ring.ring-crv{border-color:var(--red-border)}
+.ring.ring-on{background:var(--green);border-color:var(--green)}
+.ring.ring-on::before{content:'✓';position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;color:#fff;font-size:var(--t-sub);font-weight:800;line-height:1}
+.toast-akcija{background:none;border:none;color:var(--gold);font-weight:700;
+  font-size:var(--t-sub);text-transform:uppercase;letter-spacing:.4px;padding:2px 0 2px 8px;cursor:pointer;
+  pointer-events:auto}  /* #toast ima pointer-events:none (da ne hvata dodire) — gumb "Poništi" mora ih hvatati */
+
+/* ---------- chips ---------- */
+.chip{display:inline-block;font-size:var(--t-label);font-weight:700;letter-spacing:.6px;
+  padding:4px 9px;border-radius:20px;text-transform:uppercase;white-space:nowrap;vertical-align:1px;
+  line-height:1.15}   /* HITNO/Čeka dio nose najvažniju informaciju — ne smiju biti najsitniji tekst */
+.chip.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.chip.upoz{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-border)}
+.chip.kvar{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.chip.rijesen{background:var(--chip-bg);color:var(--chip-tekst-rijesen);border:1px solid var(--border)}
+.chip.rad{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-rub)}
+/* AUDIT-FIX: "Otkazan" (stornirani pogrešan unos) i "Riješen" (uspješan popravak) su vrlo
+   različiti ishodi — dosad su dijelili identičan siv chip, teško razlučivo pod jarkim
+   svjetlom. Otkazan dobiva precrtan tekst i isprekidan rub umjesto pune linije. */
+.chip.otkazan{background:var(--chip-bg);color:var(--chip-tekst-otkazan);border:1px dashed var(--border);text-decoration:line-through}
+.chip.zadatak{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-rub)}
+/* §15 #5: čeka vanjskog izvođača — "vanjsko" stanje, plavo (istraživanje: plava = čeka nekog
+   drugog), da se na prvi pogled razlikuje od žutog "čeka dio" (čeka nabavu) */
+.chip.servis{background:var(--plava-bg);color:var(--plava-tekst);border:1px solid var(--plava-rub)}
+.chip.fg{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);text-transform:none;letter-spacing:.2px}
+
+/* ---------- dashboard ---------- */
+.big-card{position:relative;overflow:hidden;color:var(--card);border-radius:var(--radius);
+  background:linear-gradient(145deg,var(--accent) 0%,var(--accent-dark) 100%);
+  padding:var(--r4) var(--r4) 15px;margin-top:var(--r4);cursor:pointer;box-shadow:var(--sjena-2);
+  transition:transform .14s ease}
+.big-card:active{transform:scale(.995)}
+.big-card:after{content:'';position:absolute;right:-40px;top:-40px;width:150px;height:150px;
+  border-radius:50%;background:var(--bijela-tint-05)}
+.big-label{font-size:var(--t-label);text-transform:uppercase;letter-spacing:1px;opacity:.72;font-weight:700}
+.big-num{font-size:var(--t-hero);font-weight:800;letter-spacing:-1.4px;margin:5px 0 3px;line-height:1.05;
+  font-variant-numeric:tabular-nums}
+.big-sub{font-size:var(--t-sub);opacity:.78;position:relative}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--r2);margin-top:var(--r3)}
+.stat{border-radius:var(--radius-s);padding:13px 8px 11px;text-align:center;cursor:pointer;
+  border:1px solid var(--border);background:var(--card);box-shadow:var(--sjena-1);
+  transition:transform .12s ease, box-shadow .12s ease}
+.stat:active{transform:scale(.97)}
+.stat.static{cursor:default}
+.stat.static:active{transform:none}   /* KPI kartice na Analitici ne rade ništa na dodir — ne smiju izgledati klikabilno */
+.stat-num{display:block;font-size:var(--t-hero);font-weight:800;line-height:1.1;letter-spacing:-.7px;
+  font-variant-numeric:tabular-nums}
+.stat-label{display:block;font-size:var(--t-label);color:var(--text-2);margin-top:var(--r1);line-height:1.3;
+  font-weight:600;letter-spacing:.1px}   /* kontrast na obojenoj podlozi — hala, sunce */
+/* 4 KPI broja na Analitici — ista veličina, jer su jednako važni. 2×2 mreža daje dovoljno
+   prostora da broj stane u jedan red — overflow-wrap:anywhere je prije lomio brojku usred znamenke */
+.stat-num.kpi{font-size:var(--t-stat);letter-spacing:-.3px;white-space:nowrap}   /* SIM-FIX: 17px je bilo presitno za glavne brojke Analitike */
+.stat.red{background:var(--red-bg);border-color:var(--red-border)}   .stat.red .stat-num{color:var(--red)}
+.stat.yellow{background:var(--yellow-bg);border-color:var(--yellow-border)} .stat.yellow .stat-num{color:var(--yellow)}
+.stat.green{background:var(--green-bg);border-color:var(--green-border)} .stat.green .stat-num{color:var(--green)}
+
+/* ---------- trend na velikoj kartici ---------- */
+.trend{display:block;font-size:var(--t-sub);font-weight:700;background:var(--bijela-tint-14);
+  width:fit-content;padding:3px 9px;border-radius:20px;margin:2px 0 0;vertical-align:0;letter-spacing:.2px}
+.trend.up{color:var(--trend-gore)}
+.trend.down{color:var(--trend-dolje)}
+
+/* ---------- najskuplji strojevi (barovi) ---------- */
+.bar-row{display:flex;align-items:center;gap:9px;padding:10px 13px;border-bottom:1px solid var(--border);cursor:pointer}
+.bar-row:last-child{border-bottom:none}
+.bar-row:active{background:var(--hover-bg)}
+.bar-name{width:98px;flex-shrink:0;font-size:var(--t-sub);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{flex:1;height:13px;background:var(--chip-bg);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;background:var(--accent);border-radius:0 4px 4px 0}
+/* mjesec koji još traje — stupac je nepotpun i ne smije se čitati kao pad */
+.bar-fill.u-tijeku{background:repeating-linear-gradient(135deg,
+  var(--accent) 0 5px, var(--accent-rub) 5px 10px)}
+.nepotpun{font-size:var(--t-tab);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.bar-val{width:58px;text-align:right;font-size:var(--t-sub);font-weight:700;font-variant-numeric:tabular-nums}
+
+/* ---------- ponovljeni kvar ---------- */
+.rep{color:var(--red);font-size:var(--t-label);font-weight:700;white-space:nowrap}
+
+/* ---------- "Trenutno stoji" ---------- */
+.stoji-cijena{text-align:right;font-size:var(--t-meta);font-weight:800;color:var(--red);
+  font-variant-numeric:tabular-nums;line-height:1.15}
+.stoji-cijena span{display:block;font-size:var(--t-tab);font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+
+/* ---------- usporedba razdoblja ---------- */
+.delta{display:block;font-size:var(--t-tab);font-weight:700;margin-top:3px;letter-spacing:.2px}
+.delta.dobro{color:var(--green)}
+.delta.lose{color:var(--red)}
+.delta.jednako{color:var(--muted);font-weight:600}
+
+/* ---------- analitika tablice ---------- */
+.tbl{width:100%;border-collapse:collapse;font-size:var(--t-sub)}
+.tbl th{text-align:left;font-size:var(--t-tab);text-transform:uppercase;letter-spacing:.4px;
+  color:var(--muted);padding:8px 10px;border-bottom:2px solid var(--border);white-space:nowrap}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl-ukupno td{border-top:2px solid var(--border-jaci);border-bottom:none;background:var(--panel-bg)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .num{text-align:right;font-variant-numeric:tabular-nums}
+/* E2-8: tablice Analitike su šire od ekrana bez ikakve naznake da se mogu pomicati.
+   PREGLED E2: nepomični gradijent preko sadržaja (::after) blijedio je zadnji stupac i
+   na širokom ekranu gdje tablica cijela stane — "21.625 €" je ostajao bez znaka €, a
+   preko sive trake "Ukupno" se vidjela bijela mrlja. Zato standardna "scroll shadow"
+   izvedba: pokrivač (local) putuje sa sadržajem i sakriva sjenu kad nema što pomicati
+   ili kad je kraj dosegnut, a sjena je u pozadini (ne preko teksta) pa brojke ostaju
+   čitljive. Naznaka se i dalje pojavi točno kad tablica strši izvan ekrana. */
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;
+  background:
+    linear-gradient(to left,var(--card),rgba(255,255,255,0)) right center/26px 100% no-repeat local,
+    radial-gradient(farthest-side at 100% 50%,rgba(16,24,40,.16),rgba(16,24,40,0)) right center/14px 100% no-repeat}
+/* "Ponovljeni uzroci": uzrok se prelomi u dva retka umjesto rezanja usred riječi (slice) */
+.tbl-wrap-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;white-space:normal}
+/* "Po stroju": ispod 430px MTTR stupac ne staje — vrijednost se spušta u drugi redak
+   ćelije STROJ, a sam stupac se skriva (ostaje dostupan skrolom na širim ekranima) */
+.tbl-mttr-ispod{display:none;color:var(--muted);font-size:var(--t-tab)}
+@media (max-width:430px){
+  .tbl-stroj th:last-child, .tbl-stroj td:last-child{display:none}
+  .tbl-stroj .tbl-mttr-ispod{display:block}
+}
+
+/* ---------- QR naljepnice ---------- */
+.qr-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px;margin-top:10px}
+.qr-kart{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;
+  break-inside:avoid;page-break-inside:avoid}
+.qr-logo img{height:26px}
+.qr-naziv{font-size:var(--t-meta);font-weight:700;margin:5px 0 7px;line-height:1.2}
+.qr-slika{display:flex;justify-content:center}
+.qr-slika img,.qr-slika canvas{display:block}
+.qr-upute{font-size:var(--t-tab);color:var(--muted);margin-top:7px;line-height:1.35}
+
+/* ---------- Raspored: agenda po hitnosti + kalendar na dodir ----------
+   Kalendar je sklopiv ulaz za grubo planiranje (zatvoren po defaultu), ne stalno
+   nametnut prikaz. Glavni sadržaj je JEDNA agenda u pet grupa (Kasni/Danas/Ovaj
+   tjedan/Kasnije/Bez roka) — svaka stavka postoji točno jednom, nikad dvaput. */
+.rasp-kal-traka{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;
+  border:1.5px solid var(--border);border-radius:10px;background:var(--card);margin-bottom:10px;
+  font-size:var(--t-meta);font-weight:650;color:var(--text);cursor:pointer}
+.rasp-kal-traka:active{background:var(--hover-bg)}
+.rasp-nav{display:flex;align-items:center;justify-content:space-between;margin:6px 0 8px;gap:var(--r2)}
+.rasp-naslov{font-size:var(--t-body);font-weight:700;flex:1;text-align:center}
+.rasp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--r1)}
+.rasp-h{text-align:center;font-size:var(--t-tab);font-weight:700;color:var(--muted);
+  text-transform:uppercase;padding:2px 0 5px}
+.rasp-d{min-height:50px;border-radius:9px;border:1.5px solid var(--border);background:var(--card);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--r1);
+  cursor:pointer;font-size:var(--t-meta);font-weight:700;color:var(--text);padding:2px}
+.rasp-d:active{transform:scale(.96)}
+.rasp-d.prosli{color:var(--muted);border-color:transparent}
+.rasp-d.izvan{opacity:.42}   /* dan susjednog mjeseca — vidljiv i živ, ali prigušen */
+.rasp-d.danas{border-color:var(--accent);border-width:2px}
+.rasp-d.odabran{background:var(--accent-soft);border-color:var(--accent)}
+/* točka nosi JEDNO dosljedno značenje (isto kao chip "Zaustavlja liniju" u ostatku
+   appa): šuplja = ima nešto taj dan, puna crvena = nešto tog dana zaustavlja liniju.
+   Nikad "dan je prošao" — to govori isključivo sekcija "Kasni" ispod. */
+.rasp-tocka{display:inline-block;width:7px;height:7px;border-radius:50%;
+  border:1.5px solid var(--muted);background:transparent}
+.rasp-tocka.kritican{border-color:var(--red);background:var(--red)}
+.rasp-premjesti{padding:11px 13px;border:1.5px solid var(--accent);background:var(--accent-soft);
+  border-radius:var(--radius-s);margin-bottom:10px}
+.rasp-premjesti .row-sub:first-child{color:var(--accent);font-weight:700}
+/* skupine agende: sklopive nose chevron, ostale trajno otvorene; desna zona za brojku/gumb */
+.rasp-grupa-head{cursor:pointer}
+h2 .h2-desno{order:2;display:flex;align-items:center;gap:var(--r2);flex-shrink:0}
+h2 .h2-n{color:var(--muted);font-weight:600;text-transform:none;letter-spacing:0}
+h2 .btn-mini{min-height:34px;padding:6px 11px;font-size:var(--t-sub);text-transform:none;letter-spacing:0}
+.rasp-dan-sub{font-size:var(--t-label);font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.4px;padding:9px 13px 2px}
+.grupa-tiho .row-title{font-size:var(--t-sub);color:var(--muted)}
+.grupa-tiho .rasp-traj{display:none}
+.flash{animation:rasp-flash .9s ease}
+@keyframes rasp-flash{0%{background:var(--accent-soft)}100%{background:transparent}}
+.fade{animation:fadein .15s ease}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+
+/* ---------- Raspored v45 — "Dnevna ploča" ----------
+   Ritam: kartica–kartica 12px; radijusi 12/9/7 + krugovi; sjena samo --sjena-1 osim
+   .rasp-sada (--sjena-2) i FAB (--sjena-3). Boja isključivo iz tokena; zlato = "danas"
+   (kao u headeru) i nigdje drugdje; crveno = kasni/kritično; nema emojija u novom HTML-u. */
+#screen-raspored{padding-bottom:84px}
+/* zona 1: tjedni trak */
+.rasp-tj{margin:2px 0 12px}
+.rasp-tj-nav{display:flex;align-items:center;height:36px;margin-bottom:var(--r2)}
+.rasp-tj-naslov{flex:1;display:flex;align-items:center;gap:var(--r2);background:none;border:none;padding:0;
+  text-align:left;font-size:var(--t-meta);font-weight:700;color:var(--text);cursor:pointer;min-height:36px}
+.rasp-tj-naslov:active{opacity:.6}
+.rasp-tj-kal{font-size:var(--t-tab);font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.rasp-tj-naslov .chev{font-size:var(--t-title)}
+.rasp-tj-nav-btn.qbtn{width:44px;height:36px;border:none;background:transparent;color:var(--text-2);font-size:var(--t-stat);border-radius:8px}
+.rasp-tj-nav-btn.qbtn:active{background:var(--accent-soft)}
+.rasp-tj-dani{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--r1)}
+.rasp-tj-d{position:relative;min-height:56px;border-radius:var(--radius-s);background:var(--card);
+  border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;padding:7px 0 6px;cursor:pointer;
+  transition:background .15s,border-color .15s,color .15s,transform .12s}
+.rasp-tj-d:active{transform:scale(.96)}
+.rasp-tj-ime{font-size:var(--t-tab);font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.3px}
+.rasp-tj-br{font-size:var(--t-body);font-weight:700;color:var(--text);line-height:1.1}
+.rasp-tj-load{width:22px;height:3px;border-radius:2px;background:var(--border);overflow:hidden}
+.rasp-tj-load i{display:block;height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+.rasp-tj-load i.crv{background:var(--red)}
+.rasp-tj-d.danas:before{content:'';position:absolute;top:5px;left:50%;transform:translateX(-50%);
+  width:5px;height:5px;border-radius:50%;background:var(--gold)}
+.rasp-tj-d.odabran{background:var(--accent-soft);border:1.5px solid var(--accent)}
+.rasp-tj-d.odabran .rasp-tj-br{color:var(--accent)}
+.rasp-tj-d.proslo .rasp-tj-br{color:var(--muted)}
+.rasp-tj-d.proslo .rasp-tj-load{opacity:.5}
+.rasp-tj-d.cilj{border:1.5px dashed var(--accent)}
+/* zona 2: hero dana */
+.rasp-hero{padding:14px 16px 12px;margin-bottom:var(--r3)}
+.rasp-hero-r1{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:var(--r3);gap:10px}
+.rasp-dan-h2{font-size:var(--t-label);font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.rasp-dan-h1{font-size:var(--t-stat);font-weight:800;letter-spacing:-.4px;line-height:1.15;color:var(--text);margin-top:2px}
+.rasp-smjena{font-size:var(--t-sub);font-weight:600;color:var(--text-2);text-align:right;white-space:nowrap}
+.rasp-smjena-jos{font-size:var(--t-label);color:var(--muted);text-align:right;margin-top:1px}
+.rasp-skok{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--accent-rub);background:var(--accent-soft);
+  color:var(--accent);font-size:var(--t-sub);font-weight:700;cursor:pointer;flex-shrink:0}
+.rasp-skok:active{background:var(--accent-rub)}
+.rasp-hero-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--r2);margin-bottom:10px}
+.rasp-stat{text-align:left;cursor:pointer;min-width:0}
+.rasp-stat .stat-num{font-size:var(--t-stat)}
+.rasp-stat .stat-num.crv{color:var(--red)}
+.rasp-stat .stat-num.nista{color:var(--border-jaci)}
+.rasp-stat .stat-label{text-transform:uppercase;font-size:var(--t-tab);letter-spacing:.5px;color:var(--muted)}
+.rasp-prog{display:flex;gap:2px;height:6px;border-radius:3px;overflow:hidden}
+.rasp-prog i{flex:1;display:block;height:100%}
+.rasp-prog .seg-on{background:var(--accent);transition:background .3s}
+.rasp-prog .seg-off{background:var(--accent-soft)}
+.rasp-prog-txt{display:flex;justify-content:space-between;font-size:var(--t-sub);color:var(--muted);margin-top:6px;gap:var(--r2)}
+.rasp-link{color:var(--accent);cursor:pointer;font-weight:600}
+.rasp-hero.gotovo{border-color:var(--green-border);background:var(--green-bg)}
+.rasp-hero.gotovo .stat-num{color:var(--green)}
+.rasp-hero.gotovo .rasp-prog .seg-on{background:var(--green)}
+.rasp-hero.gotovo .rasp-tim{border-top-color:var(--green-border)}
+/* §15 direktorov hero na Pregledu — isti vizualni jezik kao Raspored hero: 1 velika brojka
+   (€ ovaj mjesec) + trend, 3 statistike, i JEDAN redak "sada stoji / sve radi" */
+.dir-hero .rasp-dan-h1{font-size:var(--t-hero);letter-spacing:-.8px;margin-top:var(--r1)}
+.dir-hero .rasp-dan-h1 .trend{display:block;font-size:var(--t-sub);letter-spacing:0;margin-top:var(--r1)}
+/* SIM-FIX: .trend (:144) je pisan za tamnu podlogu (big-card) — na direktorovoj bijeloj
+   hero kartici je kontrast ~1,7:1. Ista varijabla paleta (--red/--green), svijetla podloga. */
+.dir-hero .trend.up{background:var(--red-bg);color:var(--red)}
+.dir-hero .trend.down{background:var(--green-bg);color:var(--green)}
+.dir-hero .rasp-hero-r1{align-items:flex-start}
+.dir-stoji{display:flex;align-items:center;gap:9px;margin-top:var(--r3);padding-top:var(--r3);border-top:1px solid var(--border);
+  font-size:var(--t-meta);font-weight:600;color:var(--text);cursor:pointer;min-height:44px}
+.dir-stoji .tocka{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--green)}
+.dir-stoji.stoji .tocka{background:var(--red);animation:puls 1.4s ease-in-out infinite}
+.dir-stoji .row-sub{font-weight:400}
+.dir-stoji .chev{margin-left:auto;color:var(--muted)}
+.rasp-hero.gotovo .dir-stoji{border-top-color:var(--green-border)}
+.rasp-kv-ok{display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--green);color:var(--card);
+  align-items:center;justify-content:center;margin-right:var(--r2);vertical-align:-6px}
+.rasp-kv-ok svg{width:16px;height:16px}
+/* pilule tima */
+.rasp-tim-wrap{position:relative}
+.rasp-tim-wrap::after{content:'';position:absolute;top:11px;right:0;bottom:0;width:26px;
+  background:linear-gradient(to right,transparent,var(--card) 65%);pointer-events:none}
+.rasp-tim{border-top:1px solid var(--border);margin-top:10px;padding-top:10px;display:flex;gap:6px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.rasp-tim::-webkit-scrollbar{display:none}
+.rasp-os{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px 0 4px;
+  border-radius:999px;border:1px solid var(--border);background:var(--card);font-size:var(--t-label);font-weight:700;
+  color:var(--text);cursor:pointer;transition:background .15s,color .15s,border-color .15s;font-family:inherit}
+.rasp-os .av{width:22px;height:22px;font-size:var(--t-tab);cursor:pointer}
+.rasp-os.slobodan{color:var(--muted)}
+.rasp-os.preko{color:var(--red);border-color:var(--red-border)}
+.rasp-os.nitko{border:1px dashed var(--border-jaci);color:var(--text-2);padding-left:10px}
+.rasp-os.aktivna{background:var(--accent);border-color:var(--accent);color:var(--card)}
+.rasp-os.aktivna .av{background:var(--card);color:var(--accent)}
+/* zona 3: Sada u pogonu */
+.rasp-sada{border-color:var(--accent-rub);box-shadow:var(--sjena-2)}
+.rasp-sada .row{flex-wrap:wrap}
+.st-urad{border-left-color:var(--accent)}
+.st-hitno{border-left-color:var(--red)}
+.puls{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;
+  vertical-align:1px;animation:puls 2s ease-in-out infinite}
+.puls.pauza{animation-play-state:paused;opacity:.5}
+@keyframes puls{0%,100%{opacity:1}50%{opacity:.35}}
+.rasp-do{font-size:var(--t-sub);font-weight:700;color:var(--text-2);flex-shrink:0;white-space:nowrap}
+.rasp-do.kasni{color:var(--red)}
+.rasp-smj-traka{position:relative;flex-basis:100%;height:4px;border-radius:2px;background:var(--border);margin:10px 0 14px}
+.rasp-smj-traka i{position:absolute;top:0;height:100%;border-radius:2px}
+.rasp-smj-traka .fill{background:var(--accent)}
+.rasp-smj-traka .proc{background:transparent;border-top:2px dashed var(--accent-rub);height:0;top:1px}
+.rasp-smj-traka .proc.kasni{border-color:var(--red-border)}
+/* E-odmah #6: krajevi trake su bili dva gola broja bez riječi ("14"/"06") — jedan potpisan
+   redak ispod trake ("smjena 14:00–06:00") umjesto toga. (Pregled: pravila .oz su otišla
+   s njima — nitko ih više ne ispisuje.) */
+.rasp-smj-lbl{font-size:var(--t-tab);color:var(--muted);line-height:1;
+  flex-basis:100%;margin:calc(-1 * var(--r2)) 0 var(--r3)}
+/* redak agende */
+.rasp-st{border-left:3px solid transparent;align-items:center;gap:var(--r3)}
+.rasp-st.st-kasni{border-left-color:var(--red)}
+.rasp-st.st-sanacija{border-left:3px dashed var(--yellow-border)}
+.rasp-st.st-gotov{background:var(--panel-bg)}
+.rasp-st.st-gotov .row-title{color:var(--muted)}
+.rasp-st.click:active{background:var(--hover-bg);transform:scale(.992);transition:transform .12s cubic-bezier(.2,.8,.2,1)}
+.rasp-st .row-title{font-size:var(--t-body)}
+.kasni-txt{color:var(--red);font-weight:700}
+.av{width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:var(--t-tab);
+  font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:0;
+  cursor:pointer;user-select:none;-webkit-user-select:none;line-height:1;position:relative}
+/* AUDIT-FIX: dodirna meta 24px → 44px, isti obrazac kao .ring::after (245) */
+.av::after{content:'';position:absolute;top:-10px;left:-10px;right:-10px;bottom:-10px}
+.av.velik{width:28px;height:28px;font-size:var(--t-label)}
+/* boja po osobi (avatarBoja) — 6 tonova koji drže kontrast ≥4.5 na svojoj podlozi */
+.av.ab0{background:var(--accent-soft);color:var(--accent)}
+.av.ab1{background:var(--av1-bg);color:var(--plava-tekst)}
+.av.ab2{background:var(--av2-bg);color:var(--green)}
+.av.ab3{background:var(--av3-bg);color:var(--av3-tekst)}
+.av.ab4{background:var(--av4-bg);color:var(--av4-tekst)}
+.av.ab5{background:var(--av5-bg);color:var(--av5-tekst)}
+.av.prazan{background:transparent;border:1.5px dashed var(--border-jaci);color:var(--muted);font-size:var(--t-meta);font-weight:600}
+.av.servis{background:var(--bg);color:var(--muted)}
+.av.ok{background:var(--green);color:var(--card);border:none;cursor:default}
+.rasp-traj{display:inline-block;font-size:var(--t-sub);font-weight:600;color:var(--text-2);padding:1px 7px;border-radius:999px;
+  border:1px solid var(--border);margin-left:2px;vertical-align:1px;line-height:1.4;white-space:nowrap}
+.rasp-traj.prazno{border:1px dashed var(--border-jaci);color:var(--muted)}
+.rasp-gotovo-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;
+  border-top:1px solid var(--border);font-size:var(--t-label);font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+  color:var(--muted);cursor:pointer}
+.rasp-prazno{padding:16px 14px;text-align:left}
+.rasp-prazno .row-sub{margin-top:var(--r1)}
+.rasp-prazno .btn-mini{margin-top:var(--r3);margin-right:var(--r2)}
+/* sheetovi planiranja */
+.rasp-sheet-lbl{font-size:var(--t-label);font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-top:var(--r3)}
+.rasp-cipovi{display:flex;flex-wrap:wrap;gap:var(--r2);margin:8px 0 4px}
+.rasp-cip{flex:1 1 calc(50% - 4px);min-height:46px;border-radius:var(--radius-xs);border:1px solid var(--accent-rub);
+  background:var(--card);color:var(--accent);font-size:var(--t-meta);font-weight:650;cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:1px;padding:6px 8px;font-family:inherit;line-height:1.2}
+.rasp-cip small{font-size:var(--t-label);font-weight:600;color:var(--muted)}
+.rasp-cip.preko small{color:var(--red)}
+.rasp-cip.aktivan{background:var(--accent-soft);border-color:var(--accent)}
+.rasp-cip:active{background:var(--accent-soft)}
+.rasp-cip.puni{flex-basis:100%}
+.rasp-cipovi.sati .rasp-cip{flex:1 1 calc(33.33% - 6px)}
+.rasp-plan-br{font-size:var(--t-label);font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-left:auto;padding:0 8px;white-space:nowrap}
+/* FAB */
+.rasp-fab{position:fixed;right:16px;bottom:calc(72px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;
+  background:var(--accent);color:var(--card);border:none;font-size:var(--t-hero);font-weight:300;line-height:1;box-shadow:var(--sjena-3);
+  z-index:29;cursor:pointer;transition:transform .12s cubic-bezier(.2,.8,.2,1);font-family:inherit;padding:0 0 3px}
+.rasp-fab:active{transform:scale(.94)}
+/* mikro-animacije */
+.okbtn.pop{animation:pop .18s cubic-bezier(.2,.8,.2,1);background:var(--green);color:var(--card);border-color:var(--green)}
+@keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.18)}100%{transform:scale(1)}}
+.row.out{max-height:0!important;opacity:0;padding-top:0!important;padding-bottom:0!important;transform:translateX(24px);
+  overflow:hidden;transition:max-height .22s cubic-bezier(.2,.8,.2,1),opacity .18s,transform .22s,padding .22s}
+@media (prefers-reduced-motion:reduce){.puls{animation:none}}
+
+/* ---------- statusna točka stroja ---------- */
+.sdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:0}
+.sdot.ok{background:var(--green)}.sdot.upoz{background:var(--yellow)}.sdot.kvar{background:var(--red)}   /* AUDIT-FIX: CSS varijable umjesto vlastite nijanse — prati boju tvrtke dosljedno kao ostatak sustava */
+
+/* ---------- poruke (chat) — SMJER-B: mjehurići (maketa PorukeB) ---------- */
+.msg{padding:5px 13px;display:flex;gap:8px;align-items:flex-end}
+.msg-meta{font-size:var(--t-label);color:var(--muted);font-weight:600;display:block;margin-bottom:2px}
+.msg-txt{font-size:var(--t-meta);background:var(--card);border:1px solid var(--border);
+  border-radius:14px 14px 14px 4px;padding:8px 12px;margin-top:0;
+  display:inline-block;max-width:78%;text-align:left}
+.msg.moja{flex-direction:row-reverse;text-align:right}
+.msg.moja .msg-txt{background:var(--accent);color:#fff;border:none;border-radius:14px 14px 4px 14px}
+.msg.moja .msg-meta{color:rgba(255,255,255,.75)}
+.msg-av{width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
+  font-size:var(--t-label);font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.msg-dan{text-align:center;font-size:var(--t-tab);font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.6px;margin:10px 0 4px}
+.msg-nove{display:flex;align-items:center;gap:var(--r2);color:var(--red);font-size:var(--t-tab);font-weight:700;
+  text-transform:uppercase;letter-spacing:.6px;margin:8px 12px 4px}
+.msg-nove:before,.msg-nove:after{content:'';flex:1;height:1px;background:var(--red-border)}
+/* sustavske poruke: kompaktan redak — vrijeme lijevo (36px, tiho), tekst desno; HITNO crveno,
+   riješeno dobiva zelenu točku ispred (bez emoji prefiksa — taj se skida u JS-u za prikaz) */
+.msg.sustav{display:flex;align-items:flex-start;gap:8px;padding:4px 13px;text-align:left}
+.msg.sustav .msg-time{font-size:var(--t-label);color:var(--muted);flex:none;width:36px;margin-top:2px}
+.msg.sustav .msg-txt{flex:1;background:none;border:none;border-radius:0;font-size:var(--t-meta);
+  color:var(--text-2);padding:0;margin:0;max-width:100%;display:inline}
+.msg.sustav.hitno .msg-txt{color:var(--red);font-weight:600}
+.msg-dot-ok{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);
+  margin-right:6px;vertical-align:1px}
+/* S9: chat-layout — tanka traka umjesto kartice, unos zalijepljen za dno */
+.chat-traka{display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:2px 2px 8px;font-size:var(--t-sub);color:var(--muted)}
+.chat-traka a{color:var(--accent);font-weight:600;cursor:pointer}
+/* ODLUKA 4 (3.9.2026.): segmented control Poruke│Kontakti (.seg) je uklonjen —
+   Kontakti su sekcija Sustava, Poruke se otvaraju zvonom; klasa više nema uporabe. */
+.msg-form{position:sticky;bottom:calc(78px + env(safe-area-inset-bottom));
+  background:var(--bg);padding-top:var(--r2);margin-top:var(--r3);z-index:5}
+.chat-dolje{position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(148px + env(safe-area-inset-bottom));z-index:6;min-height:40px;
+  background:var(--accent);color:var(--card);border:none;border-radius:20px;
+  padding:9px 18px;font-size:var(--t-sub);font-weight:700;box-shadow:0 2px 8px var(--tint-siva-20);cursor:pointer}
+body[data-role="majstor"] .btn-audit,body[data-role="proizvodnja"] .btn-audit{display:none}
+
+/* ---------- oznaka boje tvrtke ---------- */
+.marka{width:26px;height:26px;border-radius:7px;flex-shrink:0;border:1px solid var(--tint-crna-12)}
+
+/* ---------- kontakt linkovi ---------- */
+.clink{color:var(--accent);font-weight:600;text-decoration:none}
+.clink:active{text-decoration:underline}
+
+/* ---------- loader i toast ---------- */
+#loader{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;
+  border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;
+  animation:spin 1s linear infinite;z-index:90;display:none}
+@keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+#toast{position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:var(--text);color:var(--card);font-size:var(--t-meta);font-weight:600;padding:9px 16px;border-radius:20px;
+  z-index:95;opacity:0;pointer-events:none;transition:opacity .25s;
+  max-width:calc(100vw - 32px);text-align:center;line-height:1.35}
+#toast.show{opacity:.94}
+#toast.warn{background:var(--red);color:#fff}
+
+/* ---------- tipkovnička navigacija ---------- */
+.btn:focus-visible,.tab:focus-visible,.qbtn:focus-visible,.okbtn:focus-visible,
+.x:focus-visible,.btn-mini:focus-visible,.user-tile:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- akcijski gumbi u listama ---------- */
+.okbtn{width:44px;height:44px;border-radius:8px;border:1px solid var(--green-border);background:var(--green-bg);
+  color:var(--green);font-size:var(--t-body);font-weight:700;cursor:pointer;flex-shrink:0;line-height:1}
+.okbtn:active{background:var(--okbtn-active)}
+.btn-mini{border:1px solid var(--accent-rub);background:var(--card);color:var(--accent);border-radius:7px;
+  padding:11px 13px;min-height:44px;font-size:var(--t-sub);font-weight:600;cursor:pointer;white-space:nowrap;
+  transition:background .12s ease}   /* dodirna meta 44px — dosljedno s ostatkom sustava (rukavice, žurba) */
+.btn-mini:active{background:var(--accent-soft)}
+.btn-mini.opasno{color:var(--red);border-color:var(--red-border)}
+.btn-mini.opasno:active{background:var(--red-bg)}
+
+/* ---------- prekidač HITNO u brzoj prijavi (rukavice, hala, jedan dodir) ----------
+   E-15: blok je neutralno siv dok prekidač nije uključen — crven postaje tek na change,
+   umjesto da izgleda hitno prije nego korisnik uopće nešto dodirne. */
+.hitno-prekidac{display:flex;align-items:center;gap:11px;margin-top:14px;padding:13px 14px;
+  border:1.5px solid var(--border);background:var(--panel-bg);border-radius:var(--radius-s);
+  font-size:var(--t-body);font-weight:700;color:var(--text);cursor:pointer;
+  text-transform:none;letter-spacing:0}
+.hitno-prekidac input{width:24px;height:24px;flex-shrink:0;accent-color:var(--red);margin:0}
+
+/* SMJER-B (ZADATAK 5/5): Brza prijava kao donji list — .sheet je varijanta .modal-a,
+   prilijepljena uz dno ekrana; na >=640px generalni media-query ispod (.modal) već
+   centrira, ovdje samo dorada ruba/animacije/visine specifično za ovaj obrazac. */
+.modal.sheet{padding:10px 16px calc(20px + env(safe-area-inset-bottom));max-height:92vh;
+  animation:sheet-gore .16s ease-out}
+.modal.sheet:before{width:40px;height:4px}
+@keyframes sheet-gore{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-glava{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+.sheet-glava h3{font-size:var(--t-stat);font-weight:800;letter-spacing:-.4px}
+.sel-stroj{appearance:none;-webkit-appearance:none;width:100%;min-height:52px;
+  padding:0 40px 0 14px;border:1.5px solid var(--border);border-radius:9px;background-color:var(--card);
+  font-size:var(--t-body);font-weight:600;color:var(--text);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23aab1bd' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center}
+.ta-simptom{min-height:72px}
+.modal.sheet textarea[name="opis"] ~ div .btn-mini{border-radius:22px}
+.modal.sheet textarea[name="opis"] ~ div .btn-mini.aktivan{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.btn-kamera svg{flex-shrink:0}
+
+/* VLASNIK-1: app.odabir() — donji list umjesto native <select> na dodirnim poljima */
+#sheet-root:empty{display:none}
+#sheet-root .overlay{z-index:80}
+#sheet-root2:empty{display:none}
+#sheet-root2 .overlay{z-index:90}  /* AUDIT F2: picker u vlastitom sloju — vise ne prepisuje sheet (npr. narudzbu) */   /* iznad postojeceg modala (.overlay z-index:50) */
+.odabir-btn{width:100%;min-height:52px;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:0 14px;border:1.5px solid var(--border-jaci);border-radius:var(--radius-s);
+  background:var(--card);font-size:var(--t-input);font-weight:600;color:var(--text);
+  font-family:inherit;cursor:pointer;text-align:left}
+.odabir-btn:active{background:var(--hover-bg)}
+.odabir-btn .odabir-placeholder{color:var(--muted);font-weight:400}
+.odabir-btn svg{flex-shrink:0;color:var(--chevron)}
+.odabir-trazi{margin-bottom:8px}
+.odabir-li{cursor:pointer}
+.odabir-li:active{background:var(--hover-bg)}
+.odabir-li .kvacica{flex-shrink:0;margin-left:auto;color:var(--accent)}
+/* prekidač HITNO kao vizualna sklopka 60x34 — cijeli blok je label, dodir bilo gdje pali.
+   E-15: neutralno siv dok je isključen, crven tek kad je uključen (:has(input:checked)) —
+   isto pravilo kao za .hitno-prekidac iznad. */
+.hitno-blok{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin-top:16px;padding:14px 16px;min-height:64px;box-sizing:border-box;
+  border:1.5px solid var(--border);background:var(--panel-bg);border-radius:var(--radius-s);cursor:pointer;
+  transition:background .15s ease,border-color .15s ease}
+.hitno-blok .h-t{font-size:var(--t-body);font-weight:700;color:var(--text);transition:color .15s ease}
+.hitno-blok .h-s{font-size:var(--t-meta);color:var(--muted);margin-top:2px;font-weight:500}
+.hitno-blok:has(input:checked),.hitno-prekidac:has(input:checked){border-color:var(--red-border);background:var(--red-bg)}
+.hitno-blok:has(input:checked) .h-t,.hitno-prekidac:has(input:checked){color:var(--red)}
+.hitno-blok input{appearance:none;-webkit-appearance:none;width:60px;height:34px;flex-shrink:0;
+  margin:0;border-radius:17px;background:var(--border-jaci);position:relative;cursor:pointer;
+  transition:background .15s ease}
+.hitno-blok input:before{content:'';position:absolute;top:3px;left:3px;width:28px;height:28px;
+  border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .15s ease}
+.hitno-blok input:checked{background:var(--red)}
+.hitno-blok input:checked:before{left:29px}
+/* neutralna inačica za manje dramatične prekidače (Čeka dio, Privremeni popravak,
+   Linija otpuštena) — isti raspored i dodirna meta, bez crvenog naglaska HITNO gumba */
+.prekidac{display:flex;align-items:center;gap:11px;margin-top:var(--r3);padding:12px 14px;
+  border:1.5px solid var(--border);background:var(--panel-bg);border-radius:var(--radius-s);
+  font-size:var(--t-meta);font-weight:600;color:var(--text);cursor:pointer;
+  text-transform:none;letter-spacing:0}
+.prekidac input{width:24px;height:24px;flex-shrink:0;accent-color:var(--accent);margin:0}
+
+/* ---------- fotografije kvara ---------- */
+.kthumb{margin-top:7px;max-width:170px;max-height:120px;border-radius:6px;border:1px solid var(--border);display:block;cursor:pointer}
+.foto-prev{display:none;margin-top:var(--r2);max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--border)}
+.foto-full{max-width:100%;border-radius:8px;display:block}
+
+/* ---------- prijava ---------- */
+#screen-login{position:fixed;inset:0;z-index:100;display:none;
+  flex-direction:column;align-items:center;justify-content:center;padding:var(--r5)}
+#screen-login.show{display:flex}
+#screen-login{background:linear-gradient(180deg,var(--card) 0%,var(--bg) 55%)}
+.login-box{width:100%;max-width:370px;text-align:center}
+.login-logo{height:76px;margin-bottom:var(--r2)}
+.login-title{font-size:var(--t-sub);font-weight:700;margin-bottom:var(--r5);color:var(--muted);
+  text-transform:uppercase;letter-spacing:1px}
+.login-opis{font-size:var(--t-meta);color:var(--text-2);line-height:1.5;margin:-4px 0 var(--r4)}
+/* jedan stupac, po hijerarhiji (vidi loginPrioritet) — direktor gore, tehničar dolje */
+.user-tiles{display:grid;grid-template-columns:1fr;gap:var(--r2);margin-bottom:var(--r4)}
+.user-tile{padding:16px 8px;background:var(--card);border:1.5px solid var(--border);
+  border-radius:var(--radius-s);font-size:var(--t-body);font-weight:650;cursor:pointer;box-shadow:var(--sjena-1);
+  transition:border-color .14s ease, background .14s ease, transform .1s ease}
+.user-tile:active{transform:scale(.97)}
+.user-tile.sel{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft)}
+.pin-input{text-align:center;font-size:var(--t-stat);letter-spacing:10px;font-weight:700;padding:14px 12px}
+.pin-input::placeholder{letter-spacing:normal}
+.pin-wrap{position:relative}
+.pin-oko{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;
+  font-size:var(--t-stat);cursor:pointer;padding:11px;color:var(--muted);min-width:44px;min-height:44px}   /* AUDIT-FIX: 44px dosljedno s ostatkom sustava (rukavice, žurba) */
+.login-err{color:var(--red);font-size:var(--t-meta);margin-top:var(--r3);min-height:18px;font-weight:600}
+.login-noga{margin-top:var(--r5);font-size:var(--t-sub);color:var(--text-2);letter-spacing:.3px;line-height:1.8}   /* AUDIT-FIX: --muted na --bg je ~4.43:1, ispod WCAG AA 4.5:1 — ista logika kao komentar iznad */
+.login-noga a,.login-noga .link-btn{color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline;
+  display:inline-block;padding:4px 2px}   /* demo nije ravnopravan "Prijavi se" — tekstualni link, ne gumb */
+.link-btn{background:none;border:none;font:inherit;letter-spacing:inherit;padding:0;margin:0}   /* AUDIT-FIX: gumb koji izgleda kao tekstualna poveznica, ali je tipkovnički dostupan */
+
+/* ---------- demo banner ---------- */
+.demo-banner{background:var(--yellow-bg);color:var(--yellow);border-bottom:1px solid var(--yellow-border);
+  font-size:var(--t-label);font-weight:600;padding:5px 10px;display:flex;align-items:center;
+  justify-content:space-between;gap:var(--r2);flex-wrap:wrap}
+.demo-uloga{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.demo-uloga select{font:inherit;font-weight:700;padding:4px 6px;border-radius:6px;min-height:28px;
+  border:1px solid var(--yellow-border);background:var(--card);color:var(--text)}
+
+/* ---------- offline traka ---------- */
+.off-traka{position:sticky;top:0;z-index:29;background:var(--off-traka-bg);color:var(--card);font-size:var(--t-sub);font-weight:600;
+  text-align:center;padding:6px 10px}
+.off-traka.ceka{background:var(--yellow-bg);color:var(--yellow);border-bottom:1px solid var(--yellow-border)}
+.off-traka a,.off-traka .link-btn{color:inherit;text-decoration:underline;cursor:pointer;font-weight:700}
+
+/* ---------- uloge ----------
+   readonly (direktor): ništa ne piše.
+   proizvodnja (voditelj proizvodnje, §15): kao readonly, ALI smije Brzu prijavu kvara i
+   pisati u Poruke — to su elementi označeni .role-prijava (odluka vlasnika 19.8.2026.). */
+body[data-role="readonly"] .role-write{display:none !important}
+body[data-role="proizvodnja"] .role-write:not(.role-prijava){display:none !important}
+body:not([data-role="voditelj"]) .role-voditelj{display:none !important}
+/* financije vidi samo voditelj i direktor (readonly), ne proizvodnja ni tehničar */
+body[data-role="proizvodnja"] .role-fin{display:none !important}
+/* §16 P1: kad "od N h" (kapacitet, role-voditelj) nestane, ostaju 2 stat kartice.
+   SIM-FIX: selektor je bio pisan za Raspored, ali .rasp-hero-grid koristi i direktorov
+   dir-hero na Pregledu (koji uvijek ima 3 kartice) — suženo na #screen-raspored. */
+body:not([data-role="voditelj"]) #screen-raspored .rasp-hero-grid{grid-template-columns:repeat(2,1fr) !important}
+
+/* ---------- sesija / izvoz ---------- */
+.session-row{margin-top:22px;text-align:center;font-size:var(--t-sub);color:var(--muted)}
+.session-row a{color:var(--accent);font-weight:600;cursor:pointer;text-decoration:none}
+
+/* ---------- ispis IFS izvještaja ---------- */
+.print-head{display:none}
+@media print{
+  @page{margin:16mm 14mm}
+  header,#tabbar,#demo-banner,#loader,#toast,#offline-traka,#verzija-traka,.noprint{display:none !important}
+  /* ispis naljepnica: prikazuje se samo QR ekran */
+  main:has(#screen-qr:not(.hidden)){display:block !important}
+  main:has(#screen-qr:not(.hidden)) .screen:not(#screen-qr){display:none !important}
+  main:not(:has(#screen-qr:not(.hidden))){display:none !important}
+  /* raspored naljepnica na arku definira dinamički #qr-print-stil (ovisi o odabranom
+     formatu arka) — ovdje samo osiguranje da se kartica ne lomi preko stranice */
+  .qr-kart{break-inside:avoid;page-break-inside:avoid}
+  body{background:var(--card);color:var(--print-crna);font-size:11pt;line-height:1.5}
+  .overlay{position:static;background:none;display:block;padding:0}
+  .modal{max-height:none;overflow:visible;border-radius:0;width:100%;max-width:none;box-shadow:none;animation:none;padding:0}
+  .modal .btn,.modal .x,.modal select,.modal input,.modal textarea,.modal form,.modal label{display:none !important}
+  .modal-head{display:none !important}
+  /* memorandum na vrhu ispisa */
+  .print-head{display:flex !important;align-items:center;gap:14px;border-bottom:3px solid var(--accent);
+    padding-bottom:10px;margin-bottom:14px}
+  .print-head img{height:52px}
+  .print-head .ph-naslov{font-size:16pt;font-weight:700;color:var(--accent)}
+  .print-head .ph-sub{font-size:9.5pt;color:var(--print-sub);margin-top:2px}
+  .audit h4{color:var(--print-crna);border-bottom:1.5px solid var(--accent);font-size:12pt;margin:14pt 0 6pt;
+    padding-bottom:3pt;page-break-after:avoid}
+  .audit .a-item{page-break-inside:avoid;border-bottom:.5pt solid var(--print-rub);padding:5pt 0;font-size:10pt}
+  .audit .a-m{page-break-after:avoid;font-size:10.5pt}
+  .audit .a-sub{color:var(--print-tekst);font-size:9pt}
+  .audit .a-meta{color:var(--print-tekst);font-size:9pt;margin-bottom:8pt}
+  .chip{border:.75pt solid var(--print-chip-rub) !important;background:none !important;color:var(--print-crna) !important;font-size:7.5pt}
+  .rep{color:var(--print-crna);font-weight:700}
+}
+
+/* ---------- kvar items ---------- */
+.kvar-item{padding:11px 13px;border-bottom:1px solid var(--border)}
+.kvar-item:last-child{border-bottom:none}
+.kvar-item.click{cursor:pointer}
+.kvar-item.click:active{background:var(--hover-bg)}
+.kvar-top{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--r2);font-size:var(--t-sub);color:var(--muted)}
+.kvar-opis{font-size:var(--t-body);font-weight:650;margin-top:var(--r1);line-height:1.35}   /* opis je glavna stvar na kartici — sve ostalo je prigušeno */
+.kvar-meta{font-size:var(--t-sub);color:var(--muted);margin-top:var(--r1)}
+.kvar-meta b{color:var(--text)}
+/* brze radnje na kartici: dodjela i "čeka dio" bez otvaranja punog obrasca */
+.kvar-brzo{display:flex;gap:7px;align-items:center;margin-top:var(--r2)}
+.kvar-brzo select{width:auto;flex:1;min-width:0;font-size:var(--t-meta);padding:10px 26px 10px 9px;
+  min-height:42px;border-radius:7px;background-position:right 8px center}
+.kvar-brzo .btn-mini{flex-shrink:0}
+.kvar-brzo .btn-mini.aktivan{background:var(--yellow-bg);color:var(--yellow);border-color:var(--yellow-border)}
+
+/* ---------- filters / buttons ---------- */
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:var(--r2);margin-bottom:10px}
+.filters select:first-child{grid-column:1 / -1}
+/* iOS: date input ima intrinzičnu širinu koja ignorira width:100% u gridu
+   pa izlazi van ruba ekrana — min-width:0 na stavci grida + kapa na inputu */
+.filters > div{min-width:0}
+.filters input[type="date"]{max-width:100%;min-width:0;min-height:46px;
+  -webkit-appearance:none;appearance:none}
+select,input,textarea{width:100%;border:1.5px solid var(--border-jaci);border-radius:var(--radius-s);
+  background:var(--card);padding:11px 12px;font-size:var(--t-input);font-family:inherit;color:var(--text);
+  transition:border-color .14s ease, box-shadow .14s ease}  /* 16px: sprječava iOS auto-zoom */
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft)}
+select{appearance:none;-webkit-appearance:none;padding-right:34px;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%2368727f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center}
+.filters select{font-size:var(--t-input);padding:10px 8px}
+.filtar-oznaka{display:block;font-size:var(--t-tab);font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.4px;margin:0 0 3px}
+/* ---------- jedinstven sustav gumba ---------- */
+.btn{border:1.5px solid transparent;border-radius:var(--radius-s);padding:12px 16px;min-height:46px;
+  font-size:var(--t-body);font-weight:650;line-height:1.2;cursor:pointer;letter-spacing:-.1px;
+  transition:background .14s ease, border-color .14s ease, transform .1s ease, box-shadow .14s ease}
+.btn:active{transform:scale(.985)}
+.btn.primary{background:var(--accent);color:var(--card);border-color:var(--accent);box-shadow:var(--sjena-1)}
+.btn.primary:active{background:var(--accent-dark);border-color:var(--accent-dark)}
+.btn.sec{background:var(--card);color:var(--accent);border-color:var(--accent-rub)}
+.btn.sec:active{background:var(--accent-soft)}
+.btn.sm{padding:10px 13px;min-height:44px;font-size:var(--t-meta)}
+.btn.block{display:block;width:100%}
+.btn.sec.block{margin-bottom:var(--r3)}
+.btn:disabled{opacity:.55;cursor:default}
+.btn.opasno{color:var(--red);border-color:var(--red-border);background:var(--card)}
+.btn.opasno:active{background:var(--red-bg)}
+.btn-new{margin-bottom:var(--r3)}
+.back{background:none;border:none;color:var(--accent);font-size:var(--t-body);font-weight:600;
+  cursor:pointer;padding:10px 12px 12px 0;min-height:44px;display:inline-flex;align-items:center;gap:var(--r1)}
+
+/* ---------- machine detail ---------- */
+.detail-head{padding:14px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.detail-name{font-size:var(--t-title);font-weight:700}
+.detail-sub{font-size:var(--t-sub);color:var(--muted);margin-top:2px}
+
+/* ---------- parts qty ---------- */
+.qty{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.qbtn{width:44px;height:44px;border-radius:8px;border:1px solid var(--qbtn-rub);background:var(--card);
+  font-size:var(--t-title);line-height:1;color:var(--accent);cursor:pointer;font-weight:700}
+.qbtn:active{background:var(--accent-soft)}
+.qval{min-width:52px;text-align:center;font-weight:700;font-size:var(--t-body);font-variant-numeric:tabular-nums}
+.qval span{display:block;font-size:var(--t-tab);color:var(--muted);font-weight:500}
+.qval.low{color:var(--red)}
+/* rastvoreni detalji dijela — radnje se pojave tek na dodir retka */
+.dio-info{padding:0 13px 9px;border-bottom:1px solid var(--border)}
+.dio-detalj{display:flex;align-items:center;gap:7px;padding:9px 13px 11px;
+  border-bottom:1px solid var(--border);background:var(--panel-bg)}
+.dio-detalj:last-child{border-bottom:none}
+.dio-qty{margin-left:auto;display:flex;gap:7px}
+.chev{transition:transform .12s ease}
+
+/* ---------- lijep gumb umjesto native "Choose file / No file chosen" ---------- */
+/* clip, ne display:none — input ostaje fokusabilan i dostupan čitačima ekrana */
+.file-input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.file-label{text-align:center}
+
+/* ---------- modal ---------- */
+.overlay{position:fixed;inset:0;background:var(--overlay-tint);z-index:50;
+  display:flex;align-items:flex-end;justify-content:center}
+.modal{background:var(--card);width:100%;max-width:600px;max-height:90vh;overflow-y:auto;
+  border-radius:18px 18px 0 0;padding:var(--r4) var(--r4) calc(var(--r5) + env(safe-area-inset-bottom));
+  box-shadow:var(--sjena-3);animation:slideup .2s cubic-bezier(.2,.8,.2,1)}
+.modal:before{content:'';display:block;width:38px;height:4px;border-radius:2px;background:var(--border-jaci);
+  margin:-4px auto 12px}
+@keyframes slideup{from{transform:translateY(32px);opacity:0}to{transform:none;opacity:1}}
+@media(min-width:640px){.overlay{align-items:center;padding:var(--r5)}.modal{border-radius:14px}}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--r3)}
+.modal-head h3{font-size:var(--t-title);font-weight:700}
+.x{background:var(--border);border:none;width:44px;height:44px;border-radius:50%;font-size:var(--t-stat);
+  color:var(--muted);cursor:pointer;line-height:1}
+form label{display:block;font-size:var(--t-label);font-weight:700;color:var(--muted);margin:14px 0 5px;
+  text-transform:uppercase;letter-spacing:.5px}
+form .btn{margin-top:20px}
+.modal-head h3{font-size:var(--t-title);font-weight:700;letter-spacing:-.2px}
+
+/* ---------- audit ---------- */
+.audit{font-size:var(--t-meta)}
+.audit .a-meta{color:var(--muted);font-size:var(--t-sub);margin:-6px 0 12px}
+.audit h4{font-size:var(--t-meta);margin:16px 0 6px;padding-bottom:var(--r1);border-bottom:2px solid var(--accent);color:var(--accent)}
+.audit .a-item{padding:6px 0;border-bottom:1px solid var(--border)}
+.audit .a-item:last-child{border-bottom:none}
+.audit .a-m{font-weight:700;font-size:var(--t-meta);margin-top:9px}
+.audit .a-sub{color:var(--muted);font-size:var(--t-sub)}
+.audit .late{color:var(--red);font-weight:700}
+
+/* ---------- tab bar ---------- */
+#tabbar{position:fixed;bottom:0;left:0;right:0;z-index:30;
+  background:var(--bijela-tint-94);backdrop-filter:blur(10px);
+  border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom);
+  box-shadow:0 -1px 3px var(--tint-siva-04)}
+.tab-inner{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+/* §16.5 #2: tehničar i proizvodnja imaju 4 relevantne kartice (§11.2 su bila 6 za svih
+   dok se nije zasebno provjerilo — sad je provjereno i vlasnik je potvrdio da se dira).
+   ODLUKA 4 (3.9.2026., za pokazati): kartica Poruke je uklonjena iz markupa (index.html)
+   za SVE uloge — poruke se otvaraju preko zvona u zaglavlju (#hdr-zvono); voditelju
+   zato ostaje 5 kartica (Pregled·Kvarovi·Raspored·Strojevi·Skladište), ne 6.
+   ODLUKA 5 (3.9.2026.): majstoru donja traka postaje Kvarovi·Moj dan·Strojevi·Skladište
+   (Strojevi vraćen umjesto Poruka — dosad skriven jer je mjesto trebalo Porukama). */
+.tab-lbl-mojdan{display:none}
+body[data-role="majstor"] .tab-lbl-mojdan{display:inline}
+body[data-role="majstor"] .tab-lbl-raspored{display:none}
+body[data-role="majstor"] .tab-inner,
+body[data-role="proizvodnja"] .tab-inner{grid-template-columns:repeat(4,1fr)}
+body[data-role="majstor"] #tabbar [data-tab="pregled"],
+body[data-role="proizvodnja"] #tabbar [data-tab="dijelovi"]{display:none}
+/* ODLUKA 6 (3.9.2026.): direktor (readonly) čita brojke 2×/tjedno — Analitika mu je
+   redovna kartica, ne pod-ekran Pregleda; Raspored/Skladište traže radnju koju
+   readonly svejedno ne može napraviti, pa ispadaju iz njegove trake. */
+#tabbar [data-tab="analitika"]{display:none}
+body[data-role="readonly"] #tabbar [data-tab="analitika"]{display:flex}
+body[data-role="readonly"] .tab-inner{grid-template-columns:repeat(4,1fr)}
+body[data-role="readonly"] #tabbar [data-tab="raspored"],
+body[data-role="readonly"] #tabbar [data-tab="dijelovi"]{display:none}
+.tab{position:relative;background:none;border:none;padding:9px 1px 10px;display:flex;flex-direction:column;
+  align-items:center;gap:3px;font-size:var(--t-tab);font-weight:600;color:var(--muted);cursor:pointer;
+  transition:color .14s ease}
+.tab svg{width:22px;height:22px;transition:transform .14s ease}
+.tab.active{color:var(--accent)}
+.tab.active svg{transform:translateY(-1px)}
+.tab.active:before{content:'';position:absolute;top:0;left:26%;right:26%;height:3px;
+  border-radius:0 0 3px 3px;background:var(--accent)}
+.tab .dot{position:relative}
+.badge{position:absolute;top:-5px;right:-10px;background:var(--red);color:var(--card);font-size:var(--t-tab);
+  font-weight:700;min-width:17px;height:17px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+/* ---------- FAB: brza prijava (SMJER-B) ---------- */
+#fab{position:fixed;right:16px;bottom:calc(70px + env(safe-area-inset-bottom) + 16px);
+  width:56px;height:56px;border-radius:50%;background:var(--accent);border:none;
+  display:flex;align-items:center;justify-content:center;box-shadow:var(--sjena-3);
+  cursor:pointer;z-index:29;padding:0}
+#fab svg{width:26px;height:26px}
+#fab.sakriven{display:none}
